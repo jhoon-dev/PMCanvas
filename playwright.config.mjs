@@ -13,7 +13,12 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     headless: true,
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  projects: [
+    {
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'], channel: process.env.PM_BROWSER_CHANNEL },
+    },
+  ],
   webServer: {
     command: 'node test/support/e2e-server.mjs',
     url: 'http://localhost:4193/pmcanvas/api/health',

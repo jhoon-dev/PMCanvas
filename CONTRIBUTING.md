@@ -30,6 +30,8 @@ DB 변경은 migrations/에 연속 번호의 `NNN_description.sql` 파일을 추
 
 `npm run test:performance`는 500개 업무·20명·50개 상위 업무의 HTML 생성·검색·모델 편집·간트 이동을 각 5회 측정해 중앙값을 출력합니다. 네트워크·DB·브라우저 페인트 시간을 포함하지 않습니다. 숫자에 환경 의존성이 있으므로 동작 검증과 함께 비교하고 CI에 좁은 절대 시간 한도를 두지 않습니다.
 
+브라우저 CI는 ubuntu-24.04 이미지에 이미 설치된 Chrome을 `PM_BROWSER_CHANNEL=chrome`으로 실행하고 실제 버전을 로그에 기록합니다. 매 실행마다 브라우저·OS 패키지를 설치하는 대기를 줄입니다. 로컬 기본은 Playwright의 Chromium입니다. [러너 포함 소프트웨어](https://github.com/actions/runner-images/blob/main/images/ubuntu/Ubuntu2404-Readme.md), [Playwright Chrome 채널](https://playwright.dev/docs/browsers)을 참고하세요.
+
 UI 문구는 사용자 데이터를 붙이기 **전에** `ui('화면 문구')`로 변환합니다. 업무명·메모·이메일·ID·인력 정보에는 ui를 적용하지 말고 HTML 이스케이프만 하세요. 번역은 public/locales/en.js에 있으며 새 언어는 지원 목록과 별도 사전으로 확장합니다. 날짜 값은 ISO 형식, 업무 계산 기준은 기존 설정을 유지합니다. 서버 Excel은 요청별 언어를 명시적으로 받아 처리하므로 다른 요청의 언어를 바꾸지 않습니다.
 
 충돌 모델은 project-merge.js, 비교 다이얼로그는 conflict-ui.js에 둡니다. 운영 알림은 operation-alerts.mjs와 alerts-ui.js가 담당합니다. 새 실패에는 고정 분류만 저장하고 SMTP 원문 오류·계정 비밀을 알림에 넣지 않습니다. 알림 발송 자체의 실패를 재귀적으로 기록하지 마세요.
