@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import {randomUUID} from 'node:crypto';
 import {fail} from './errors.mjs';
 import {cleanProject,projectChanges} from './project.mjs';
-export const publicUser=u=>({id:u.id,email:u.email,name:u.name,isAdmin:!!u.is_admin,isActive:u.is_active!==false,localLogin:u.local_login!==false});
+export const publicUser=u=>({id:u.id,email:u.email,name:u.name,isAdmin:!!u.is_admin,isActive:u.is_active!==false,localLogin:u.local_login!==false,registrationPending:!!u.registration_pending});
 
 export async function createPool(env=process.env){
  const {Pool}=await import('pg');
@@ -18,7 +18,7 @@ export async function migrate(pool){
  try{
   await client.query('BEGIN');await client.query('SELECT pg_advisory_xact_lock(726534001)');
   await client.query('CREATE TABLE IF NOT EXISTS pm_schema_migrations(version integer PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())');
-  for(const [version,file] of [[1,'001_initial.sql'],[2,'002_user_status.sql'],[3,'003_federated_auth.sql'],[4,'004_planning.sql'],[5,'005_security.sql']]){
+  for(const [version,file] of [[1,'001_initial.sql'],[2,'002_user_status.sql'],[3,'003_federated_auth.sql'],[4,'004_planning.sql'],[5,'005_security.sql'],[6,'006_registration.sql']]){
    const {rows}=await client.query('SELECT version FROM pm_schema_migrations WHERE version=$1',[version]);
    if(!rows.length){await client.query(fs.readFileSync(new URL('../migrations/'+file,import.meta.url),'utf8'));await client.query('INSERT INTO pm_schema_migrations(version) VALUES ($1)',[version]);}
   }
@@ -58,11 +58,11 @@ export class PgRepository{
  async health(){await this.pool.query('SELECT 1');}
  async findUserByEmail(email){return (await this.pool.query('SELECT * FROM pm_users WHERE email=$1',[email])).rows[0]||null;}
  async countUsers(){return Number((await this.pool.query('SELECT count(*) AS n FROM pm_users')).rows[0].n);}
- async createUser({email,name,passwordHash,isAdmin=false}){
-  try{const {rows}=await this.pool.query('INSERT INTO pm_users(id,email,name,password_hash,is_admin) VALUES ($1,$2,$3,$4,$5) RETURNING *',[randomUUID(),email,name,passwordHash,isAdmin]);return publicUser(rows[0]);}
+ async createUser({email,name,passwordHash,isAdmin=false,registrationPending=false}){
+  try{const {rows}=await this.pool.query('INSERT INTO pm_users(id,email,name,password_hash,is_admin,is_active,registration_pending) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *',[randomUUID(),email,name,passwordHash,isAdmin,!registrationPending,registrationPending]);return publicUser(rows[0]);}
   catch(error){if(error.code==='23505')fail(409,'EMAIL_EXISTS','이미 등록된 이메일입니다.');throw error;}
  }
- async listUsers(){return (await this.pool.query('SELECT id,email,name,is_admin,is_active,local_login FROM pm_users ORDER BY created_at')).rows.map(publicUser);}
+ async listUsers(){return (await this.pool.query('SELECT id,email,name,is_admin,is_active,local_login,registration_pending FROM pm_users ORDER BY registration_pending DESC,created_at')).rows.map(publicUser);}
  async createSession({hash,userId,csrf,expires,passwordHash}){
   return this.transaction(async c=>{
    const user=(await c.query('SELECT password_hash,is_active,local_login FROM pm_users WHERE id=$1 FOR UPDATE',[userId])).rows[0];
@@ -92,7 +92,7 @@ export class PgRepository{
    if(!target)fail(404,'USER_NOT_FOUND','계정을 찾을 수 없습니다.');
    if(target.is_admin||actorId===targetId)fail(403,'ADMIN_PROTECTED','관리자 계정은 본인의 비밀번호 변경만 가능합니다.');
    if(passwordHash&&!target.local_login)fail(400,'EXTERNAL_PASSWORD','외부 인증 계정의 비밀번호는 인증 서버에서 변경해 주세요.');
-   const {rows}=await c.query('UPDATE pm_users SET is_active=COALESCE($2,is_active),password_hash=COALESCE($3,password_hash) WHERE id=$1 RETURNING *',[targetId,isActive??null,passwordHash??null]);
+   const {rows}=await c.query('UPDATE pm_users SET is_active=COALESCE($2,is_active),registration_pending=CASE WHEN $2 THEN false ELSE registration_pending END,password_hash=COALESCE($3,password_hash) WHERE id=$1 RETURNING *',[targetId,isActive??null,passwordHash??null]);
    await c.query('DELETE FROM pm_sessions WHERE user_id=$1',[targetId]);
    return publicUser(rows[0]);
   });

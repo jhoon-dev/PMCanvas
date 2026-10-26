@@ -2,7 +2,7 @@ import {DraftStore} from './draft-store.js';
 import {api} from './api-client.js';
 import {WbsWorkspace} from './wbs-workspace.js';
 let currentUser=null,saveInFlight=false,mutationSequence=0,fetchSequence=0;
-let loginProvider='';
+let loginProvider='',registrationPolicy={mode:'disabled',domains:[]};
 import {csvText, wbsRows, completionRecords, completionRows} from './reports.js';
 import {today,addDays,daysBetween,workdays,working,shiftWorkday,nextWorkday,dateValue,validDate,taskHours,earned,progress,planned,summary,validateProject} from './engine.js';
 const $=s=>document.querySelector(s),uid=()=>crypto.randomUUID(),TODAY=today(),palette=['#416be8','#27a498','#ae7ad8','#df9a40','#de718c','#66849e'];
@@ -256,7 +256,7 @@ function updateAccessUi(){
  document.querySelector('.side-bottom small').textContent=readOnly?'조회자 · 공동 프로젝트':'팀과 함께하는 프로젝트';
 }
 function showAuth(message=''){
- $('#authGate').hidden=false;$('#authError').textContent=message;
+ $('#authGate').hidden=false;$('#registrationForm')?.remove();$('#loginForm').hidden=false;$('#authError').textContent=message;
  if(currentUser)$('#loginEmail').value=currentUser.email;
 }
 async function initializeAuthentication(){
@@ -264,7 +264,7 @@ async function initializeAuthentication(){
  const url=new URL(location.href),error=url.searchParams.get('authError');
  if(error){$('#authError').textContent=messages[error]||messages.SSO_FAILED;url.searchParams.delete('authError');history.replaceState(null,'',url);}
  try{
-  const {providers}=await api('auth/providers');if(!providers.length)return;
+  const {providers,registration}=await api('auth/providers');registrationPolicy=registration||registrationPolicy;$('#registerButton').hidden=registrationPolicy.mode!=='approval';$('#registrationDisabled').hidden=registrationPolicy.mode==='approval';if(!providers.length)return;
   const group=document.createElement('div');group.className='federated-logins';
   group.innerHTML=providers.filter(p=>p.type!=='ldap').map(p=>'<button type="button" class="button sso-login" data-sso-provider="'+esc(p.id)+'">'+esc(p.label)+'로 로그인</button>').join('');
   const directory=providers.filter(p=>p.type==='ldap');
@@ -302,9 +302,14 @@ async function refreshUsers(){
  const list=$('#userList');if(!list)return;
  try{
   const {users}=await api('users');if(!list.isConnected)return;
-  list.innerHTML=users.map(u=>'<article class="account-user"><div class="sharing-row"><span><strong>'+esc(u.name)+'</strong><small>'+esc(u.email)+' · '+(u.isAdmin?'관리자':u.isActive?'활성':'비활성')+'</small></span>'+
-   (u.isAdmin?'<span class="badge neutral">관리자</span>':'<button class="button small" data-user-status="'+esc(u.id)+'" data-next-active="'+!u.isActive+'" aria-label="'+esc(u.name)+(u.isActive?' 비활성화':' 활성화')+'">'+(u.isActive?'비활성화':'활성화')+'</button>')+'</div>'+
-   (u.isAdmin?'':u.localLogin===false?'<p class="subtle">외부 인증 전용 계정</p>':'<details><summary>비밀번호 재설정 · '+esc(u.name)+'</summary><p class="subtle">새 비밀번호는 사용자에게 직접 전달하세요. 모든 기존 세션이 종료됩니다.</p><form class="server-form" data-reset-user="'+esc(u.id)+'">'+field('새 임시 비밀번호','password','','password','required minlength="12" maxlength="256" autocomplete="new-password"')+'<button class="button">비밀번호 재설정</button><p class="account-result" role="status"></p></form></details>')+'</article>').join('');
+  users.sort((a,b)=>Number(b.registrationPending)-Number(a.registrationPending));
+  const pending=users.filter(u=>u.registrationPending).length;
+  list.innerHTML=(pending?'<p class="notice">가입 승인 대기 '+pending+'명 · 이메일과 소속을 확인한 후 승인하세요.</p>':'')+users.map(u=>{
+   const label=u.registrationPending?'가입 승인':u.isActive?'비활성화':'활성화';
+   return '<article class="account-user"><div class="sharing-row"><span><strong>'+esc(u.name)+'</strong><small>'+esc(u.email)+' · '+(u.isAdmin?'관리자':u.registrationPending?'가입 승인 대기':u.isActive?'활성':'비활성')+'</small></span>'+
+    (u.isAdmin?'<span class="badge neutral">관리자</span>':'<button class="button small '+(u.registrationPending?'primary':'')+'" data-user-status="'+esc(u.id)+'" data-registration-pending="'+!!u.registrationPending+'" data-next-active="'+!u.isActive+'" aria-label="'+esc(u.name)+' '+label+'">'+label+'</button>')+'</div>'+
+    (u.isAdmin||u.registrationPending?'':u.localLogin===false?'<p class="subtle">외부 인증 전용 계정</p>':'<details><summary>비밀번호 재설정 · '+esc(u.name)+'</summary><p class="subtle">새 비밀번호는 사용자에게 직접 전달하세요. 모든 기존 세션이 종료됩니다.</p><form class="server-form" data-reset-user="'+esc(u.id)+'">'+field('새 임시 비밀번호','password','','password','required minlength="12" maxlength="256" autocomplete="new-password"')+'<button class="button">비밀번호 재설정</button><p class="account-result" role="status"></p></form></details>')+'</article>';
+  }).join('');
  }catch(error){if(list.isConnected)list.textContent=error.message;}
 }
 async function openSharing(){
@@ -388,7 +393,7 @@ $('#infoBody').addEventListener('click',async e=>{
  const status=e.target.closest('[data-user-status]');
  if(status){
   const isActive=status.dataset.nextActive==='true';
-  if(!confirm(isActive?'이 계정을 다시 활성화할까요?':'이 계정을 비활성화하고 모든 기기에서 로그아웃할까요? 프로젝트 데이터는 보존됩니다.'))return;
+  if(!confirm(status.dataset.registrationPending==='true'?'이메일과 소속을 확인한 계정의 가입을 승인할까요?':isActive?'이 계정을 다시 활성화할까요?':'이 계정을 비활성화하고 모든 기기에서 로그아웃할까요? 프로젝트 데이터는 보존됩니다.'))return;
   status.disabled=true;
   try{await api('users/'+status.dataset.userStatus,{method:'PATCH',body:{isActive}});await refreshUsers();toast(isActive?'계정을 활성화했습니다.':'계정을 비활성화했습니다.');}
   catch(error){toast(error.message);status.disabled=false;}return;
@@ -439,3 +444,24 @@ async function openSecurityAudit(){try{const {events}=await api('auth/security-e
 
 document.addEventListener('click',e=>{document.querySelectorAll('.action-menu[open]').forEach(menu=>{if(!menu.contains(e.target)||e.target.closest('button'))menu.open=false;});});
 document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;document.querySelectorAll('.action-menu[open]').forEach(menu=>{if(menu.contains(document.activeElement)){menu.open=false;menu.querySelector('summary')?.focus();e.preventDefault();}});});
+
+function returnToLogin(email=''){
+ $('#registrationForm')?.remove();$('#loginForm').hidden=false;$('#loginPassword').value='';$('#authError').textContent='';
+ if(email){loginProvider='';const select=$('#loginProvider');if(select)select.value='';$('#loginEmail').type='email';$('#loginEmail').closest('label').firstChild.textContent='이메일';$('#loginEmail').value=email;$('#loginPassword').focus();}else $('#registerButton').focus();
+}
+$('#registerButton').addEventListener('click',()=>{
+ if(registrationPolicy.mode!=='approval')return;
+ if(currentUser&&(storageError||wbs.dirty)){toast('현재 계정의 변경사항을 먼저 저장하거나 백업해 주세요.');return;}
+ $('#loginForm').hidden=true;$('#loginPassword').value='';$('#registrationForm')?.remove();
+ const form=document.createElement('form');form.id='registrationForm';form.className='auth-card';
+ form.innerHTML='<span class="eyebrow">PM CANVAS</span><h1>회원가입</h1><p>관리자 승인 후 팀의 업무 공간을 사용할 수 있어요.</p>'+(registrationPolicy.domains.length?'<p class="registration-domains">가입 가능 이메일: '+registrationPolicy.domains.map(esc).join(', ')+'</p>':'')+field('이름','name','','text','required maxlength="80" autocomplete="name"')+field('이메일','email','','email','required maxlength="254" autocomplete="email"')+field('비밀번호','password','','password','required minlength="12" maxlength="256" autocomplete="new-password"')+field('비밀번호 확인','confirmPassword','','password','required minlength="12" maxlength="256" autocomplete="new-password"')+'<small>비밀번호는 12자 이상으로 입력하세요.</small><p class="form-error" role="alert"></p><button class="button primary" type="submit">가입 신청</button><button class="auth-link" type="button" data-registration-back>로그인으로 돌아가기</button>';
+ $('#authGate').append(form);form.elements.name.focus();
+ form.onsubmit=async e=>{
+  e.preventDefault();const button=form.querySelector('[type=submit]'),error=form.querySelector('.form-error'),data=new FormData(form);error.textContent='';
+  if(data.get('password')!==data.get('confirmPassword')){error.textContent='비밀번호 확인이 일치하지 않습니다.';form.elements.confirmPassword.focus();return;}
+  button.disabled=true;
+  try{const result=await api('auth/register',{method:'POST',body:Object.fromEntries(data)});const email=String(data.get('email'));form.reset();form.innerHTML='<span class="eyebrow">PM CANVAS</span><h1>신청 완료</h1><p role="status">'+esc(result.message)+'</p><small>승인 후 프로젝트를 만들거나 공유받을 수 있습니다.</small><button class="button primary" type="button" data-registration-back>로그인으로 돌아가기</button>';form.querySelector('button').dataset.email=email;form.querySelector('h1').tabIndex=-1;form.querySelector('h1').focus();}
+  catch(err){error.textContent=err.message;}finally{button.disabled=false;}
+ };
+});
+$('#authGate').addEventListener('click',e=>{const button=e.target.closest('[data-registration-back]');if(button)returnToLogin(button.dataset.email||'');});

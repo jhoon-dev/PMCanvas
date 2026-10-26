@@ -7,11 +7,12 @@ import {createHandler} from '../server/http.mjs';
 import {hashPassword} from '../server/security.mjs';
 import {MemoryRepository} from './support/memory-repository.mjs';
 import {Federation} from '../server/federation.mjs';
+import {registrationConfig} from '../server/registration.mjs';
 const PASSWORD='a-test-password-12345',HASH=await hashPassword(PASSWORD);
 const ORIGIN='http://localhost:3000';
-async function fixture(t,{basePath='',providers=[]}={}){
+async function fixture(t,{basePath='',providers=[],trustProxies='',registration=registrationConfig()}={}){
  const users=[{id:randomUUID(),email:'owner@example.com',name:'소유자',password_hash:HASH,is_admin:true},{id:randomUUID(),email:'other@example.com',name:'팀원',password_hash:HASH,is_admin:false}];
- const repo=new MemoryRepository(users),handler=createHandler({repo,origin:ORIGIN,basePath,federation:new Federation({repo,origin:ORIGIN,basePath,providers}),logger:{error(){}}});
+ const repo=new MemoryRepository(users),handler=createHandler({repo,origin:ORIGIN,basePath,registration,trustProxies,federation:new Federation({repo,origin:ORIGIN,basePath,providers}),logger:{error(){}}});
  async function inject(url,{method='GET',body,headers={}}={}){
   const req=Readable.from(body===undefined?[]:[Buffer.from(JSON.stringify(body))]);
   Object.assign(req,{url,method,headers,socket:{remoteAddress:'127.0.0.1'}});
@@ -199,4 +200,56 @@ test('Excel 가져오기 API는 인증·CSRF·편집 권한과 파일 형식을 
  const {projectWorkbook}=await import('../server/excel.mjs');const file=(await projectWorkbook(p,'2026-10-26')).toString('base64');
  const response=await f.call(owner,path,{method:'POST',body:{file}});assert.equal(response.status,200);assert.equal(response.data.sheets.find(s=>s.name==='WBS').rows[1][2],'기능 개발');
  assert.equal((await f.call(owner,'projects/'+p.id)).data.project._revision,1);
+});
+
+const application={name:'신규 팀원',email:'new@example.com',password:PASSWORD,confirmPassword:PASSWORD};
+test('회원가입: 승인 전 접근 차단, 관리자·CSRF 승인, 권한 위조 거절과 프로젝트 격리',async t=>{
+ const f=await fixture(t,{basePath:'/pmcanvas'}),guest=f.client();
+ const policy=await f.call(guest,'auth/providers');assert.equal(policy.data.registration.mode,'approval');
+ const result=await f.call(guest,'auth/register',{method:'POST',body:{...application,isAdmin:true,isActive:true,registrationPending:false}});
+ assert.equal(result.status,202);assert.equal(result.headers.get('set-cookie'),null);assert.equal('user' in result.data,false);
+ const stored=await f.repo.findUserByEmail(application.email);assert.equal(stored.is_admin,false);assert.equal(stored.is_active,false);assert.equal(stored.registration_pending,true);assert.match(stored.password_hash,/^scrypt-v2:/);
+ assert.equal((await f.call(guest,'projects')).status,401);
+ const before=await f.call(guest,'auth/login',{method:'POST',body:application});assert.equal(before.status,403);assert.equal(before.data.error.code,'APPROVAL_PENDING');assert.equal(f.repo.sessions.size,0);
+ assert.equal((await f.call(guest,'auth/login',{method:'POST',body:{...application,password:'wrong'}})).status,401);
+ const admin=await f.login('owner@example.com'),other=await f.login('other@example.com');
+ const users=await f.call(admin,'users');assert.equal(users.data.users.find(u=>u.email===application.email).registrationPending,true);assert.equal(JSON.stringify(users.data).includes('scrypt-v2'),false);
+ const route='users/'+stored.id;
+ assert.equal((await f.call(other,route,{method:'PATCH',body:{isActive:true}})).status,403);
+ assert.equal((await f.call(admin,route,{method:'PATCH',body:{isActive:true},headers:{'X-CSRF-Token':'bad'}})).status,403);
+ const approved=await f.call(admin,route,{method:'PATCH',body:{isActive:true}});assert.equal(approved.data.user.registrationPending,false);assert.equal(approved.data.user.isActive,true);
+ const login=await f.call(guest,'auth/login',{method:'POST',body:application});assert.equal(login.status,200);assert.equal(login.data.user.isAdmin,false);
+ assert.deepEqual((await f.call(guest,'projects')).data.projects,[]);
+ assert.ok(f.repo.security.some(e=>e.kind==='account.registration.requested'));
+});
+test('회원가입: 중복·기존 관리자·외부 계정에 같은 응답, 기존 정보와 비밀번호 보존',async t=>{
+ const f=await fixture(t),guest=f.client(),external=await f.repo.createUser({email:'sso@example.com',name:'외부 계정',passwordHash:'external-only'});f.repo.users.get(external.id).local_login=false;
+ const before=structuredClone([...f.repo.users]);
+ const first=await f.call(guest,'auth/register',{method:'POST',body:application});
+ for(const email of [application.email,'owner@example.com','sso@example.com']){const result=await f.call(guest,'auth/register',{method:'POST',body:{...application,email,name:'덮어쓰기 시도'}});assert.equal(result.status,202);assert.deepEqual(result.data,first.data);}
+ for(const [id,user]of before)assert.deepEqual(f.repo.users.get(id),user);
+ assert.equal(f.repo.users.size,before.length+1);assert.equal((await f.repo.findUserByEmail(application.email)).name,application.name);
+});
+test('회원가입: 비활성·회사 도메인·입력값·Origin 검사와 이메일별 반복 제한',async t=>{
+ const disabled=await fixture(t,{registration:registrationConfig({REGISTRATION_MODE:'disabled'})});
+ assert.equal((await disabled.call(disabled.client(),'auth/register',{method:'POST',body:application})).status,403);assert.equal(disabled.repo.users.size,2);
+ const f=await fixture(t,{registration:registrationConfig({REGISTRATION_DOMAINS:'company.com'})}),guest=f.client();
+ assert.equal((await f.call(guest,'auth/register',{method:'POST',body:application,headers:{Origin:'https://attacker.example'}})).status,403);
+ assert.equal((await f.call(guest,'auth/register',{method:'POST',body:application})).data.error.code,'REGISTRATION_DOMAIN');
+ const valid={...application,email:'new@company.com'};
+ for(const patch of [{name:' '},{password:'short',confirmPassword:'short'},{confirmPassword:'different'}])assert.equal((await f.call(guest,'auth/register',{method:'POST',body:{...valid,...patch,email:Math.random()+'@company.com'}})).status,400);
+ const result=await f.call(guest,'auth/register',{method:'POST',body:valid});assert.equal(result.status,202);
+ await f.call(guest,'auth/register',{method:'POST',body:valid});await f.call(guest,'auth/register',{method:'POST',body:valid});
+ assert.equal((await f.call(guest,'auth/register',{method:'POST',body:valid})).status,429);assert.equal(f.repo.users.size,3);
+});
+test('회원가입 컨피그는 잘못된 모드·도메인을 거절한다',()=>{
+ assert.throws(()=>registrationConfig({REGISTRATION_MODE:'open'}));assert.throws(()=>registrationConfig({REGISTRATION_DOMAINS:'*.company.com'}));
+ assert.deepEqual(registrationConfig({REGISTRATION_DOMAINS:' Company.com,company.com,example.org '}),{mode:'approval',domains:['company.com','example.org']});
+});
+
+test('회원가입: 신뢰 프록시의 IP별 가입 한도는 다른 사용자와 분리된다',async t=>{
+ const f=await fixture(t,{trustProxies:'127.0.0.1'}),guest=f.client(),headers={'X-Forwarded-For':'203.0.113.10'};
+ for(let i=0;i<10;i++)assert.equal((await f.call(guest,'auth/register',{method:'POST',body:{...application,email:'invalid'+i+'@example.com',name:''},headers})).status,400);
+ assert.equal((await f.call(guest,'auth/register',{method:'POST',body:application,headers})).status,429);
+ assert.equal((await f.call(guest,'auth/register',{method:'POST',body:application,headers:{'X-Forwarded-For':'203.0.113.11'}})).status,202);
 });

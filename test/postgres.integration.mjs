@@ -147,3 +147,26 @@ test('실제 PostgreSQL: 공유 시도 제한·MFA 원자 처리·복구 코드�
   await repo.securityEvent({actorId:user.id,kind:'test.security.audit',details:{action:'verified'}});assert.ok((await repo.securityEvents()).some(e=>e.actorId===user.id&&e.kind==='test.security.audit'));
  }finally{await pool.query('DELETE FROM pm_auth_attempts WHERE key=$1',[key]);if(user){await pool.query('DELETE FROM pm_security_events WHERE actor_id=$1',[user.id]);await pool.query('DELETE FROM pm_auth_transient WHERE value->>\'userId\'=$1',[user.id]);await pool.query('DELETE FROM pm_users WHERE id=$1',[user.id]);}await pool.end();}
 });
+
+test('실제 PostgreSQL: 가입 신청 중복 원자성·대기 상태 제약·승인 전 세션 금지와 관리자 승인',{skip:process.env.RUN_POSTGRES_TESTS!=='1'},async()=>{
+ if(!/_test$/.test(process.env.PGDATABASE||''))throw Error('Use a dedicated _test database.');
+ const pool=await createPool(),repo=new PgRepository(pool),suffix=randomUUID(),ids=[];
+ try{
+  await migrate(pool);await migrate(pool);
+  const admin=await repo.createUser({email:'admin-'+suffix+'@example.com',name:'관리자',passwordHash:'test-hash',isAdmin:true});ids.push(admin.id);assert.equal(admin.registrationPending,false);
+  const email='pending-'+suffix+'@example.com';
+  const results=await Promise.allSettled([0,1].map(()=>repo.createUser({email,name:'가입 신청',passwordHash:'test-hash',registrationPending:true})));
+  for(const result of results)if(result.status==='fulfilled')ids.push(result.value.id);
+  assert.equal(results.filter(r=>r.status==='fulfilled').length,1);assert.equal(results.find(r=>r.status==='rejected').reason.code,'EMAIL_EXISTS');
+  const pending=await repo.findUserByEmail(email);assert.equal(pending.registration_pending,true);assert.equal(pending.is_active,false);assert.equal(pending.is_admin,false);
+  assert.equal((await repo.listUsers()).find(u=>u.id===pending.id).registrationPending,true);
+  await assert.rejects(pool.query('UPDATE pm_users SET is_active=true WHERE id=$1',[pending.id]),e=>e.code==='23514');
+  const session={hash:digest(token()),userId:pending.id,csrf:token(),expires:new Date(Date.now()+60000),passwordHash:'test-hash'};
+  await assert.rejects(repo.createSession(session),e=>e.status===401);
+  await assert.rejects(repo.manageUser(pending.id,pending.id,{isActive:true}),e=>e.status===403);
+  const approved=await repo.manageUser(admin.id,pending.id,{isActive:true});assert.equal(approved.registrationPending,false);assert.equal(approved.isActive,true);
+  await repo.createSession(session);assert.equal((await repo.findSession(session.hash)).user.id,pending.id);
+  assert.deepEqual(await repo.listProjects(pending.id),[]);
+  await repo.manageUser(admin.id,pending.id,{isActive:false});assert.equal(await repo.findSession(session.hash),null);assert.equal((await repo.findUserByEmail(email)).registration_pending,false);
+ }finally{for(const id of ids.reverse())await pool.query('DELETE FROM pm_users WHERE id=$1',[id]);await pool.end();}
+});

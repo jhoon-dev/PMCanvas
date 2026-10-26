@@ -33,7 +33,7 @@ export class MemoryRepository{
  async listIdentities(){return [...this.identities].map(([key,id])=>{const [providerKey,...subject]=key.split('|'),u=this.users.get(id);return {providerKey,subject:subject.join('|'),email:u.email,name:u.name};});}
  async linkIdentity(actorId,{providerKey,subject,email}){const actor=this.users.get(actorId),u=await this.findUserByEmail(email);if(!actor?.is_admin)fail(403,'FORBIDDEN','관리자 필요');if(!u)fail(404,'USER_NOT_FOUND','계정 없음');if(u.is_admin)fail(403,'ADMIN_PROTECTED','관리자 보호');const key=providerKey+'|'+subject;if(this.identities.has(key))fail(409,'IDENTITY_EXISTS','연결 있음');this.identities.set(key,u.id);return {ok:true};}
  async unlinkIdentity(actorId,providerKey,subject){if(!this.users.get(actorId)?.is_admin)fail(403,'FORBIDDEN','관리자 필요');const key=providerKey+'|'+subject,id=this.identities.get(key);if(!id)fail(404,'IDENTITY_NOT_FOUND','연결 없음');this.identities.delete(key);this.revokeSessions(id);return {ok:true};}
- async createUser({email,name,passwordHash,isAdmin=false}){if(await this.findUserByEmail(email))fail(409,'EMAIL_EXISTS','이미 등록된 이메일입니다.');const u={id:randomUUID(),email,name,password_hash:passwordHash,is_admin:isAdmin};this.users.set(u.id,u);return {id:u.id,email,name,isAdmin};}
+ async createUser({email,name,passwordHash,isAdmin=false,registrationPending=false}){if(await this.findUserByEmail(email))fail(409,'EMAIL_EXISTS','이미 등록된 이메일입니다.');const u={id:randomUUID(),email,name,password_hash:passwordHash,is_admin:isAdmin,is_active:!registrationPending,registration_pending:registrationPending};this.users.set(u.id,u);return publicUser(u);}
  async createSession({hash,passwordHash,...data}){const u=this.users.get(data.userId);if(!u||u.is_active===false||u.password_hash!==passwordHash)fail(401,'LOGIN_FAILED','계정 정보가 변경되었습니다.');this.sessions.set(hash,data);}
  async findSession(hash){const s=this.sessions.get(hash);if(!s||new Date(s.expires)<new Date())return null;const u=this.users.get(s.userId);if(!u||u.is_active===false)return null;return {user:publicUser(u),csrf:s.csrf};}
  async deleteSession(hash){this.sessions.delete(hash);}
@@ -44,7 +44,7 @@ export class MemoryRepository{
   if(!actor?.is_admin||actor.is_active===false)fail(403,'FORBIDDEN','권한이 없습니다.');
   if(!target)fail(404,'USER_NOT_FOUND','계정이 없습니다.');
   if(target.is_admin||actorId===targetId)fail(403,'ADMIN_PROTECTED','관리자 계정은 보호됩니다.');
-  if(isActive!==undefined)target.is_active=isActive;
+  if(isActive!==undefined)target.is_active=isActive;if(isActive===true)target.registration_pending=false;
   if(passwordHash!==undefined)target.password_hash=passwordHash;
   this.revokeSessions(targetId);return publicUser(target);
  }

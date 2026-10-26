@@ -97,3 +97,12 @@ networkTest('하위 경로 /pmcanvas에서 화면과 API 실행, 임의 파일�
  assert.equal((await fetch(origin+'/pmcanvas/server/main.mjs')).status,404);
  assert.equal((await fetch(origin+'/api/projects')).status,404);
 });
+
+networkTest('회원가입 HTTP: 세션 없는 접수·승인 전 로그인 차단·승인 후 로그인',async t=>{
+ const f=await fixture(t,{basePath:'/pmcanvas'}),c=f.client(),body={name:'가입 통신 검증',email:'network@example.com',password:PASSWORD,confirmPassword:PASSWORD};
+ const applied=await f.call(c,'auth/register',{method:'POST',body});assert.equal(applied.status,202);assert.equal(applied.headers.get('set-cookie'),null);
+ assert.equal((await f.call(c,'auth/login',{method:'POST',body})).data.error.code,'APPROVAL_PENDING');
+ const admin=await f.login('owner@example.com'),user=await f.repo.findUserByEmail(body.email);
+ assert.equal((await f.call(admin,'users/'+user.id,{method:'PATCH',body:{isActive:true}})).status,200);
+ const logged=await f.call(c,'auth/login',{method:'POST',body});assert.equal(logged.status,200);assert.match(logged.headers.get('set-cookie'),/HttpOnly/);assert.equal((await f.call(c,'auth/me')).data.user.email,body.email);
+});

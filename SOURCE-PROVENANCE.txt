@@ -14,3 +14,5 @@ v0.7.0: Added WBS grid, transactional draft editing, clipboard TSV and interacti
 0.9.0: scoped browser draft recovery, hierarchical WBS rollups, workload checks, bounded XLSX import preview, baseline comparison, workday CPM.
 
 0.10.0: security hardening: bounded process-isolated Excel jobs, constant-time calendar count, shared login reservations and trusted proxy policy, scrypt-v2 migration, admin TOTP/recovery, expiring opt-in drafts, security events and CI.
+
+0.12.0: self-registration requests, administrator approval, pending account constraint, configurable registration/domain policy and abuse limits.

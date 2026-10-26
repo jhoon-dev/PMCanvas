@@ -5,6 +5,7 @@ import {createApplication} from './http.mjs';
 import {hashPassword,emailAddress} from './security.mjs';
 import {loadAuthConfig} from './auth-config.mjs';
 import {Federation} from './federation.mjs';
+import {registrationConfig} from './registration.mjs';
 const pool=await createPool(),repo=new PgRepository(pool);
 try{
  await migrate(pool);
@@ -19,7 +20,7 @@ try{
  const basePath=process.env.BASE_PATH||'',providers=loadAuthConfig();
  const federation=new Federation({repo,origin,basePath,providers});
  const keyFile=process.env.MFA_KEY_FILE||'config/secrets/mfa.key';const key=fs.readFileSync(keyFile);if(key.length!==32)throw Error('MFA_KEY_FILE must contain 32 random bytes. Run npm run setup or npm run service:up.');
- const server=createApplication({repo,origin,basePath,federation,adminMfa:new AdminMfa(repo,key),trustProxies:process.env.TRUSTED_PROXIES||''});
+ const server=createApplication({repo,origin,basePath,federation,registration:registrationConfig(process.env),adminMfa:new AdminMfa(repo,key),trustProxies:process.env.TRUSTED_PROXIES||''});
  console.log('Authentication connections:',providers.map(p=>p.id+' ('+p.type+')').join(', ')||'local only');
  const port=Number(process.env.PORT||3000),host=process.env.HOST||'0.0.0.0';
  server.listen(port,host,()=>console.log('PM Canvas API listening on port '+port));

@@ -9,8 +9,9 @@ import {HttpError,fail} from './errors.mjs';
 import {token,digest,safeEqual,hashPassword,verifyPassword,emailAddress,cookieValue,sessionCookie} from './security.mjs';
 import {cleanProject,uuid} from './project.mjs';
 import {Federation} from './federation.mjs';
+import {registrationConfig} from './registration.mjs';
 
-export function createHandler({repo,origin='http://localhost:3000',basePath='',logger=console,trustProxies='',adminMfa=null,federation=new Federation({repo,origin,basePath})}){
+export function createHandler({repo,origin='http://localhost:3000',basePath='',logger=console,trustProxies='',adminMfa=null,registration=registrationConfig(),federation=new Federation({repo,origin,basePath})}){
  if(new URL(origin).origin!==origin)throw Error('PUBLIC_ORIGIN must contain only scheme and host, without a path or trailing slash.');
  if(basePath&&!/^\/[a-zA-Z0-9_-]+(?:\/[a-zA-Z0-9_-]+)*$/.test(basePath))throw Error('BASE_PATH must be empty or a path without a trailing slash.');
  const secure=new URL(origin).protocol==='https:',reserve=requestLimiter(repo),trusted=proxyList(trustProxies);
@@ -57,7 +58,7 @@ export function createHandler({repo,origin='http://localhost:3000',basePath='',l
    auditPath=path;const method=req.method;
    if(path==='/api/health'&&method==='GET'){try{await repo.health();return json(res,200,{ok:true});}catch{return json(res,503,{ok:false});}}
    req.clientIp=clientAddress(req,trusted);
-   if(path==='/api/auth/providers'&&method==='GET')return json(res,200,{providers:federation.list()});
+   if(path==='/api/auth/providers'&&method==='GET')return json(res,200,{providers:federation.list(),registration});
    const sso=path.match(/^\/api\/auth\/sso\/([a-z][a-z0-9_-]{0,39})\/(start|callback|metadata)$/);
    if(sso){
     const [,id,action]=sso,p=federation.provider(id);
@@ -112,10 +113,26 @@ export function createHandler({repo,origin='http://localhost:3000',basePath='',l
      return json(res,200,{user:result.user,csrf:result.csrf},{'Set-Cookie':result.cookie});
     }catch(error){if(error.status===403||error.code==='IDENTITY_UNLINKED')throw error;fail(401,'LOGIN_FAILED','디렉터리 인증에 실패했습니다. 계정 정보와 연결 설정을 확인해 주세요.');}
    }
+   if(path==='/api/auth/register'&&method==='POST'){
+    if(registration.mode!=='approval')fail(403,'REGISTRATION_DISABLED','현재 회원가입을 받지 않습니다. 관리자에게 문의해 주세요.');
+    await reserve('registration-global',100,3600000);if(req.clientIp)await reserve('registration-ip:'+req.clientIp,10,900000);
+    const body=await readJson(req,16384),email=emailAddress(body.email);
+    req.loginHash=digest(email);await reserve('registration-email:'+email,3,3600000);
+    if(registration.domains.length&&!registration.domains.includes(email.split('@')[1]))fail(400,'REGISTRATION_DOMAIN','가입 가능한 회사 이메일을 입력해 주세요.');
+    if(typeof body.name!=='string'||!body.name.trim()||body.name.length>80)fail(400,'INVALID_NAME','이름은 1~80자로 입력해 주세요.');
+    if(body.password!==body.confirmPassword)fail(400,'PASSWORD_MISMATCH','비밀번호 확인이 일치하지 않습니다.');
+    const passwordHash=await hashPassword(body.password);
+    try{
+     const created=await repo.createUser({email,name:body.name.trim(),passwordHash,isAdmin:false,registrationPending:true});
+     await audit(req,'account.registration.requested',{targetId:created.id});
+    }catch(error){if(error.code!=='EMAIL_EXISTS')throw error;}
+    return json(res,202,{ok:true,message:'가입 신청을 접수했습니다. 관리자 승인 후 로그인해 주세요.'});
+   }
    if(path==='/api/auth/login'&&method==='POST'){
     const body=await readJson(req,16384),email=emailAddress(body.email);
     req.loginHash=digest(email);await reserve('local:'+email);if(req.clientIp)await reserve('login-ip:'+req.clientIp,40);
     const user=await repo.findUserByEmail(email),valid=await verifyPassword(body.password,user?.password_hash||await dummyHash);
+    if(user&&valid&&user.registration_pending)fail(403,'APPROVAL_PENDING','가입 승인 대기 중입니다. 관리자에게 승인 여부를 확인해 주세요.');
     if(!user||!valid||user.is_active===false||user.local_login===false)fail(401,'LOGIN_FAILED','이메일 또는 비밀번호를 확인해 주세요.');
     req.actorId=user.id;
     if(user.password_hash.startsWith('scrypt-v1:')&&repo.upgradeHash){const upgraded=await hashPassword(body.password);await repo.upgradeHash(user.id,user.password_hash,upgraded);user.password_hash=upgraded;await audit(req,'auth.password.rehashed');}

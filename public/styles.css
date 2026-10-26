@@ -31,3 +31,5 @@ button:disabled{opacity:.6}
 .account-user .sharing-row>span:first-child{min-width:0;overflow-wrap:anywhere}.account-user .sharing-row>button{flex-shrink:0}
 .account-section .subtle,.account-section .field{font-size:12px}
 .auth-gate{overflow-y:auto}.auth-card{margin:auto}.federated-logins{display:grid;gap:10px}.sso-login{width:100%;white-space:normal}.connection-card{padding:14px 0;border-bottom:1px solid #e9edf2;overflow-wrap:anywhere}.connection-card code{font-size:11px}.connection-card p{margin:6px 0}.identity-actions{margin-top:10px}
+
+.auth-link{border:0;background:none;color:#416be8;font:inherit;font-size:12px;padding:6px;cursor:pointer;text-align:center}.auth-link:focus-visible{outline:2px solid #416be8;outline-offset:3px}.registration-domains{font-size:11px;overflow-wrap:anywhere}.auth-card h1:focus{outline:none}@media(max-width:700px){.auth-card{padding:26px;gap:14px}}
