@@ -6,9 +6,11 @@ import { parseEnv } from 'node:util';
 import { spawnSync } from 'node:child_process';
 import { createInterface } from 'node:readline/promises';
 import { emailAddress } from '../server/security.mjs';
+import { runtimeIdentity, prepareRuntimeStorage } from './runtime-storage.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const envPath = path.join(root, '.env');
+let runtimeEnvironment = runtimeIdentity();
 export function setupValues({ email, origin = 'http://localhost:3000', port = '3000' }) {
   email = emailAddress(email);
   if (!/^\d+$/.test(String(port)) || Number(port) < 1 || Number(port) > 65535)
@@ -35,6 +37,7 @@ export function setupValues({ email, origin = 'http://localhost:3000', port = '3
     ADMIN_EMAIL: email,
     ADMIN_NAME: '관리자',
     ADMIN_PASSWORD: secret(),
+    ...runtimeIdentity(),
   };
 }
 function compose(args, { capture = false } = {}) {
@@ -46,6 +49,7 @@ function compose(args, { capture = false } = {}) {
       stdio: capture ? ['ignore', 'pipe', 'pipe'] : 'inherit',
       encoding: 'utf8',
       shell: false,
+      env: { ...process.env, ...runtimeEnvironment },
     },
   );
   if (result.error) throw result.error;
@@ -60,6 +64,11 @@ function compose(args, { capture = false } = {}) {
 async function main() {
   const [command, ...args] = process.argv.slice(2);
   const ensureMfaKey = () => {
+    for (const name of ['config', 'config/secrets', 'config/secrets/mfa.key']) {
+      if (fs.lstatSync(path.join(root, name), { throwIfNoEntry: false })?.isSymbolicLink()) {
+        throw Error('Private storage must not use symlink paths.');
+      }
+    }
     const dir = path.join(root, 'config', 'secrets');
     fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
     const key = path.join(dir, 'mfa.key');
@@ -105,11 +114,19 @@ async function main() {
   }
   if (!fs.existsSync(envPath)) throw Error('Run npm run setup first.');
   const env = parseEnv(fs.readFileSync(envPath, 'utf8'));
+  runtimeEnvironment = runtimeIdentity(env);
   const database = env.APP_DATABASE || 'pmcanvas';
   if (!/^[a-z][a-z0-9_]{0,62}$/.test(database)) throw Error('Invalid APP_DATABASE.');
   if (command === 'up') {
+    const moved = prepareRuntimeStorage(root, runtimeEnvironment);
     ensureMfaKey();
-    fs.mkdirSync(path.join(root, 'backups'), { recursive: true, mode: 0o700 });
+    prepareRuntimeStorage(root, runtimeEnvironment);
+    if (moved)
+      console.log(
+        'Moved ' +
+          moved +
+          ' legacy recovery key(s) outside the backup directory. Store recovery keys separately from DB dumps.',
+      );
     compose(['up', '-d', '--build', '--wait', '--wait-timeout', '180']);
     return;
   }

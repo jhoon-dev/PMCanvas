@@ -74,6 +74,19 @@ export function restoreTaskBundle(current, bundle) {
   return { project: cleanProject(p), adjustments };
 }
 export function backupSettings(body) {
+  if (body.timeZone !== undefined) {
+    try {
+      if (
+        typeof body.timeZone !== 'string' ||
+        body.timeZone.length > 100 ||
+        !/^[A-Za-z_]+(?:\/[A-Za-z0-9_+-]+)*$/.test(body.timeZone)
+      )
+        throw Error();
+      new Intl.DateTimeFormat('en', { timeZone: body.timeZone });
+    } catch {
+      fail(400, 'INVALID_BACKUP_SETTINGS', '올바른 IANA 시간대를 입력해 주세요.');
+    }
+  }
   if (
     typeof body.enabled !== 'boolean' ||
     typeof body.verifyRestore !== 'boolean' ||
@@ -93,5 +106,6 @@ export function backupSettings(body) {
     retentionDays: body.retentionDays,
     verifyRestore: body.verifyRestore,
     revision: body.revision,
+    ...(body.timeZone === undefined ? {} : { timeZone: body.timeZone }),
   };
 }

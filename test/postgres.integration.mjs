@@ -1456,6 +1456,11 @@ test(
       assert.deepEqual(await repo.listTrash(owner), []);
       assert.equal(
         (await pool.query('SELECT id FROM pm_projects WHERE id=$1', [projectId])).rowCount,
+        1,
+      );
+      await repo.cleanupTrash();
+      assert.equal(
+        (await pool.query('SELECT id FROM pm_projects WHERE id=$1', [projectId])).rowCount,
         0,
       );
     } finally {
@@ -1513,6 +1518,15 @@ test(
       const second = await worker.claim();
       assert.ok(second);
       assert.notEqual(second.id, first.id);
+      await pool.query(
+        "UPDATE pm_backup_settings SET enabled=false,requested=false,lease_until=now()-interval '1 minute' WHERE id=true",
+      );
+      assert.equal(await worker.claim(), null);
+      assert.equal(
+        (await pool.query('SELECT state FROM pm_backup_runs WHERE id=$1', [second.id])).rows[0]
+          .state,
+        'failed',
+      );
       assert.equal(
         (await pool.query('SELECT state FROM pm_backup_runs WHERE id=$1', [first.id])).rows[0]
           .state,
@@ -1526,6 +1540,59 @@ test(
         'UPDATE pm_backup_settings SET requested=false,lease_until=NULL,updated_by=NULL WHERE id=true',
       );
       for (const id of ids) await pool.query('DELETE FROM pm_users WHERE id=$1', [id]);
+      await pool.end();
+    }
+  },
+);
+
+test(
+  '실제 PostgreSQL: 예약 시간대·일광절약 전환과 설정 값 보존',
+  { skip: process.env.RUN_POSTGRES_TESTS !== '1' },
+  async () => {
+    if (!/_test$/.test(process.env.PGDATABASE || ''))
+      throw Error('Dedicated _test database required');
+    const pool = await createPool(),
+      repo = new PgRepository(pool);
+    let admin;
+    try {
+      await migrate(pool);
+      const schedule = async (hour, zone, at) =>
+        (await pool.query('SELECT pm_next_backup_at($1,$2,$3)::text AS at', [hour, zone, at]))
+          .rows[0].at;
+      assert.equal(
+        new Date(await schedule(3, 'Asia/Seoul', '2026-10-26T04:00:00Z')).toISOString(),
+        '2026-10-26T18:00:00.000Z',
+      );
+      assert.equal(
+        new Date(await schedule(3, 'UTC', '2026-10-26T04:00:00Z')).toISOString(),
+        '2026-10-27T03:00:00.000Z',
+      );
+      assert.equal(
+        new Date(await schedule(2, 'America/New_York', '2026-03-08T06:00:00Z')).toISOString(),
+        '2026-03-08T07:00:00.000Z',
+      );
+      admin = await repo.createUser({
+        email: randomUUID() + '@example.com',
+        name: '시간대',
+        passwordHash: 'unused',
+        isAdmin: true,
+      });
+      let s = (await repo.backupStatus()).settings;
+      await repo.saveBackupSettings(admin.id, { ...s, timeZone: 'UTC' });
+      s = (await repo.backupStatus()).settings;
+      assert.equal(s.timeZone, 'UTC');
+      delete s.timeZone;
+      await repo.saveBackupSettings(admin.id, s);
+      assert.equal((await repo.backupStatus()).settings.timeZone, 'UTC');
+      await assert.rejects(
+        repo.saveBackupSettings(admin.id, { ...s, timeZone: 'Mars/Space' }),
+        (e) => e.code === 'INVALID_BACKUP_SETTINGS',
+      );
+    } finally {
+      await pool.query(
+        "UPDATE pm_backup_settings SET updated_by=NULL,time_zone='Asia/Seoul' WHERE id=true",
+      );
+      if (admin) await pool.query('DELETE FROM pm_users WHERE id=$1', [admin.id]);
       await pool.end();
     }
   },

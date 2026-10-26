@@ -1403,3 +1403,24 @@ test('운영 API: 백업 설정은 관리자·입력·revision·CSRF·중복 요
     409,
   );
 });
+
+test('회원가입은 이메일만 먼저 접수하고 이름·비밀번호는 인증 시 확정', async (t) => {
+  const f = await fixture(t),
+    email = 'email-first@example.com';
+  const r = await f.call(f.client(), 'auth/register', { method: 'POST', body: { email } });
+  assert.equal(r.status, 202);
+  const u = await f.repo.findUserByEmail(email);
+  assert.equal(u.name, '이메일 인증 대기');
+  assert.equal(u.registration_pending, true);
+  assert.equal(u.is_active, false);
+  await f.registrationEmail.idle();
+  assert.equal(
+    (
+      await f.call(f.client(), 'auth/register', {
+        method: 'POST',
+        body: { email: 'bad-name@example.com', name: '' },
+      })
+    ).status,
+    400,
+  );
+});

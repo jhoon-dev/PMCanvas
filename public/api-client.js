@@ -16,10 +16,9 @@ export async function api(path, { method = 'GET', body, responseType = 'json' } 
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
   } catch {
-    throw Object.assign(
-      Error('서버에 연결하지 못했습니다. 현재 내용을 백업한 뒤 연결을 확인해 주세요.'),
-      { status: 0 },
-    );
+    throw Object.assign(Error('서버에 연결하지 못했습니다. 연결을 확인한 후 다시 시도해 주세요.'), {
+      status: 0,
+    });
   }
   if (response.ok && responseType === 'blob') return response.blob();
   let result;

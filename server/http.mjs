@@ -130,6 +130,12 @@ export function createHandler({
       'draft-store.js',
       'wbs-import.js',
       'operations-ui.js',
+      'html.js',
+      'account-ui.js',
+      'my-work-ui.js',
+      'info-dialog.js',
+      'mail-settings-ui.js',
+      'backup-settings-ui.js',
     ].map((f) => ['/' + f, f]),
   ]);
   const dummyHash = hashPassword('constant-timing-placeholder-password');
@@ -489,7 +495,12 @@ export function createHandler({
         await reserve('registration-email:' + email, 3, 3600000);
         if (registration.domains.length && !registration.domains.includes(email.split('@')[1]))
           fail(400, 'REGISTRATION_DOMAIN', '가입 가능한 회사 이메일을 입력해 주세요.');
-        if (typeof body.name !== 'string' || !body.name.trim() || body.name.length > 80)
+        const registrationName = body.name === undefined ? '이메일 인증 대기' : body.name;
+        if (
+          typeof registrationName !== 'string' ||
+          !registrationName.trim() ||
+          registrationName.length > 80
+        )
           fail(400, 'INVALID_NAME', '이름은 1~80자로 입력해 주세요.');
         if (body.password !== body.confirmPassword)
           fail(400, 'PASSWORD_MISMATCH', '비밀번호 확인이 일치하지 않습니다.');
@@ -501,7 +512,7 @@ export function createHandler({
         try {
           const created = await repo.createUser({
             email,
-            name: body.name.trim(),
+            name: registrationName.trim(),
             passwordHash,
             isAdmin: false,
             registrationPending: true,

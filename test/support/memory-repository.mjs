@@ -517,16 +517,14 @@ export class MemoryRepository extends MemoryOperations {
       );
     if (changes.length) {
       entry.revision++;
-      this.events
-        .get(id)
-        .unshift({
-          id: String(entry.revision),
-          revision: entry.revision,
-          type: 'project.updated',
-          changes,
-          at: new Date(),
-          actor: '테스트',
-        });
+      this.events.get(id).unshift({
+        id: String(entry.revision),
+        revision: entry.revision,
+        type: 'project.updated',
+        changes,
+        at: new Date(),
+        actor: '테스트',
+      });
     }
     return this.document(entry, userId);
   }

@@ -39,5 +39,5 @@ test('API 클라이언트: 하위 경로·CSRF·세션 쿠키·충돌 메시지'
   );
   assert.equal(requests[1].options.headers['X-CSRF-Token'], 'csrf-token');
   mode = 'offline';
-  await assert.rejects(api('projects'), (e) => e.status === 0 && e.message.includes('백업'));
+  await assert.rejects(api('projects'), (e) => e.status === 0 && e.message.includes('다시 시도'));
 });

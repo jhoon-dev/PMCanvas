@@ -18,6 +18,7 @@ services:
       retries: 20
   app:
     build: .
+    user: "${PM_RUN_UID:-1000}:${PM_RUN_GID:-1000}"
     restart: unless-stopped
     init: true
     mem_limit: 1g
@@ -54,6 +55,7 @@ services:
       ADMIN_NAME: ${ADMIN_NAME:-관리자}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env}
   backup:
+    user: "${PM_RUN_UID:-1000}:${PM_RUN_GID:-1000}"
     build:
       context: .
       dockerfile: Dockerfile.backup

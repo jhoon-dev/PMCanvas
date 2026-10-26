@@ -1,6 +1,11 @@
+import { escapeHtml as esc } from './html.js';
+import { accountRows } from './account-ui.js';
+import { createMailSettingsUi } from './mail-settings-ui.js';
+import { createInfoDialog } from './info-dialog.js';
 import { DraftStore } from './draft-store.js';
 import { api } from './api-client.js';
-import { workspaceOperations, myWorkView } from './operations-ui.js';
+import { workspaceOperations } from './operations-ui.js';
+import { myWorkView } from './my-work-ui.js';
 import { WbsWorkspace } from './wbs-workspace.js';
 let currentUser = null,
   saveInFlight = false,
@@ -40,11 +45,6 @@ const $ = (s) => document.querySelector(s),
   uid = () => crypto.randomUUID(),
   TODAY = today(),
   palette = ['#416be8', '#27a498', '#ae7ad8', '#df9a40', '#de718c', '#66849e'];
-const esc = (s) =>
-  String(s ?? '').replace(
-    /[&<>"']/g,
-    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c],
-  );
 const icons = {
   dashboard: 'M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z',
   layers: 'm12 3 9 5-9 5-9-5z M3 12l9 5 9-5 M3 16l9 5 9-5',
@@ -280,7 +280,8 @@ function render() {
   if (!['overview', 'tasks', 'daily', 'people'].includes(view)) view = 'overview';
   const p = project(),
     s = summary(p, asOf);
-  $('#breadcrumbProject').textContent = p.name;
+  $('#breadcrumbProject').textContent =
+    view === 'daily' && dailyMode === 'mine' ? '전체 프로젝트 · 내 업무' : p.name;
   $('#projectSelect').innerHTML = state.projects
     .map(
       (x) =>
@@ -788,11 +789,18 @@ function dailyView(p, s) {
   const toggle =
     '<div class="daily-mode"><button class="button small ' +
     (dailyMode === 'mine' ? 'primary' : '') +
-    '" data-daily-mode="mine">내 업무 모아보기</button><button class="button small ' +
+    '" data-daily-mode="mine">내 업무</button><button class="button small ' +
     (dailyMode === 'project' ? 'primary' : '') +
-    '" data-daily-mode="project">이 프로젝트 완료 체크</button></div>';
+    '" data-daily-mode="project">프로젝트 전체</button></div>';
   if (dailyMode === 'mine')
-    return myWorkView({ projects: myProjects, esc, progress, today: TODAY, projectMode: toggle });
+    return myWorkView({
+      projects: myProjects,
+      esc,
+      progress,
+      today: TODAY,
+      projectMode: toggle,
+      canLink: p._role === 'owner',
+    });
   const ts = filteredTasks(p),
     items = ts.flatMap((t) => t.items.map((i) => ({ t, i }))),
     done = items.filter((x) => x.i.doneDate === asOf).length;
@@ -944,8 +952,9 @@ function peopleView(p, s) {
   );
 }
 function openInfo(title, body) {
+  info.resetGuard();
   $('#infoDialog').classList.remove('report-dialog', 'mail-settings-dialog');
-  $('#infoDialog .eyebrow').textContent = 'HOW IT WORKS';
+  $('#infoDialog .eyebrow').textContent = 'PM CANVAS';
   $('#infoTitle').textContent = title;
   $('#infoBody').innerHTML = body;
   $('#infoDialog').showModal();
@@ -1281,6 +1290,9 @@ document.addEventListener('click', (e) => {
   const daily = e.target.closest('[data-daily-mode]');
   if (daily) {
     dailyMode = daily.dataset.dailyMode;
+    ownerFilter = '';
+    query = '';
+    statusFilter = '';
     render();
     return;
   }
@@ -1466,7 +1478,7 @@ $('#projectSelect').onchange = (e) => {
 };
 $('#mobileNewProject').onclick = () => openEditor('project');
 $('#closeDialog').onclick = $('#cancelDialog').onclick = () => $('#editorDialog').close();
-$('#closeInfo').onclick = () => $('#infoDialog').close();
+$('#closeInfo').onclick = () => info.close();
 $('#helpButton').onclick = help;
 $('#methodFooter').onclick = method;
 $('#newProjectSide').onclick = () => openEditor('project');
@@ -1881,120 +1893,21 @@ async function openAccount() {
           '<button class="button primary">비밀번호 변경</button><p class="account-result" role="status"></p></form></details></section>'),
   );
 }
-async function refreshUsers() {
+let knownUsers = [];
+async function refreshUsers({ cached = false } = {}) {
   const list = $('#userList');
   if (!list) return;
   try {
-    const { users } = await api('users');
+    const { users } = cached ? { users: knownUsers } : await api('users');
     if (!list.isConnected) return;
+    knownUsers = users;
     users.sort((a, b) => Number(b.registrationPending) - Number(a.registrationPending));
-    const visible = ops.filterUsers(users),
-      pending = users.filter((u) => u.registrationPending).length;
-    list.innerHTML =
-      (!$('#userTools') && pending
-        ? '<p class="notice">가입 신청 ' +
-          pending +
-          '명 · 이메일 인증 완료 후 승인할 수 있습니다.</p>'
-        : '') +
-        visible
-          .map((u) => {
-            const label = u.registrationPending ? '가입 승인' : u.isActive ? '비활성화' : '활성화';
-            return (
-              '<article class="account-user"><div class="sharing-row"><span><strong>' +
-              esc(u.name) +
-              '</strong><small>' +
-              esc(u.email) +
-              ' · ' +
-              (u.isAdmin
-                ? '관리자'
-                : u.registrationPending
-                  ? u.emailVerified
-                    ? '이메일 인증 완료 · 승인 대기'
-                    : '이메일 인증 대기'
-                  : u.registrationRejected
-                    ? '가입 거절'
-                    : u.isActive
-                      ? '활성'
-                      : '비활성') +
-              '</small></span>' +
-              (u.isAdmin
-                ? '<span class="badge neutral">관리자</span>'
-                : u.registrationPending
-                  ? '<button class="button small primary" data-registration-review="' +
-                    esc(u.id) +
-                    '">신청 검토</button>'
-                  : u.registrationRejected
-                    ? '<span class="badge neutral">가입 거절</span>'
-                    : '<button class="button small" data-user-status="' +
-                      esc(u.id) +
-                      '" data-registration-pending="false" data-next-active="' +
-                      !u.isActive +
-                      '" aria-label="' +
-                      esc(u.name) +
-                      ' ' +
-                      label +
-                      '">' +
-                      label +
-                      '</button>') +
-              '</div>' +
-              (u.registrationRejected
-                ? '<p class="subtle">거절 사유: ' + esc(u.rejectionReason || '미입력') + '</p>'
-                : '') +
-              (u.registrationPending && u.reviewMailStatus
-                ? '<p class="subtle">관리자 승인 요청 · ' +
-                  {
-                    pending: '발송 대기 · 실패 시 자동 재시도',
-                    sending: '발송 중',
-                    sent: 'SMTP 전달 완료',
-                    failed: '일부 또는 전체 발송 실패',
-                  }[u.reviewMailStatus] +
-                  (u.reviewMailStatus === 'failed'
-                    ? ' <button class="auth-link" data-retry-review="' +
-                      esc(u.id) +
-                      '">실패한 메일 다시 보내기</button>'
-                    : '') +
-                  '</p>'
-                : '') +
-              (u.approvalMailStatus
-                ? '<p class="subtle">승인 안내 메일 · ' +
-                  {
-                    pending: '발송 대기 · 실패 시 자동 재시도',
-                    sending: '발송 중',
-                    sent: 'SMTP 전달 완료',
-                    failed: '발송 실패',
-                  }[u.approvalMailStatus] +
-                  (u.approvalMailStatus === 'failed' && u.isActive
-                    ? ' <button class="auth-link" data-retry-notice="' +
-                      esc(u.id) +
-                      '">다시 보내기</button>'
-                    : '') +
-                  '</p>'
-                : '') +
-              (u.isAdmin || u.registrationPending
-                ? ''
-                : u.localLogin === false
-                  ? '<p class="subtle">외부 인증 전용 계정</p>'
-                  : '<details><summary>비밀번호 재설정 · ' +
-                    esc(u.name) +
-                    '</summary><p class="subtle">새 비밀번호는 사용자에게 직접 전달하세요. 모든 기존 세션이 종료됩니다.</p><form class="server-form" data-reset-user="' +
-                    esc(u.id) +
-                    '">' +
-                    field(
-                      '새 임시 비밀번호',
-                      'password',
-                      '',
-                      'password',
-                      'required minlength="12" maxlength="256" autocomplete="new-password"',
-                    ) +
-                    '<button class="button">비밀번호 재설정</button><p class="account-result" role="status"></p></form></details>') +
-              '</article>'
-            );
-          })
-          .join('') || '<p class="subtle">해당하는 계정이 없습니다.</p>';
+    list.innerHTML = accountRows(ops.filterUsers(users), field);
   } catch (error) {
     if (list.isConnected) list.textContent = error.message;
   }
 }
+
 async function openSharing() {
   const p = project();
   if (!p || p._role !== 'owner') {
@@ -2641,11 +2554,10 @@ $('#registerButton').addEventListener('click', () => {
         registrationPolicy.domains.map(esc).join(', ') +
         '</p>'
       : '') +
-    field('이름', 'name', '', 'text', 'required maxlength="80" autocomplete="name"') +
     field('이메일', 'email', '', 'email', 'required maxlength="254" autocomplete="email"') +
-    '<small>메일의 인증 링크에서 로그인 비밀번호를 설정합니다.</small><p class="form-error" role="alert"></p><button class="button primary" type="submit">인증 메일 보내기</button><button class="auth-link" type="button" data-resend-verification>이미 신청했나요? 인증 메일 다시 받기</button><button class="auth-link" type="button" data-registration-back>로그인으로 돌아가기</button>';
+    '<small>메일의 인증 링크에서 이름과 비밀번호를 한 번만 입력합니다.</small><p class="form-error" role="alert"></p><button class="button primary" type="submit">인증 메일 보내기</button><button class="auth-link" type="button" data-resend-verification>이미 신청했나요? 인증 메일 다시 받기</button><button class="auth-link" type="button" data-registration-back>로그인으로 돌아가기</button>';
   $('#authGate').append(form);
-  form.elements.name.focus();
+  form.elements.email.focus();
   form.onsubmit = async (e) => {
     e.preventDefault();
     const button = form.querySelector('[type=submit]'),
@@ -2907,191 +2819,6 @@ $('#authGate').addEventListener('click', (e) => {
   if (e.target.closest('[data-request-reset]')) showForgotPassword();
 });
 
-async function openMailSettings() {
-  if (!currentUser?.isAdmin) return;
-  openInfo('이메일 발송 설정', '<div id="mailSettingsHost">불러오는 중…</div>');
-  $('#infoDialog').classList.add('mail-settings-dialog');
-  $('#infoDialog .eyebrow').textContent = '관리자 설정';
-  const host = $('#mailSettingsHost'),
-    q = (selector) => host.querySelector(selector);
-  try {
-    let { settings } = await api('admin/mail-settings');
-    if (!host.isConnected) return;
-    let busy = false;
-    host.innerHTML =
-      '<p>가입 인증·관리자 승인 요청·승인 안내·비밀번호 재설정에 사용할 메일 서버를 설정하세요. 저장하면 바로 적용됩니다.</p><form id="mailSettingsForm" class="server-form"><fieldset class="smtp-fields"><label class="mail-flag"><input name="enabled" type="checkbox">이메일 발송 사용</label><label class="field">승인 요청 수신 이메일<textarea name="reviewRecipients" rows="2" maxlength="4096" placeholder="admin@example.com, team@example.com" aria-describedby="reviewRecipientsHint"></textarea></label><p class="subtle" id="reviewRecipientsHint">쉼표나 줄바꿈으로 구분해 최대 10개. 비워두면 활성 관리자들의 등록 이메일로 보냅니다.</p><div class="mail-settings-grid">' +
-      field(
-        'SMTP 서버',
-        'host',
-        '',
-        'text',
-        'maxlength="253" placeholder="smtp.example.com" autocomplete="off"',
-      ) +
-      field('포트', 'port', '', 'number', 'required min="1" max="65535"') +
-      '<label class="field">보안 연결<select name="security"><option value="starttls">STARTTLS · 보통 587번</option><option value="tls">TLS · 보통 465번</option></select></label>' +
-      field(
-        '발신 이메일',
-        'from',
-        '',
-        'email',
-        'maxlength="254" placeholder="pmcanvas@example.com"',
-      ) +
-      '</div><label class="mail-flag"><input name="authEnabled" type="checkbox">SMTP 인증 사용</label><div class="mail-settings-grid" id="smtpAuthFields">' +
-      field('인증 계정', 'username', '', 'text', 'maxlength="254" autocomplete="off"') +
-      field(
-        'SMTP 비밀번호',
-        'smtpPassword',
-        '',
-        'password',
-        'maxlength="4096" autocomplete="new-password"',
-      ) +
-      '</div><p class="subtle" id="smtpPasswordHint"></p></fieldset><div class="mail-save-row"><button type="submit" class="button primary">설정 저장</button><span id="mailEnabledStatus" class="subtle"></span></div><p class="account-result" role="status" id="mailSaveResult"></p></form><section class="account-section"><h3>테스트 메일</h3><p class="subtle" id="mailTestHint"></p><form id="mailTestForm" class="server-form">' +
-      field(
-        '받는 이메일',
-        'to',
-        currentUser.email,
-        'email',
-        'required maxlength="254" autocomplete="email"',
-      ) +
-      '<button class="button" type="submit">테스트 메일 보내기</button><p class="account-result" role="status" id="mailTestResult"></p></form></section>';
-    const form = q('#mailSettingsForm'),
-      test = q('#mailTestForm'),
-      e = form.elements;
-    const value = () => ({
-      enabled: e.enabled.checked,
-      host: e.host.value.trim(),
-      port: Number(e.port.value),
-      secure: e.security.value === 'tls',
-      from: e.from.value.trim(),
-      authEnabled: e.authEnabled.checked,
-      username: e.username.value.trim(),
-      password: e.smtpPassword.value,
-      reviewRecipients: e.reviewRecipients.value,
-      revision: settings.revision,
-    });
-    const dirty = () => {
-      const v = value();
-      return (
-        !!v.password ||
-        v.reviewRecipients.trim() !== (settings.reviewRecipients || []).join(', ') ||
-        ['enabled', 'host', 'port', 'secure', 'from', 'authEnabled', 'username'].some(
-          (k) => v[k] !== settings[k],
-        )
-      );
-    };
-    const refresh = () => {
-      const changed = dirty();
-      form.querySelector('[type=submit]').disabled = busy || !changed;
-      test.querySelector('[type=submit]').disabled = busy || changed || !settings.enabled;
-      q('#mailTestHint').textContent = changed
-        ? '변경한 설정을 먼저 저장해 주세요.'
-        : settings.enabled
-          ? '저장된 설정으로 테스트 메일을 보냅니다.'
-          : '이메일 발송을 켜고 저장하면 테스트할 수 있어요.';
-      e.host.required = e.from.required = e.enabled.checked;
-      e.username.required = e.enabled.checked && e.authEnabled.checked;
-      e.username.disabled = e.smtpPassword.disabled = !e.authEnabled.checked;
-      q('#smtpAuthFields').hidden = !e.authEnabled.checked;
-      q('#smtpPasswordHint').textContent = !e.authEnabled.checked
-        ? '인증을 끄고 저장하면 등록된 계정과 비밀번호를 삭제합니다.'
-        : settings.hasPassword
-          ? '비밀번호가 등록되어 있습니다. 빈칸이면 기존 값을 유지합니다. 서버나 계정을 바꿀 때는 다시 입력하세요.'
-          : '인증을 사용하는 메일 서버라면 비밀번호를 입력하세요.';
-    };
-    const populate = () => {
-      e.enabled.checked = settings.enabled;
-      e.host.value = settings.host;
-      e.port.value = settings.port;
-      e.security.value = settings.secure ? 'tls' : 'starttls';
-      e.from.value = settings.from;
-      e.authEnabled.checked = settings.authEnabled;
-      e.username.value = settings.username;
-      e.reviewRecipients.value = (settings.reviewRecipients || []).join(', ');
-      e.smtpPassword.value = '';
-      e.smtpPassword.placeholder = settings.hasPassword ? '등록됨 · 변경할 때만 입력' : '';
-      q('#smtpPasswordHint').textContent = settings.hasPassword
-        ? '비밀번호가 등록되어 있습니다. 빈칸이면 기존 값을 유지합니다. 서버나 계정을 바꿀 때는 다시 입력하세요.'
-        : '인증을 사용하는 메일 서버라면 비밀번호를 입력하세요.';
-      q('#mailEnabledStatus').textContent = settings.enabled ? '발송 사용 중' : '발송 중지';
-      refresh();
-    };
-    form.addEventListener('input', () => {
-      q('#mailTestResult').textContent = '';
-      refresh();
-    });
-    form.addEventListener('change', (event) => {
-      if (event.target === e.security) e.port.value = e.security.value === 'tls' ? '465' : '587';
-      refresh();
-    });
-    form.onsubmit = async (event) => {
-      event.preventDefault();
-      if (busy) return;
-      busy = true;
-      const data = value();
-      q('fieldset').disabled = true;
-      refresh();
-      q('#mailSaveResult').textContent = '저장 중…';
-      try {
-        ({ settings } = await api('admin/mail-settings', { method: 'PUT', body: data }));
-        resetEmailEnabled = settings.enabled;
-        if (host.isConnected) {
-          populate();
-          q('#mailSaveResult').textContent = '저장했습니다. 새 설정이 적용됐습니다.';
-          q('#mailTestResult').textContent = '';
-        }
-      } catch (error) {
-        if (host.isConnected) {
-          q('#mailSaveResult').textContent = error.message;
-          if (error.status === 401) {
-            e.smtpPassword.value = '';
-            $('#infoDialog').close();
-            showAuth(error.message);
-          }
-        }
-      } finally {
-        busy = false;
-        if (host.isConnected) {
-          q('fieldset').disabled = false;
-          refresh();
-        }
-      }
-    };
-    test.onsubmit = async (event) => {
-      event.preventDefault();
-      if (busy || dirty() || !settings.enabled) return;
-      busy = true;
-      refresh();
-      test.elements.to.disabled = true;
-      q('#mailTestResult').textContent = '테스트 메일 발송 중…';
-      try {
-        const result = await api('admin/mail-settings/test', {
-          method: 'POST',
-          body: { to: test.elements.to.value },
-        });
-        if (host.isConnected) q('#mailTestResult').textContent = result.message;
-      } catch (error) {
-        if (host.isConnected) {
-          q('#mailTestResult').textContent = error.message;
-          if (error.status === 401) {
-            $('#infoDialog').close();
-            showAuth(error.message);
-          }
-        }
-      } finally {
-        busy = false;
-        if (host.isConnected) {
-          test.elements.to.disabled = false;
-          refresh();
-        }
-      }
-    };
-    populate();
-    e.host.focus();
-  } catch (error) {
-    if (host.isConnected) host.textContent = error.message;
-  }
-}
-
 function opsCanChange() {
   if (wbs.dirty || storageError || saveInFlight) {
     toast('현재 변경사항을 먼저 저장하거나 취소해 주세요.');
@@ -3108,7 +2835,20 @@ async function refreshMyWork() {
     /* A successful project save is independent of this read. */
   }
 }
+const info = createInfoDialog({ toast });
+const openMailSettings = createMailSettingsUi({
+  api,
+  field,
+  openInfo,
+  user: () => currentUser,
+  onEnabled: (enabled) => {
+    resetEmailEnabled = enabled;
+  },
+  showAuth,
+  registerGuard: info.registerGuard,
+});
 const ops = workspaceOperations({
+  dialog: info,
   api,
   esc,
   field,
@@ -3133,6 +2873,12 @@ const ops = workspaceOperations({
     state.activeId = projectId;
     dailyMode = 'project';
     navigate('daily');
+    const selected = project()?.tasks.find((task) => task.id === taskId);
+    if (selected) {
+      ownerFilter = selected.owner;
+      query = selected.name;
+      render();
+    }
     const task = [...document.querySelectorAll('[data-check-task]')].find(
       (el) => el.dataset.checkTask === taskId,
     );

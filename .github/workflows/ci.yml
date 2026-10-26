@@ -31,6 +31,7 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci --ignore-scripts
+      - run: npm run format:check
       - run: node --test --test-concurrency=2 test/*.test.mjs
       - run: npm run test:http
         env:
@@ -39,6 +40,8 @@ jobs:
         env:
           RUN_POSTGRES_TESTS: '1'
       - run: npm audit --audit-level=moderate
+      - name: Verify storage with a non-default Linux UID
+        run: docker run --rm --user 0:0 --read-only --tmpfs /tmp -v "$PWD/scripts/runtime-storage.mjs:/workspace/scripts/runtime-storage.mjs:ro" -v "$PWD/test/support/linux-storage-check.mjs:/workspace/test/support/linux-storage-check.mjs:ro" node:24-bookworm-slim node /workspace/test/support/linux-storage-check.mjs
       - name: Build backup sidecar and verify an actual isolated restore
         run: |
           docker build -f Dockerfile.backup -t pmcanvas-backup:ci .

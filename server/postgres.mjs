@@ -5,6 +5,7 @@ import { digest } from './security.mjs';
 import { cleanProject, projectChanges } from './project.mjs';
 import { WorkspaceOperations } from './workspace-operations.mjs';
 import { reviewRecipients } from './mail-settings.mjs';
+import { migrationFiles } from './migrations.mjs';
 export const publicUser = (u) => ({
   id: u.id,
   email: u.email,
@@ -29,28 +30,13 @@ export async function migrate(pool) {
     await client.query(
       'CREATE TABLE IF NOT EXISTS pm_schema_migrations(version integer PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())',
     );
-    for (const [version, file] of [
-      [1, '001_initial.sql'],
-      [2, '002_user_status.sql'],
-      [3, '003_federated_auth.sql'],
-      [4, '004_planning.sql'],
-      [5, '005_security.sql'],
-      [6, '006_registration.sql'],
-      [7, '007_password_reset.sql'],
-      [8, '008_mail_settings.sql'],
-      [9, '009_registration_email.sql'],
-      [10, '010_registration_review.sql'],
-      [11, '011_review_recipients.sql'],
-      [12, '012_workspace_operations.sql'],
-    ]) {
+    for (const { version, file } of migrationFiles()) {
       const { rows } = await client.query(
         'SELECT version FROM pm_schema_migrations WHERE version=$1',
         [version],
       );
       if (!rows.length) {
-        await client.query(
-          fs.readFileSync(new URL('../migrations/' + file, import.meta.url), 'utf8'),
-        );
+        await client.query(fs.readFileSync(file, 'utf8'));
         await client.query('INSERT INTO pm_schema_migrations(version) VALUES ($1)', [version]);
       }
     }

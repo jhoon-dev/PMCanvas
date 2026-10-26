@@ -163,16 +163,15 @@ export class WorkspaceOperations {
     });
   }
   async listTrash(userId) {
-    await this.cleanupTrash();
     const projects = (
       await this.pool.query(
-        'SELECT p.id,p.id AS "projectId",p.name,\'project\' AS type,p.deleted_at AS "deletedAt",p.deleted_at+interval \'30 days\' AS "expiresAt" FROM pm_projects p JOIN pm_project_access a ON a.project_id=p.id WHERE a.user_id=$1 AND a.role=\'owner\' AND p.deleted_at IS NOT NULL',
+        "SELECT p.id,p.id AS \"projectId\",p.name,'project' AS type,p.deleted_at AS \"deletedAt\",p.deleted_at+interval '30 days' AS \"expiresAt\" FROM pm_projects p JOIN pm_project_access a ON a.project_id=p.id WHERE a.user_id=$1 AND a.role='owner' AND p.deleted_at>now()-interval '30 days'",
         [userId],
       )
     ).rows;
     const tasks = (
       await this.pool.query(
-        "SELECT t.id,t.project_id AS \"projectId\",p.name,'tasks' AS type,t.deleted_at AS \"deletedAt\",t.deleted_at+interval '30 days' AS \"expiresAt\",jsonb_array_length(t.document->'tasks') AS count FROM pm_deleted_tasks t JOIN pm_projects p ON p.id=t.project_id JOIN pm_project_access a ON a.project_id=p.id WHERE a.user_id=$1 AND a.role IN ('owner','editor') AND p.deleted_at IS NULL",
+        "SELECT t.id,t.project_id AS \"projectId\",p.name,'tasks' AS type,t.deleted_at AS \"deletedAt\",t.deleted_at+interval '30 days' AS \"expiresAt\",jsonb_array_length(t.document->'tasks') AS count FROM pm_deleted_tasks t JOIN pm_projects p ON p.id=t.project_id JOIN pm_project_access a ON a.project_id=p.id WHERE a.user_id=$1 AND a.role IN ('owner','editor') AND p.deleted_at IS NULL AND t.deleted_at>now()-interval '30 days'",
         [userId],
       )
     ).rows;
@@ -234,15 +233,21 @@ export class WorkspaceOperations {
   async backupStatus() {
     const settings = (
       await this.pool.query(
-        'SELECT enabled,hour,retention_days AS "retentionDays",verify_restore AS "verifyRestore",revision,next_run_at AS "nextRunAt",requested,worker_seen_at AS "workerSeenAt",lease_until AS "leaseUntil" FROM pm_backup_settings WHERE id=true',
+        'SELECT enabled,hour,retention_days AS "retentionDays",verify_restore AS "verifyRestore",time_zone AS "timeZone",revision,next_run_at AS "nextRunAt",requested,worker_seen_at AS "workerSeenAt",lease_until AS "leaseUntil" FROM pm_backup_settings WHERE id=true',
       )
     ).rows[0];
     const runs = (
       await this.pool.query(
-        'SELECT id,started_at AS "startedAt",finished_at AS "finishedAt",state,filename,bytes,verified,message FROM pm_backup_runs ORDER BY started_at DESC LIMIT 20',
+        'SELECT id,started_at AS "startedAt",finished_at AS "finishedAt",state,filename,bytes,verified,message,key_fingerprint AS "keyFingerprint" FROM pm_backup_runs ORDER BY started_at DESC LIMIT 20',
       )
     ).rows;
-    return { settings, runs };
+    const summary = (
+      await this.pool.query(`SELECT
+      max(finished_at) FILTER (WHERE state='success') AS "lastSuccessAt",
+      max(finished_at) FILTER (WHERE state='success' AND verified) AS "lastVerifiedAt"
+      FROM pm_backup_runs`)
+    ).rows[0];
+    return { settings, runs, summary };
   }
   async saveBackupSettings(actorId, b) {
     return this.transaction(async (c) => {
@@ -252,9 +257,23 @@ export class WorkspaceOperations {
         ])
       ).rows[0];
       if (!a?.is_admin || !a.is_active) fail(403, 'FORBIDDEN', '관리자 권한이 필요합니다.');
+      if (
+        b.timeZone &&
+        !(await c.query('SELECT name FROM pg_timezone_names WHERE name=$1', [b.timeZone])).rowCount
+      ) {
+        fail(400, 'INVALID_BACKUP_SETTINGS', '서버에서 지원하는 IANA 시간대를 입력해 주세요.');
+      }
       const r = await c.query(
-        "UPDATE pm_backup_settings SET enabled=$2,hour=$3,retention_days=$4,verify_restore=$5,revision=revision+1,updated_by=$1,next_run_at=((date_trunc('day',now() AT TIME ZONE 'Asia/Seoul')+($3::integer*interval '1 hour')+CASE WHEN extract(hour FROM now() AT TIME ZONE 'Asia/Seoul')>=$3::integer THEN interval '1 day' ELSE interval '0 day' END) AT TIME ZONE 'Asia/Seoul') WHERE id=true AND revision=$6 RETURNING id",
-        [actorId, b.enabled, b.hour, b.retentionDays, b.verifyRestore, b.revision],
+        'UPDATE pm_backup_settings SET enabled=$2,hour=$3,retention_days=$4,verify_restore=$5,revision=revision+1,updated_by=$1,time_zone=COALESCE($7,time_zone),next_run_at=pm_next_backup_at($3::integer,COALESCE($7,time_zone)) WHERE id=true AND revision=$6 RETURNING id',
+        [
+          actorId,
+          b.enabled,
+          b.hour,
+          b.retentionDays,
+          b.verifyRestore,
+          b.revision,
+          b.timeZone ?? null,
+        ],
       );
       if (!r.rowCount)
         fail(409, 'BACKUP_CONFLICT', '다른 관리자가 설정을 변경했습니다. 다시 열어 주세요.');

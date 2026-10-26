@@ -39,7 +39,7 @@ async function fixture(t, { failAt = '', verify = true } = {}) {
     job: { id: randomUUID(), verify_restore: verify, retention_days: 14 },
   };
 }
-test('백업은 격리 DB에서 복원 점검 후 정리하고 키를 별도 보존', async (t) => {
+test('백업은 격리 DB에서 복원 점검하고 덤프 폴더에 암호화 키를 쓰지 않음', async (t) => {
   const f = await fixture(t);
   await f.worker.execute(f.job);
   assert.deepEqual(
@@ -49,7 +49,8 @@ test('백업은 격리 DB에서 복원 점검 후 정리하고 키를 별도 보
   assert.notEqual(f.calls[2][1].at(-1), 'source_test');
   assert.equal(f.calls[3][1].includes('--single-transaction'), true);
   assert.ok(f.queries.some((q) => q.sql.includes("state='success'") && q.args[3] === true));
-  assert.equal((await fs.readdir(path.join(f.directory, 'keys'))).length, 1);
+  assert.equal((await fs.readdir(f.directory)).includes('keys'), false);
+  assert.match(f.queries.find((q) => q.sql.includes('key_fingerprint')).args[1], /^[a-f0-9]{64}$/);
   assert.ok((await fs.readdir(f.directory)).some(automaticBackupFile));
 });
 test('DB 생성 실패 시 기존 DB를 지우지 않으며 오류에 비밀값을 노출하지 않음', async (t) => {

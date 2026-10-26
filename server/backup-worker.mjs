@@ -30,6 +30,15 @@ export class BackupWorker {
       await c.query('UPDATE pm_backup_settings SET worker_seen_at=now() WHERE id=true');
       const s = (await c.query('SELECT * FROM pm_backup_settings WHERE id=true FOR UPDATE'))
         .rows[0];
+      if (s?.lease_id && (!s.lease_until || new Date(s.lease_until) <= new Date())) {
+        await c.query(
+          "UPDATE pm_backup_runs SET state='failed',finished_at=now(),message='작업 서비스가 중단되어 실행을 완료하지 못했습니다.' WHERE id=$1 AND state='running'",
+          [s.lease_id],
+        );
+        await c.query('UPDATE pm_backup_settings SET lease_id=NULL,lease_until=NULL WHERE id=true');
+        s.lease_id = null;
+        s.lease_until = null;
+      }
       if (
         !s ||
         (s.lease_until && new Date(s.lease_until) > new Date()) ||
@@ -43,7 +52,7 @@ export class BackupWorker {
       );
       const id = randomUUID();
       await c.query(
-        "UPDATE pm_backup_settings SET lease_id=$1,lease_until=now()+interval '30 minutes',requested=false,next_run_at=((date_trunc('day',now() AT TIME ZONE 'Asia/Seoul')+(hour*interval '1 hour')+CASE WHEN extract(hour FROM now() AT TIME ZONE 'Asia/Seoul')>=hour THEN interval '1 day' ELSE interval '0 day' END) AT TIME ZONE 'Asia/Seoul') WHERE id=true",
+        "UPDATE pm_backup_settings SET lease_id=$1,lease_until=now()+interval '30 minutes',requested=false,next_run_at=pm_next_backup_at(hour,time_zone) WHERE id=true",
         [id],
       );
       await c.query("INSERT INTO pm_backup_runs(id,state) VALUES ($1,'running')", [id]);
@@ -88,17 +97,11 @@ export class BackupWorker {
       await fs.mkdir(this.directory, { recursive: true, mode: 0o700 });
       const key = await fs.readFile(this.env.BACKUP_KEY_FILE || '/run/secrets/mfa.key');
       if (key.length !== 32) throw Error('Invalid key');
-      const keys = path.join(this.directory, 'keys');
-      await fs.mkdir(keys, { recursive: true, mode: 0o700 });
-      const keyfile = path.join(
-        keys,
-        'key-' + createHash('sha256').update(key).digest('hex') + '.bin',
-      );
-      try {
-        await fs.writeFile(keyfile, key, { flag: 'wx', mode: 0o600 });
-      } catch (e) {
-        if (e.code !== 'EEXIST' || !(await fs.readFile(keyfile)).equals(key)) throw e;
-      }
+      // Record only an identifier; decryption keys are stored separately from dumps.
+      await this.pool.query('UPDATE pm_backup_runs SET key_fingerprint=$2 WHERE id=$1', [
+        job.id,
+        createHash('sha256').update(key).digest('hex'),
+      ]);
       stage = 'DB 백업';
       await this.command('pg_dump', ['-Fc', '--file', file], this.env);
       await fs.chmod(file, 0o600);
