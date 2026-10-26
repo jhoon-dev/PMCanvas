@@ -120,3 +120,18 @@ export {
   dateToolbar,
   empty,
 };
+
+const field = (label, name, value = '', type = 'text', extra = '') =>
+  '<label class="field">' +
+  label +
+  '<input name="' +
+  name +
+  '" type="' +
+  type +
+  '" value="' +
+  esc(value) +
+  '" ' +
+  extra +
+  '></label>';
+
+export { field };

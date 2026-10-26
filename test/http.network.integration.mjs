@@ -288,7 +288,14 @@ networkTest('하위 경로 /pmcanvas에서 화면과 API 실행, 임의 파일�
   const origin = f.base.replace('/pmcanvas/api/', '');
   assert.equal((await fetch(origin + '/pmcanvas/')).status, 200);
   assert.equal((await fetch(origin + '/pmcanvas/api-client.js')).status, 200);
-  for (const file of ['dashboard-view.js', 'wbs-view.js', 'view-ui.js']) {
+  for (const file of [
+    'dashboard-view.js',
+    'wbs-view.js',
+    'view-ui.js',
+    'auth-ui.js',
+    'daily-view.js',
+    'people-view.js',
+  ]) {
     const response = await fetch(origin + '/pmcanvas/' + file);
     assert.equal(response.status, 200);
     assert.match(response.headers.get('content-type'), /javascript/);

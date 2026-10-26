@@ -120,6 +120,9 @@ export function createHandler({
     ...[
       'app.js',
       'dashboard-view.js',
+      'auth-ui.js',
+      'daily-view.js',
+      'people-view.js',
       'wbs-view.js',
       'view-ui.js',
       'api-client.js',

@@ -1,3 +1,6 @@
+import { createAuthUi } from './auth-ui.js';
+import { dailyView, filteredTasks, recordCompletion } from './daily-view.js';
+import { peopleView, memberEditor, updateMember } from './people-view.js';
 import { escapeHtml as esc } from './html.js';
 import { accountRows } from './account-ui.js';
 import { createMailSettingsUi } from './mail-settings-ui.js';
@@ -8,37 +11,14 @@ import { workspaceOperations } from './operations-ui.js';
 import { myWorkView } from './my-work-ui.js';
 import { WbsView } from './wbs-view.js';
 import { dashboardView } from './dashboard-view.js';
-import {
-  icon,
-  pct,
-  num,
-  short,
-  full,
-  btn,
-  avatar as renderAvatar,
-  person as renderPerson,
-  meter,
-  badge as taskBadge,
-  pageHead,
-  dateToolbar as reportDateToolbar,
-  empty,
-} from './view-ui.js';
+import { icon, num, btn, pageHead, empty, field } from './view-ui.js';
 let currentUser = null,
   saveInFlight = false,
   mutationSequence = 0,
   fetchSequence = 0,
   myProjects = [],
   dailyMode = 'mine';
-const resetLanding = location.hash.startsWith('#reset-password'),
-  verificationLanding = location.hash.startsWith('#verify-email');
-let emailVerificationToken = location.hash.match(/^#verify-email=([A-Za-z0-9_-]{43})$/)?.[1] || '';
-let passwordResetToken = location.hash.match(/^#reset-password=([A-Za-z0-9_-]{43})$/)?.[1] || '';
-if (resetLanding || verificationLanding)
-  history.replaceState(null, '', location.pathname + location.search);
-let resetEmailEnabled = false,
-  reviewLanding = location.hash === '#registration-approvals';
-let loginProvider = '',
-  registrationPolicy = { mode: 'disabled', domains: [] };
+let reviewLanding = location.hash === '#registration-approvals';
 import { csvText, wbsRows, completionRecords, completionRows } from './reports.js';
 import {
   today,
@@ -46,8 +26,6 @@ import {
   shiftWorkday,
   nextWorkday,
   validDate,
-  taskHours,
-  earned,
   progress,
   summary,
   validateProject,
@@ -120,10 +98,6 @@ function toast(text) {
   clearTimeout(window.toastTimer);
   window.toastTimer = setTimeout(() => $('#toast').classList.remove('show'), 3500);
 }
-const avatar = (m, size = '') => renderAvatar(project(), m, size),
-  person = (id) => renderPerson(project(), id),
-  badge = (t) => taskBadge(t, asOf),
-  dateToolbar = (extra = '') => reportDateToolbar(asOf, extra);
 function render() {
   document.body.dataset.appView = view;
   if (!state.projects.length) {
@@ -205,10 +179,19 @@ function render() {
       content = wbs.render(p, asOf);
       break;
     case 'daily':
-      content = dailyView(p, s);
+      content = dailyView(p, {
+        asOf,
+        currentDate: TODAY,
+        ownerFilter,
+        statusFilter,
+        query,
+        onlyPending,
+        dailyMode,
+        myProjects,
+      });
       break;
     case 'people':
-      content = peopleView(p, s);
+      content = peopleView(p, s, asOf);
       break;
     default:
       content = dashboardView(p, s, asOf);
@@ -222,211 +205,6 @@ function hydrateIcons() {
   document.querySelectorAll('[data-icon]').forEach((e) => {
     e.innerHTML = icon(e.dataset.icon);
   });
-}
-function filterControls() {
-  return (
-    '<div class="filter-controls"><input type="search" id="taskSearch" placeholder="업무 검색" value="' +
-    esc(query) +
-    '" aria-label="업무 검색"><select id="ownerFilter" aria-label="담당자 필터"><option value="">전체 담당자</option>' +
-    project()
-      .members.map(
-        (m) =>
-          '<option value="' +
-          esc(m.id) +
-          '" ' +
-          (m.id === ownerFilter ? 'selected' : '') +
-          '>' +
-          esc(m.name) +
-          '</option>',
-      )
-      .join('') +
-    '</select><select id="statusFilter" aria-label="상태 필터"><option value="">전체 상태</option><option value="active" ' +
-    (statusFilter === 'active' ? 'selected' : '') +
-    '>진행 중</option><option value="late" ' +
-    (statusFilter === 'late' ? 'selected' : '') +
-    '>지연</option><option value="done" ' +
-    (statusFilter === 'done' ? 'selected' : '') +
-    '>완료</option></select></div>'
-  );
-}
-function filteredTasks(p) {
-  return p.tasks.filter(
-    (t) =>
-      (!ownerFilter || t.owner === ownerFilter) &&
-      (!query || t.name.toLowerCase().includes(query.toLowerCase())) &&
-      (!statusFilter ||
-        (statusFilter === 'done'
-          ? progress(t, asOf) === 1
-          : statusFilter === 'late'
-            ? t.end < asOf && progress(t, asOf) < 1
-            : progress(t, asOf) > 0 && progress(t, asOf) < 1)),
-  );
-}
-function dailyView(p, s) {
-  const toggle =
-    '<div class="daily-mode"><button class="button small ' +
-    (dailyMode === 'mine' ? 'primary' : '') +
-    '" data-daily-mode="mine">내 업무</button><button class="button small ' +
-    (dailyMode === 'project' ? 'primary' : '') +
-    '" data-daily-mode="project">프로젝트 전체</button></div>';
-  if (dailyMode === 'mine')
-    return myWorkView({
-      projects: myProjects,
-      esc,
-      progress,
-      today: TODAY,
-      projectMode: toggle,
-      canLink: p._role === 'owner',
-    });
-  const ts = filteredTasks(p),
-    items = ts.flatMap((t) => t.items.map((i) => ({ t, i }))),
-    done = items.filter((x) => x.i.doneDate === asOf).length;
-  return (
-    pageHead(
-      'DAILY CHECK-IN',
-      '매일 작업 체크',
-      '담당자를 선택하고, 실제로 완료한 작업만 체크해 주세요.',
-      btn('완료 내역', 'history') + btn('＋ 업무 추가', 'task', 'primary'),
-    ) +
-    toggle +
-    dateToolbar(filterControls()) +
-    '<div class="daily-summary"><div class="daily-summary-icon">' +
-    icon('check') +
-    '</div><div><strong>' +
-    full(asOf) +
-    '의 완료 기록</strong><p>체크하면 완료일이 기록되고 진척률과 예상 완료일을 다시 계산합니다.</p></div><span class="daily-count">' +
-    done +
-    '<small>개 완료</small></span></div><div class="section-toolbar"><span>' +
-    items.length +
-    '개 체크 항목 · 예상 공수 기준으로 반영</span><label class="toggle-label"><input type="checkbox" id="onlyPending" ' +
-    (onlyPending ? 'checked' : '') +
-    '>미완료만 보기</label></div>' +
-    (ts.length
-      ? ts
-          .map((t) => {
-            const visible = t.items.filter((i) => !onlyPending || !i.doneDate || i.doneDate > asOf);
-            if (!visible.length) return '';
-            return (
-              '<article class="panel check-panel"><div class="check-task-head"><div><span class="eyebrow">' +
-              esc(t.phase || '일반') +
-              '</span><h2>' +
-              esc(t.name) +
-              '</h2><div class="task-meta">' +
-              person(t.owner) +
-              '<span>' +
-              short(t.start) +
-              ' — ' +
-              short(t.end) +
-              '</span>' +
-              badge(t) +
-              '</div></div><div class="check-task-progress"><strong>' +
-              pct(progress(t, asOf)) +
-              '</strong>' +
-              meter(progress(t, asOf)) +
-              '</div></div><div class="check-items">' +
-              visible
-                .map((i) => {
-                  const checked = i.doneDate && i.doneDate <= asOf,
-                    future = i.doneDate && i.doneDate > asOf;
-                  return (
-                    '<label class="check-item ' +
-                    (checked ? 'is-done' : '') +
-                    '"><input type="checkbox" data-check-task="' +
-                    esc(t.id) +
-                    '" data-check-item="' +
-                    esc(i.id) +
-                    '" ' +
-                    (checked ? 'checked' : '') +
-                    ' ' +
-                    (future ? 'disabled' : '') +
-                    '><span class="check-box">' +
-                    icon('check') +
-                    '</span><span class="grow"><strong>' +
-                    esc(i.title) +
-                    '</strong><small>' +
-                    (future
-                      ? short(i.doneDate) + '에 완료된 작업'
-                      : checked
-                        ? short(i.doneDate) + ' 완료'
-                        : '아직 완료하지 않은 작업') +
-                    '</small></span><span class="effort-chip">' +
-                    num(i.hours) +
-                    'h</span></label>'
-                  );
-                })
-                .join('') +
-              '</div></article>'
-            );
-          })
-          .join('')
-      : empty('체크할 업무가 없습니다', '업무를 추가하거나 담당자·상태 필터를 변경해 주세요.')) +
-    '<p class="view-note">완료 체크는 선택한 보고 기준일로 기록됩니다. 주말에도 실제로 완료한 작업을 기록할 수 있습니다.</p>'
-  );
-}
-function peopleView(p, s) {
-  return (
-    pageHead(
-      'PROJECT TEAM',
-      '참여인력',
-      '누가 어떤 일을 맡고 있는지, 투입 현황을 함께 확인하세요.',
-      btn('＋ 참여인력 추가', 'member', 'primary'),
-    ) +
-    '<div class="notice">' +
-    icon('users') +
-    '<span>등급은 인력 분류에 사용합니다. 예상일은 근무시간·투입률·계획 일정·완료 기록으로 계산합니다.</span></div>' +
-    (p.members.length
-      ? '<section class="team-grid">' +
-        p.members
-          .map((m, idx) => {
-            const ts = p.tasks.filter((t) => t.owner === m.id),
-              total = ts.reduce((a, t) => a + taskHours(t), 0),
-              done = ts.reduce((a, t) => a + earned(t, asOf), 0),
-              pc = s.forecast.pace[m.id];
-            return (
-              '<article class="panel member-card"><div class="member-top">' +
-              avatar(m, 'large') +
-              '<button class="icon-button" data-edit-member="' +
-              esc(m.id) +
-              '" aria-label="' +
-              esc(m.name) +
-              ' 수정">' +
-              icon('more') +
-              '</button></div><h2>' +
-              esc(m.name) +
-              '</h2><div class="member-role">' +
-              esc(m.role) +
-              '<span>·</span><span class="grade">' +
-              esc(m.grade) +
-              '</span></div><div class="member-stats"><div><small>투입률</small><strong>' +
-              m.allocation +
-              '<em>%</em></strong></div><div><small>일 가용시간</small><strong>' +
-              num((m.hours * m.allocation) / 100) +
-              '<em>h</em></strong></div><div><small>담당 업무</small><strong>' +
-              ts.length +
-              '<em>개</em></strong></div></div><div class="member-progress-label"><span>담당 업무 진척률</span><strong>' +
-              (total ? pct(done / total) : '—') +
-              '</strong></div>' +
-              meter(total ? done / total : 0) +
-              '<div class="member-foot">' +
-              num(done) +
-              ' / ' +
-              num(total) +
-              'h 완료 작업량</div><div class="pace-note">' +
-              (pc.observed
-                ? '최근 속도 반영 · 계획 대비 ' + num(pc.ratio * 100) + '%'
-                : '계획 기준 추정 · 완료 기록 수집 중') +
-              '</div></article>'
-            );
-          })
-          .join('') +
-        '</section>'
-      : empty(
-          '함께할 인력을 추가해 주세요',
-          '이름과 역할, 등급, 투입률만 입력하면 시작할 수 있어요.',
-          'member',
-          '참여인력 추가',
-        ))
-  );
 }
 function openInfo(title, body) {
   info.resetGuard();
@@ -448,18 +226,6 @@ function help() {
     '<div class="help-step"><b>01</b><div><h3>참여인력 등록</h3><p>이름, 역할, 등급과 이 프로젝트에 투입할 비율을 입력합니다.</p></div></div><div class="help-step"><b>02</b><div><h3>업무와 세부 작업 등록</h3><p>예상 시작·종료일과 담당자를 정하고, 하루 단위로 완료 여부를 확인할 수 있게 작은 작업으로 나눕니다. 세부 작업마다 예상 시간을 입력합니다.</p></div></div><div class="help-step"><b>03</b><div><h3>매일 완료 체크</h3><p>매일 작업 체크에서 담당자를 선택하고 완료한 작업을 체크합니다. 대시보드에서 진척률과 예상 완료일을 확인합니다.</p></div></div><div class="notice">이 버전은 서버의 PostgreSQL에 저장됩니다. 소유자가 프로젝트 공유에서 편집자·조회자를 추가할 수 있습니다. 화면은 15초마다 갱신되며, 동시 수정은 충돌을 표시합니다. JSON 백업·불러오기를 지원합니다.</div>',
   );
 }
-const field = (label, name, value = '', type = 'text', extra = '') =>
-  '<label class="field">' +
-  label +
-  '<input name="' +
-  name +
-  '" type="' +
-  type +
-  '" value="' +
-  esc(value) +
-  '" ' +
-  extra +
-  '></label>';
 function itemEditor(i = { id: uid(), title: '', hours: 4, doneDate: null }) {
   return (
     '<div class="item-editor" data-item-id="' +
@@ -509,35 +275,9 @@ function openEditor(type, id = '') {
       (type === 'project' ? '' : esc((p.holidays || []).join('\n'))) +
       '</textarea><small>월–금 근무 기준입니다. 공휴일·팀 휴무일을 한 줄에 하나씩 입력하세요.</small></label>';
   } else if (type === 'member') {
-    const m = p.members.find((x) => x.id === id) || {
-      name: '',
-      role: '개발',
-      grade: '중급',
-      hours: 8,
-      allocation: 100,
-    };
-    $('#dialogTitle').textContent = id ? '참여인력 수정' : '참여인력 추가';
-    body =
-      field('이름', 'name', m.name, 'text', 'required maxlength="80" placeholder="참여인력 이름"') +
-      '<div class="form-grid">' +
-      field('역할', 'role', m.role, 'text', 'required maxlength="40" list="roles"') +
-      field('등급', 'grade', m.grade, 'text', 'required maxlength="40" list="grades"') +
-      '</div><datalist id="roles"><option>PM</option><option>기획</option><option>개발</option><option>디자인</option><option>QA</option></datalist><datalist id="grades"><option>특급</option><option>고급</option><option>중급</option><option>초급</option></datalist><div class="form-grid">' +
-      field(
-        '하루 근무시간 (h)',
-        'hours',
-        m.hours,
-        'number',
-        'required min=".1" max="16" step=".1"',
-      ) +
-      field(
-        '프로젝트 투입률 (%)',
-        'allocation',
-        m.allocation,
-        'number',
-        'required min="1" max="100" step="1"',
-      ) +
-      '</div><div class="notice">등급은 직접 입력할 수 있습니다. 예상일 계산에는 근무시간과 투입률이 반영됩니다.</div>';
+    const member = memberEditor(p, id);
+    $('#dialogTitle').textContent = member.title;
+    body = member.body;
   } else {
     const t = p.tasks.find((x) => x.id === id) || {
       name: '',
@@ -645,17 +385,7 @@ $('#editorForm').addEventListener('submit', async (e) => {
         state.projects[state.projects.findIndex((x) => x.id === p.id)] = target;
       }
     } else if (editor.type === 'member') {
-      const m = {
-        id: editor.id || uid(),
-        name: value('name'),
-        role: value('role'),
-        grade: value('grade'),
-        hours: Number(value('hours')),
-        allocation: Number(value('allocation')),
-      };
-      if (editor.id) target.members[target.members.findIndex((x) => x.id === editor.id)] = m;
-      else target.members.push(m);
-      validateProject(target);
+      updateMember(target, editor.id, f, uid);
       state.projects[state.projects.findIndex((x) => x.id === p.id)] = target;
     } else {
       const items = [...document.querySelectorAll('.item-editor')].map((row) => ({
@@ -871,27 +601,18 @@ $('#main').addEventListener('change', async (e) => {
     onlyPending = el.checked;
     render();
   }
-  if (el.dataset.checkItem) {
-    const p = project(),
-      t = p.tasks.find((t) => t.id === el.dataset.checkTask),
-      i = t?.items.find((i) => i.id === el.dataset.checkItem);
-    if (!i) return;
-    if (asOf > TODAY) {
-      toast('미래 날짜에는 완료를 기록할 수 없습니다.');
-      render();
-      return;
-    }
-    i.doneDate = el.checked ? asOf : null;
-    const saved = await persist();
-    render();
-    toast(
-      saved
-        ? i.doneDate
-          ? '완료 기록을 저장했습니다. 진척률과 예상일을 갱신했어요.'
-          : '완료 체크를 취소했습니다.'
-        : '저장 실패 · 현재 데이터를 백업해 주세요.',
-    );
-  }
+  if (el.dataset.checkItem)
+    await recordCompletion({
+      project: project(),
+      taskId: el.dataset.checkTask,
+      itemId: el.dataset.checkItem,
+      checked: el.checked,
+      asOf,
+      currentDate: TODAY,
+      persist,
+      onRender: render,
+      toast,
+    });
 });
 $('#main').addEventListener('input', (e) => {
   if (e.target.id === 'taskSearch') {
@@ -909,28 +630,7 @@ window.addEventListener('hashchange', () => {
     else showAuth();
     return;
   }
-  if (location.hash.startsWith('#verify-email')) {
-    const value = location.hash.match(/^#verify-email=([A-Za-z0-9_-]{43})$/)?.[1] || '';
-    history.replaceState(null, '', location.pathname + location.search);
-    if (wbs.dirty || storageError || saveInFlight) {
-      toast('현재 변경사항을 저장한 뒤 인증 링크를 다시 열어 주세요.');
-      return;
-    }
-    emailVerificationToken = value;
-    showEmailVerification();
-    return;
-  }
-  if (location.hash.startsWith('#reset-password')) {
-    const value = location.hash.match(/^#reset-password=([A-Za-z0-9_-]{43})$/)?.[1] || '';
-    history.replaceState(null, '', location.pathname + location.search);
-    if (wbs.dirty || storageError || saveInFlight) {
-      toast('현재 변경사항을 저장한 뒤 이메일의 재설정 링크를 다시 열어 주세요.');
-      return;
-    }
-    passwordResetToken = value;
-    showPasswordReset();
-    return;
-  }
+  if (auth.handleHash()) return;
   const next = normalizeView(location.hash.slice(1));
   if (next === view) return;
   if (wbs.dirty && next !== 'tasks') {
@@ -1043,7 +743,7 @@ function downloadReport(rows, label) {
 }
 function exportWbs() {
   const p = view === 'tasks' ? wbs.snapshot() : project(),
-    tasks = view === 'tasks' ? wbs.visible({ includeCollapsed: true }) : filteredTasks(p);
+    tasks = view === 'tasks' ? wbs.visible({ includeCollapsed: true }) : filterDailyTasks(p);
   if (!tasks.length) {
     toast('출력할 업무가 없습니다. 검색 조건을 확인해 주세요.');
     return;
@@ -1188,84 +888,7 @@ function updateAccessUi() {
     : '팀과 함께하는 프로젝트';
 }
 function showAuth(message = '') {
-  $('#authGate').hidden = false;
-  $('#forgotPasswordForm')?.remove();
-  $('#resetPasswordForm')?.remove();
-  $('#registrationForm')?.remove();
-  $('#verifyEmailForm')?.remove();
-  $('#resendVerificationForm')?.remove();
-  $('#loginForm').hidden = false;
-  $('#authError').textContent = message;
-  if (currentUser) $('#loginEmail').value = currentUser.email;
-}
-async function initializeAuthentication() {
-  const messages = {
-    SSO_FAILED: '외부 인증에 실패했거나 요청이 만료되었습니다. 다시 시작해 주세요.',
-    IDENTITY_UNLINKED: '관리자에게 외부 계정 연결을 요청해 주세요.',
-    DOMAIN_DENIED: '허용된 조직 계정이 아닙니다.',
-    ACCOUNT_DISABLED: '비활성화된 계정입니다. 관리자에게 문의해 주세요.',
-    UNVERIFIED_EMAIL: '인증 서버의 이메일 검증 설정을 관리자에게 확인해 주세요.',
-  };
-  const url = new URL(location.href),
-    error = url.searchParams.get('authError');
-  if (error) {
-    $('#authError').textContent = messages[error] || messages.SSO_FAILED;
-    url.searchParams.delete('authError');
-    history.replaceState(null, '', url);
-  }
-  try {
-    const { providers, registration, passwordReset } = await api('auth/providers');
-    resetEmailEnabled = !!passwordReset?.enabled;
-    registrationPolicy = registration || registrationPolicy;
-    $('#registerButton').hidden = registrationPolicy.mode !== 'approval';
-    $('#registrationDisabled').hidden = registrationPolicy.mode === 'approval';
-    if (!providers.length) return;
-    const group = document.createElement('div');
-    group.className = 'federated-logins';
-    group.innerHTML = providers
-      .filter((p) => p.type !== 'ldap')
-      .map(
-        (p) =>
-          '<button type="button" class="button sso-login" data-sso-provider="' +
-          esc(p.id) +
-          '">' +
-          esc(p.label) +
-          '로 로그인</button>',
-      )
-      .join('');
-    const directory = providers.filter((p) => p.type === 'ldap');
-    if (directory.length)
-      group.innerHTML +=
-        '<label class="field">로그인 방식<select id="loginProvider"><option value="">PM Canvas 계정</option>' +
-        directory
-          .map((p) => '<option value="' + esc(p.id) + '">' + esc(p.label) + '</option>')
-          .join('') +
-        '</select></label>';
-    $('#loginEmail').closest('label').before(group);
-    group.addEventListener('click', (e) => {
-      const b = e.target.closest('[data-sso-provider]');
-      if (!b) return;
-      if (storageError || saveInFlight || wbs.dirty) {
-        $('#authError').textContent =
-          '현재 변경사항을 먼저 저장하거나 백업한 뒤 외부 로그인을 진행해 주세요.';
-        return;
-      }
-      location.assign(new URL('./api/auth/sso/' + b.dataset.ssoProvider + '/start', location.href));
-    });
-    group.querySelector('select')?.addEventListener('change', (e) => {
-      loginProvider = e.target.value;
-      const input = $('#loginEmail');
-      input.type = loginProvider ? 'text' : 'email';
-      input.closest('label').firstChild.textContent = loginProvider
-        ? '디렉터리 사용자명'
-        : '이메일';
-      input.value = '';
-      $('#authError').textContent = '';
-    });
-  } catch {
-    $('#authError').textContent =
-      '외부 인증 목록을 불러오지 못했습니다. 연결을 확인하거나 PM Canvas 계정으로 로그인해 주세요.';
-  }
+  auth.show(message);
 }
 async function loadProjects({ force = false } = {}) {
   if (wbs.dirty || wbs.interacting) return false;
@@ -1573,46 +1196,6 @@ async function openAudit() {
     $('#infoBody').textContent = error.message;
   }
 }
-$('#loginForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const button = e.target.querySelector('button');
-  button.disabled = true;
-  try {
-    const email = $('#loginEmail').value;
-    if (
-      (storageError || wbs.dirty) &&
-      currentUser &&
-      email.trim().toLowerCase() !== currentUser.email
-    )
-      throw Error('저장하지 못한 변경사항이 있습니다. 기존 계정으로 다시 로그인해 주세요.');
-    if ((storageError || wbs.dirty) && loginProvider)
-      throw Error('현재 변경사항을 먼저 저장하거나 백업해 주세요.');
-    const session = await api(loginProvider ? 'auth/directory' : 'auth/login', {
-      method: 'POST',
-      body: loginProvider
-        ? { provider: loginProvider, username: email, password: $('#loginPassword').value }
-        : { email, password: $('#loginPassword').value },
-    });
-    $('#loginPassword').value = '';
-    if (session.mfaRequired) {
-      showMfaLogin(session);
-      return;
-    }
-    await completeBrowserLogin(session);
-  } catch (error) {
-    $('#authError').textContent = error.message;
-    if (error.code === 'EMAIL_UNVERIFIED') {
-      const link = document.createElement('button');
-      link.type = 'button';
-      link.className = 'auth-link';
-      link.dataset.resendVerification = '';
-      link.textContent = '인증 메일 다시 받기';
-      $('#authError').append(link);
-    }
-  } finally {
-    button.disabled = false;
-  }
-});
 $('#accountButton').addEventListener('click', openAccount);
 $('#infoBody').addEventListener('submit', async (e) => {
   if (
@@ -1814,9 +1397,6 @@ setInterval(async () => {
     if (error.status === 401) showAuth(error.message);
   }
 }, 15000);
-initializeAuthentication().finally(() =>
-  verificationLanding ? showEmailVerification() : resetLanding ? showPasswordReset() : boot(),
-);
 
 let exportingExcel = false;
 async function exportExcel() {
@@ -1824,9 +1404,9 @@ async function exportExcel() {
   try {
     if (view === 'tasks') wbs.commitAll();
     const p = view === 'tasks' ? wbs.snapshot() : project(),
-      taskIds = (view === 'tasks' ? wbs.visible({ includeCollapsed: true }) : filteredTasks(p)).map(
-        (t) => t.id,
-      ),
+      taskIds = (
+        view === 'tasks' ? wbs.visible({ includeCollapsed: true }) : filterDailyTasks(p)
+      ).map((t) => t.id),
       at = asOf;
     if (!taskIds.length) {
       toast('출력할 업무가 없습니다. 검색 조건을 확인해 주세요.');
@@ -1871,75 +1451,6 @@ async function showApprovalInbox() {
     return;
   }
   await ops.admin('pending');
-}
-async function completeBrowserLogin(session) {
-  if (currentUser?.id !== session.user.id) {
-    wbs.persistDraft();
-    if (currentUser) DraftStore.clearUser(currentUser.id);
-    wbs.draft = null;
-    wbs.base = null;
-    wbs.pending.clear();
-    wbs.recovery = null;
-  }
-  currentUser = session.user;
-  $('#authGate').hidden = true;
-  $('#loginForm').hidden = false;
-  $('#mfaForm')?.remove();
-  if (storageError || wbs.dirty) render();
-  else await loadProjects();
-  if (session.recoveryCodes) {
-    openInfo(
-      'MFA 복구 코드를 보관하세요',
-      '<p>인증 앱을 사용할 수 없을 때 아래 코드를 한 번씩 사용할 수 있습니다. 안전한 오프라인 장소에 보관하세요. 이 화면에서만 표시합니다.</p><pre>' +
-        session.recoveryCodes.map(esc).join('\n') +
-        '</pre>',
-    );
-    if (reviewLanding)
-      $('#infoDialog').addEventListener(
-        'close',
-        () => {
-          showApprovalInbox().catch((error) => toast(error.message));
-        },
-        { once: true },
-      );
-  } else await showApprovalInbox();
-}
-function showMfaLogin(challenge) {
-  $('#loginForm').hidden = true;
-  $('#mfaForm')?.remove();
-  const form = document.createElement('form');
-  form.id = 'mfaForm';
-  form.className = 'auth-card';
-  form.innerHTML =
-    '<h2>관리자 2단계 인증</h2>' +
-    (challenge.enrollment
-      ? '<p>인증 앱에 아래 설정 키를 등록하고 표시되는 6자리 코드를 입력하세요.</p><label class="field">설정 키<input id="mfaSecret" readonly value="' +
-        esc(challenge.secret) +
-        '"></label><p>계정: PMCanvas · SHA1 · 6자리 · 30초</p>'
-      : '<p>인증 앱 코드 또는 일회용 복구 코드를 입력하세요.</p>') +
-    '<label class="field">인증 코드<input id="mfaCode" autocomplete="one-time-code" maxlength="64" required autofocus></label><p class="form-error" role="alert"></p><button class="button primary">인증</button><button class="button" type="button" id="cancelMfa">다시 로그인</button>';
-  $('#authGate').append(form);
-  $('#mfaCode').focus();
-  $('#cancelMfa').onclick = () => {
-    form.remove();
-    $('#loginForm').hidden = false;
-  };
-  form.onsubmit = async (e) => {
-    e.preventDefault();
-    const button = form.querySelector('button');
-    button.disabled = true;
-    try {
-      const session = await api('auth/mfa/verify', {
-        method: 'POST',
-        body: { challenge: challenge.challenge, code: $('#mfaCode').value },
-      });
-      await completeBrowserLogin(session);
-    } catch (error) {
-      form.querySelector('.form-error').textContent = error.message;
-    } finally {
-      button.disabled = false;
-    }
-  };
 }
 $('#infoBody').addEventListener('change', (e) => {
   if (e.target.id === 'draftPersist')
@@ -1991,311 +1502,6 @@ document.addEventListener('keydown', (e) => {
   });
 });
 
-function returnToLogin(email = '') {
-  $('#registrationForm')?.remove();
-  $('#forgotPasswordForm')?.remove();
-  $('#resetPasswordForm')?.remove();
-  $('#verifyEmailForm')?.remove();
-  $('#resendVerificationForm')?.remove();
-  passwordResetToken = '';
-  emailVerificationToken = '';
-  $('#loginForm').hidden = false;
-  $('#loginPassword').value = '';
-  $('#authError').textContent = '';
-  if (email) {
-    loginProvider = '';
-    const select = $('#loginProvider');
-    if (select) select.value = '';
-    $('#loginEmail').type = 'email';
-    $('#loginEmail').closest('label').firstChild.textContent = '이메일';
-    $('#loginEmail').value = email;
-    $('#loginPassword').focus();
-  } else $('#loginEmail').focus();
-}
-$('#registerButton').addEventListener('click', () => {
-  if (registrationPolicy.mode !== 'approval') return;
-  if (currentUser && (storageError || wbs.dirty)) {
-    toast('현재 계정의 변경사항을 먼저 저장하거나 백업해 주세요.');
-    return;
-  }
-  $('#loginForm').hidden = true;
-  $('#loginPassword').value = '';
-  $('#registrationForm')?.remove();
-  const form = document.createElement('form');
-  form.id = 'registrationForm';
-  form.className = 'auth-card';
-  form.innerHTML =
-    '<span class="eyebrow">PM CANVAS</span><h1>회원가입</h1><p>이메일 인증과 관리자 승인 후 사용할 수 있어요.</p>' +
-    (registrationPolicy.domains.length
-      ? '<p class="registration-domains">가입 가능 이메일: ' +
-        registrationPolicy.domains.map(esc).join(', ') +
-        '</p>'
-      : '') +
-    field('이메일', 'email', '', 'email', 'required maxlength="254" autocomplete="email"') +
-    '<small>메일의 인증 링크에서 이름과 비밀번호를 한 번만 입력합니다.</small><p class="form-error" role="alert"></p><button class="button primary" type="submit">인증 메일 보내기</button><button class="auth-link" type="button" data-resend-verification>이미 신청했나요? 인증 메일 다시 받기</button><button class="auth-link" type="button" data-registration-back>로그인으로 돌아가기</button>';
-  $('#authGate').append(form);
-  form.elements.email.focus();
-  form.onsubmit = async (e) => {
-    e.preventDefault();
-    const button = form.querySelector('[type=submit]'),
-      error = form.querySelector('.form-error'),
-      data = new FormData(form);
-    error.textContent = '';
-
-    button.disabled = true;
-    try {
-      const result = await api('auth/register', { method: 'POST', body: Object.fromEntries(data) });
-      const email = String(data.get('email'));
-      form.reset();
-      form.innerHTML =
-        '<span class="eyebrow">PM CANVAS</span><h1>신청 완료</h1><p role="status">' +
-        esc(result.message) +
-        '</p><small>인증 링크는 30분 동안 유효합니다. 승인 결과도 메일로 알려드립니다.</small><button class="auth-link" type="button" data-resend-verification>인증 메일 다시 받기</button><button class="button primary" type="button" data-registration-back>로그인으로 돌아가기</button>';
-      form.querySelector('[data-registration-back]').dataset.email = email;
-      form.querySelector('[data-resend-verification]').dataset.email = email;
-      form.querySelector('h1').tabIndex = -1;
-      form.querySelector('h1').focus();
-    } catch (err) {
-      error.textContent = err.message;
-    } finally {
-      button.disabled = false;
-    }
-  };
-});
-$('#authGate').addEventListener('click', (e) => {
-  const button = e.target.closest('[data-registration-back]');
-  if (button) returnToLogin(button.dataset.email || '');
-});
-
-function authFlowForm(id) {
-  $('#authGate').hidden = false;
-  $('#loginForm').hidden = true;
-  $('#loginPassword').value = '';
-  for (const key of [
-    'registrationForm',
-    'forgotPasswordForm',
-    'resetPasswordForm',
-    'verifyEmailForm',
-    'resendVerificationForm',
-    'mfaForm',
-  ])
-    $('#' + key)?.remove();
-  const form = document.createElement('form');
-  form.id = id;
-  form.className = 'auth-card';
-  $('#authGate').append(form);
-  return form;
-}
-function showResendVerification(email = '') {
-  if (currentUser && (storageError || wbs.dirty)) {
-    toast('현재 변경사항을 먼저 저장하거나 백업해 주세요.');
-    return;
-  }
-  emailVerificationToken = '';
-  const form = authFlowForm('resendVerificationForm');
-  form.innerHTML =
-    '<span class="eyebrow">PM CANVAS</span><h1>인증 메일 다시 받기</h1><p>가입 신청에 사용한 이메일을 입력하세요.</p>' +
-    field('이메일', 'email', email, 'email', 'required maxlength="254" autocomplete="email"') +
-    '<p class="form-error" role="alert"></p><button type="submit" class="button primary">인증 메일 보내기</button><button type="button" class="auth-link" data-registration-back>로그인으로 돌아가기</button>';
-  form.elements.email.focus();
-  form.onsubmit = async (e) => {
-    e.preventDefault();
-    const button = form.querySelector('[type=submit]'),
-      error = form.querySelector('.form-error');
-    button.disabled = true;
-    error.textContent = '';
-    try {
-      const result = await api('auth/resend-verification', {
-        method: 'POST',
-        body: { email: form.elements.email.value },
-      });
-      form.reset();
-      form.innerHTML =
-        '<span class="eyebrow">PM CANVAS</span><h1>메일을 확인해 주세요</h1><p role="status">' +
-        esc(result.message) +
-        '</p><small>가장 최근에 받은 링크를 30분 안에 사용하세요.</small><button type="button" class="button primary" data-registration-back>로그인으로 돌아가기</button>';
-      form.querySelector('h1').tabIndex = -1;
-      form.querySelector('h1').focus();
-    } catch (err) {
-      error.textContent = err.message;
-    } finally {
-      button.disabled = false;
-    }
-  };
-}
-function showEmailVerification() {
-  const form = authFlowForm('verifyEmailForm');
-  form.innerHTML =
-    '<span class="eyebrow">PM CANVAS</span><h1>이메일 인증</h1><p>본인의 이름과 로그인 비밀번호를 설정하면 인증이 완료됩니다.</p>' +
-    field('이름', 'name', '', 'text', 'required maxlength="80" autocomplete="name"') +
-    field(
-      '로그인 비밀번호',
-      'newPassword',
-      '',
-      'password',
-      'required minlength="12" maxlength="256" autocomplete="new-password"',
-    ) +
-    field(
-      '비밀번호 확인',
-      'confirmPassword',
-      '',
-      'password',
-      'required minlength="12" maxlength="256" autocomplete="new-password"',
-    ) +
-    '<small>비밀번호는 12자 이상으로 설정하세요. 인증 후 관리자 승인이 필요합니다.</small><p class="form-error" role="alert">' +
-    (emailVerificationToken ? '' : '유효하지 않은 링크입니다. 인증 메일을 다시 요청해 주세요.') +
-    '</p><button type="submit" class="button primary" ' +
-    (emailVerificationToken ? '' : 'disabled') +
-    '>이메일 인증 완료</button><button type="button" class="auth-link" data-resend-verification>인증 메일 다시 받기</button><button type="button" class="auth-link" data-registration-back>로그인으로 돌아가기</button>';
-  form.elements.name.focus();
-  form.onsubmit = async (e) => {
-    e.preventDefault();
-    const button = form.querySelector('[type=submit]'),
-      error = form.querySelector('.form-error'),
-      data = new FormData(form);
-    error.textContent = '';
-    if (data.get('newPassword') !== data.get('confirmPassword')) {
-      error.textContent = '비밀번호 확인이 일치하지 않습니다.';
-      form.elements.confirmPassword.focus();
-      return;
-    }
-    button.disabled = true;
-    try {
-      const result = await api('auth/verify-email', {
-        method: 'POST',
-        body: { ...Object.fromEntries(data), token: emailVerificationToken },
-      });
-      emailVerificationToken = '';
-      form.reset();
-      form.innerHTML =
-        '<span class="eyebrow">PM CANVAS</span><h1>이메일 인증 완료</h1><p role="status">' +
-        esc(result.message) +
-        '</p><button type="button" class="button primary" data-registration-back>로그인으로 돌아가기</button>';
-      form.querySelector('h1').tabIndex = -1;
-      form.querySelector('h1').focus();
-    } catch (err) {
-      error.textContent = err.message;
-      if (err.code === 'VERIFICATION_INVALID') {
-        emailVerificationToken = '';
-        form.reset();
-      }
-    } finally {
-      button.disabled = !emailVerificationToken;
-    }
-  };
-}
-$('#authGate').addEventListener('click', (e) => {
-  const b = e.target.closest('[data-resend-verification]');
-  if (b) showResendVerification(b.dataset.email || (!loginProvider ? $('#loginEmail').value : ''));
-});
-function showForgotPassword() {
-  if (currentUser && (storageError || wbs.dirty)) {
-    toast('현재 변경사항을 먼저 저장하거나 백업해 주세요.');
-    return;
-  }
-  passwordResetToken = '';
-  const form = authFlowForm('forgotPasswordForm');
-  form.innerHTML =
-    '<span class="eyebrow">PM CANVAS</span><h1>비밀번호 찾기</h1><p>가입한 이메일로 재설정 링크를 보내드려요.</p>' +
-    field('이메일', 'email', '', 'email', 'required maxlength="254" autocomplete="email"') +
-    '<small>회사 SSO·AD 계정은 회사 인증 서비스에서 변경하세요.</small><p class="form-error" role="alert">' +
-    (resetEmailEnabled
-      ? ''
-      : '현재 이메일 재설정을 사용할 수 없습니다. 관리자에게 문의해 주세요.') +
-    '</p><button type="submit" class="button primary" ' +
-    (resetEmailEnabled ? '' : 'disabled') +
-    '>재설정 메일 보내기</button><button type="button" class="auth-link" data-registration-back>로그인으로 돌아가기</button>';
-  if (!loginProvider) form.elements.email.value = $('#loginEmail').value;
-  form.elements.email.focus();
-  form.onsubmit = async (e) => {
-    e.preventDefault();
-    const button = form.querySelector('[type=submit]'),
-      error = form.querySelector('.form-error');
-    button.disabled = true;
-    error.textContent = '';
-    try {
-      const result = await api('auth/forgot-password', {
-        method: 'POST',
-        body: { email: form.elements.email.value },
-      });
-      form.reset();
-      form.innerHTML =
-        '<span class="eyebrow">PM CANVAS</span><h1>메일을 확인해 주세요</h1><p role="status">' +
-        esc(result.message) +
-        '</p><small>링크는 15분 동안 사용할 수 있어요.</small><button type="button" class="button primary" data-registration-back>로그인으로 돌아가기</button>';
-      form.querySelector('h1').tabIndex = -1;
-      form.querySelector('h1').focus();
-    } catch (err) {
-      error.textContent = err.message;
-    } finally {
-      button.disabled = !resetEmailEnabled;
-    }
-  };
-}
-$('#forgotPasswordButton').addEventListener('click', showForgotPassword);
-function showPasswordReset() {
-  const form = authFlowForm('resetPasswordForm');
-  form.innerHTML =
-    '<span class="eyebrow">PM CANVAS</span><h1>새 비밀번호 설정</h1><p>변경하면 모든 기기에서 로그아웃됩니다.</p>' +
-    field(
-      '새 비밀번호',
-      'newPassword',
-      '',
-      'password',
-      'required minlength="12" maxlength="256" autocomplete="new-password"',
-    ) +
-    field(
-      '새 비밀번호 확인',
-      'confirmPassword',
-      '',
-      'password',
-      'required minlength="12" maxlength="256" autocomplete="new-password"',
-    ) +
-    '<small>12자 이상으로 입력하세요.</small><p class="form-error" role="alert">' +
-    (passwordResetToken ? '' : '유효하지 않은 링크입니다. 비밀번호 재설정을 다시 요청해 주세요.') +
-    '</p><button type="submit" class="button primary" ' +
-    (passwordResetToken ? '' : 'disabled') +
-    '>비밀번호 변경</button><button type="button" class="auth-link" data-request-reset>재설정 메일 다시 요청</button><button type="button" class="auth-link" data-registration-back>로그인으로 돌아가기</button>';
-  form.elements.newPassword.focus();
-  form.onsubmit = async (e) => {
-    e.preventDefault();
-    const button = form.querySelector('[type=submit]'),
-      error = form.querySelector('.form-error'),
-      password = form.elements.newPassword.value,
-      confirmPassword = form.elements.confirmPassword.value;
-    error.textContent = '';
-    if (password !== confirmPassword) {
-      error.textContent = '비밀번호 확인이 일치하지 않습니다.';
-      form.elements.confirmPassword.focus();
-      return;
-    }
-    button.disabled = true;
-    try {
-      await api('auth/reset-password', {
-        method: 'POST',
-        body: { token: passwordResetToken, newPassword: password, confirmPassword },
-      });
-      passwordResetToken = '';
-      form.reset();
-      form.innerHTML =
-        '<span class="eyebrow">PM CANVAS</span><h1>비밀번호를 변경했습니다</h1><p role="status">새 비밀번호로 다시 로그인해 주세요.</p><button class="button primary" type="button" data-registration-back>로그인하기</button>';
-      form.querySelector('h1').tabIndex = -1;
-      form.querySelector('h1').focus();
-    } catch (err) {
-      error.textContent = err.message;
-      if (err.code === 'RESET_INVALID') {
-        passwordResetToken = '';
-        form.reset();
-      }
-    } finally {
-      button.disabled = !passwordResetToken;
-    }
-  };
-}
-$('#authGate').addEventListener('click', (e) => {
-  if (e.target.closest('[data-request-reset]')) showForgotPassword();
-});
-
 function opsCanChange() {
   if (wbs.dirty || storageError || saveInFlight) {
     toast('현재 변경사항을 먼저 저장하거나 취소해 주세요.');
@@ -2319,7 +1525,7 @@ const openMailSettings = createMailSettingsUi({
   openInfo,
   user: () => currentUser,
   onEnabled: (enabled) => {
-    resetEmailEnabled = enabled;
+    auth.setMailEnabled(enabled);
   },
   showAuth,
   registerGuard: info.registerGuard,
@@ -2371,3 +1577,33 @@ trashButton.onclick = () => {
   ops.trash();
 };
 document.querySelector('.top-file-menu .menu-popover').append(trashButton);
+
+function filterDailyTasks(p) {
+  return filteredTasks(p, { asOf, ownerFilter, statusFilter, query });
+}
+const auth = createAuthUi({
+  api,
+  user: () => currentUser,
+  hasUnsaved: () => !!(storageError || wbs.dirty),
+  isBusy: () => saveInFlight,
+  acceptUser(nextUser) {
+    if (currentUser?.id !== nextUser.id) {
+      wbs.persistDraft();
+      if (currentUser) DraftStore.clearUser(currentUser.id);
+      wbs.draft = null;
+      wbs.base = null;
+      wbs.pending.clear();
+      wbs.recovery = null;
+    }
+    currentUser = nextUser;
+  },
+  refreshWorkspace: async () => {
+    if (storageError || wbs.dirty) render();
+    else await loadProjects();
+  },
+  openInfo,
+  approvalPending: () => reviewLanding,
+  onApproval: showApprovalInbox,
+  toast,
+});
+auth.start(boot);
