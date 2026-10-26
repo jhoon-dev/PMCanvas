@@ -10,7 +10,12 @@ import { inflateRawSync } from 'node:zlib';
 import selfsigned from 'selfsigned';
 import { SignedXml } from 'xml-crypto';
 import { parseAuthConfig, loadAuthConfig } from '../server/auth-config.mjs';
-import { Federation, identity, escapeLdapFilter } from '../server/federation.mjs';
+import {
+  Federation,
+  identity,
+  escapeLdapFilter,
+  checkSamlEnvelope,
+} from '../server/federation.mjs';
 import { digest } from '../server/security.mjs';
 import { MemoryRepository } from './support/memory-repository.mjs';
 import { createApplication } from '../server/http.mjs';
@@ -308,6 +313,38 @@ for (const [name, claims] of [
     await assert.rejects(x.f.finish(x.p.id, { url: a.url, browser: a.begun.browser }));
   });
 const xmlEsc = (s) => s.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;');
+test('SAML XML: 정상 응답 허용, 파서 복구·외부 엔티티·잘못된 assertion 거부', () => {
+  const callback = 'https://pm.example.com/pmcanvas/api/auth/sso/saml/callback';
+  const requestId = '_request';
+  const response = `<p:Response xmlns:p="urn:oasis:names:tc:SAML:2.0:protocol" Destination="${callback}" InResponseTo="${requestId}"><p:Status><p:StatusCode Value="urn:oasis:names:tc:SAML:2.0:status:Success"/></p:Status></p:Response>`;
+  const assertion = `<a:Assertion xmlns:a="urn:oasis:names:tc:SAML:2.0:assertion"><a:SubjectConfirmationData Recipient="${callback}" InResponseTo="${requestId}"/></a:Assertion>`;
+  const profile = (outer = response, inner = assertion) => ({
+    getSamlResponseXml: () => outer,
+    getAssertionXml: () => inner,
+    issuer: 'https://idp.example.com/issuer',
+  });
+  const provider = { idpIssuer: 'https://idp.example.com/issuer' };
+  assert.doesNotThrow(() => checkSamlEnvelope(profile(), provider, callback, requestId));
+  for (const invalid of [
+    response.replace('Destination="', 'Destination='),
+    response.replace('</p:Status>', '</p:Different>'),
+    response.replace('</p:Response>', ''),
+    response.replace('<p:Status>', '<p:Status note="&unknown;">'),
+    '<!DOCTYPE Response SYSTEM "https://external.example.com/schema">' + response,
+    '<!ENTITY injected "test">' + response,
+    '',
+    null,
+  ]) {
+    assert.throws(() => checkSamlEnvelope(profile(invalid), provider, callback, requestId));
+    assert.throws(() =>
+      checkSamlEnvelope(profile(response, invalid), provider, callback, requestId),
+    );
+  }
+  assert.throws(() => checkSamlEnvelope(profile(), provider, callback, '_another-request'));
+  assert.throws(() =>
+    checkSamlEnvelope(profile(), { idpIssuer: 'different' }, callback, requestId),
+  );
+});
 function signed(xml, element, cert) {
   const sig = new SignedXml({
     privateKey: cert.private,

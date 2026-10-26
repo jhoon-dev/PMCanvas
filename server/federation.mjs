@@ -34,14 +34,9 @@ function xmlDocument(xml) {
   if (typeof xml !== 'string' || /<!DOCTYPE|<!ENTITY/i.test(xml))
     throw Error('Unsupported SAML XML.');
   return new DOMParser({
-    errorHandler: {
-      warning: () => {},
-      error: () => {
-        throw Error('Invalid XML.');
-      },
-      fatalError: () => {
-        throw Error('Invalid XML.');
-      },
+    // Authentication XML must not be repaired, including parser warnings.
+    onError: () => {
+      throw Error('Invalid XML.');
     },
   }).parseFromString(xml, 'text/xml');
 }
