@@ -4,15 +4,16 @@ import {Readable} from 'node:stream';
 import {EventEmitter} from 'node:events';
 import {randomUUID} from 'node:crypto';
 import {createHandler} from '../server/http.mjs';
-import {hashPassword} from '../server/security.mjs';
+import {hashPassword,digest} from '../server/security.mjs';
 import {MemoryRepository} from './support/memory-repository.mjs';
 import {Federation} from '../server/federation.mjs';
 import {registrationConfig} from '../server/registration.mjs';
+import {PasswordReset} from '../server/password-reset.mjs';
 const PASSWORD='a-test-password-12345',HASH=await hashPassword(PASSWORD);
 const ORIGIN='http://localhost:3000';
-async function fixture(t,{basePath='',providers=[],trustProxies='',registration=registrationConfig()}={}){
+async function fixture(t,{basePath='',providers=[],trustProxies='',mailer=null,registration=registrationConfig()}={}){
  const users=[{id:randomUUID(),email:'owner@example.com',name:'소유자',password_hash:HASH,is_admin:true},{id:randomUUID(),email:'other@example.com',name:'팀원',password_hash:HASH,is_admin:false}];
- const repo=new MemoryRepository(users),handler=createHandler({repo,origin:ORIGIN,basePath,registration,trustProxies,federation:new Federation({repo,origin:ORIGIN,basePath,providers}),logger:{error(){}}});
+ const repo=new MemoryRepository(users),reset=mailer?new PasswordReset({repo,mailer,origin:ORIGIN,basePath,logger:{error(){}}}):null,handler=createHandler({repo,origin:ORIGIN,basePath,registration,trustProxies,passwordReset:reset,federation:new Federation({repo,origin:ORIGIN,basePath,providers}),logger:{error(){}}});
  async function inject(url,{method='GET',body,headers={}}={}){
   const req=Readable.from(body===undefined?[]:[Buffer.from(JSON.stringify(body))]);
   Object.assign(req,{url,method,headers,socket:{remoteAddress:'127.0.0.1'}});
@@ -35,7 +36,7 @@ async function fixture(t,{basePath='',providers=[],trustProxies='',registration=
   return {status:response.status,data,headers:response.headers};
  }
  async function login(email){const c=client(),r=await call(c,'auth/login',{method:'POST',body:{email,password:PASSWORD}});assert.equal(r.status,200);return c;}
- return {repo,users,client,call,login,inject};
+ return {repo,users,client,call,login,inject,reset};
 }
 const project=()=>({id:randomUUID(),name:'팀 프로젝트',description:'',holidays:[],members:[{id:'m1',name:'개발자',grade:'고급',role:'개발',hours:8,allocation:100}],tasks:[{id:'t1',name:'기능 개발',phase:'개발',owner:'m1',start:'2026-10-19',end:'2026-10-23',predecessor:'',memo:'',items:[{id:'i1',title:'기능 구현',hours:8,doneDate:null}]}]});
 test('외부 계정 매핑은 관리자·CSRF 검증, 비밀 제외, 기존 사용자 ID 보존',async t=>{
@@ -252,4 +253,33 @@ test('회원가입: 신뢰 프록시의 IP별 가입 한도는 다른 사용자�
  for(let i=0;i<10;i++)assert.equal((await f.call(guest,'auth/register',{method:'POST',body:{...application,email:'invalid'+i+'@example.com',name:''},headers})).status,400);
  assert.equal((await f.call(guest,'auth/register',{method:'POST',body:application,headers})).status,429);
  assert.equal((await f.call(guest,'auth/register',{method:'POST',body:application,headers:{'X-Forwarded-For':'203.0.113.11'}})).status,202);
+});
+
+const resetBody=value=>({token:value,newPassword:'new-reset-password-12345',confirmPassword:'new-reset-password-12345'});
+const mailToken=mail=>new URL(mail.url).hash.slice('#reset-password='.length);
+test('이메일 재설정: 동일 접수 응답·Origin·확인값·세션 폐기·일회성 링크·자동 로그인 금지',async t=>{
+ const mails=[],f=await fixture(t,{basePath:'/pmcanvas',mailer:{sendReset:async mail=>mails.push(mail)}}),a=await f.login('other@example.com'),b=await f.login('other@example.com'),guest=f.client();
+ const request=email=>f.call(guest,'auth/forgot-password',{method:'POST',body:{email}});
+ assert.equal((await f.call(guest,'auth/forgot-password',{method:'POST',body:{email:'other@example.com'},headers:{Origin:'https://evil.example'}})).status,403);
+ const known=await request('other@example.com'),unknown=await request('missing@example.com');assert.equal(known.status,202);assert.deepEqual(known.data,unknown.data);assert.equal(known.headers.get('set-cookie'),null);assert.equal(JSON.stringify(known.data).includes('token'),false);
+ await f.reset.idle();assert.equal(mails.length,1);const value=mailToken(mails[0]);assert.equal(mails[0].url.startsWith('http://localhost:3000/pmcanvas/#reset-password='),true);assert.equal([...f.repo.resets.values()][0].hash.length,64);assert.equal(JSON.stringify([...f.repo.resets.values()]).includes(value),false);
+ const finish=body=>f.call(guest,'auth/reset-password',{method:'POST',body});
+ assert.equal((await finish({...resetBody(value),confirmPassword:'wrong'})).status,400);
+ assert.equal((await finish({...resetBody(value),newPassword:'short',confirmPassword:'short'})).status,400);
+ assert.equal((await f.call(a,'auth/me')).status,200);
+ for(let i=0;i<8;i++)await f.repo.reserveAttempt(digest('local:other@example.com'),8,900000);
+ const changed=await finish(resetBody(value));assert.equal(changed.status,200);assert.match(changed.headers.get('set-cookie'),/Max-Age=0/);assert.equal('csrf' in changed.data,false);
+ assert.equal((await f.call(a,'auth/me')).status,401);assert.equal((await f.call(b,'auth/me')).status,401);assert.equal((await finish(resetBody(value))).data.error.code,'RESET_INVALID');
+ assert.equal((await f.call(guest,'auth/login',{method:'POST',body:{email:'other@example.com',password:PASSWORD}})).status,401);
+ assert.equal((await f.call(guest,'auth/login',{method:'POST',body:{email:'other@example.com',password:resetBody(value).newPassword}})).status,200);
+ assert.ok(f.repo.security.some(e=>e.kind==='auth.password_reset.completed'));assert.equal(JSON.stringify(f.repo.security).includes(value),false);
+});
+test('이메일 재설정: 외부·비활성·가입 대기 계정 제외, 메일 실패와 비활성 설정·요청 제한',async t=>{
+ const mails=[],f=await fixture(t,{mailer:{sendReset:async m=>mails.push(m)}}),guest=f.client();
+ for(const [email,patch]of [['inactive@example.com',{is_active:false}],['external@example.com',{local_login:false}],['pending@example.com',{registration_pending:true,is_active:false}]]){const user=await f.repo.createUser({email,name:'제외 계정',passwordHash:HASH});Object.assign(f.repo.users.get(user.id),patch);assert.equal((await f.call(guest,'auth/forgot-password',{method:'POST',body:{email}})).status,202);}
+ await f.reset.idle();assert.equal(mails.length,0);
+ for(let i=0;i<3;i++)assert.equal((await f.call(guest,'auth/forgot-password',{method:'POST',body:{email:'other@example.com'}})).status,202);
+ assert.equal((await f.call(guest,'auth/forgot-password',{method:'POST',body:{email:'other@example.com'}})).status,429);await f.reset.idle();
+ const disabled=await fixture(t);assert.equal((await disabled.call(disabled.client(),'auth/forgot-password',{method:'POST',body:{email:'other@example.com'}})).status,503);
+ const failed=await fixture(t,{mailer:{sendReset:async()=>{throw Error('smtp failure')}}});assert.equal((await failed.call(failed.client(),'auth/forgot-password',{method:'POST',body:{email:'other@example.com'}})).status,202);await failed.reset.idle();assert.equal(failed.repo.resets.size,0);assert.ok(failed.repo.security.some(e=>e.kind==='auth.password_reset.delivery_failed'));
 });

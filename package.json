@@ -1,6 +1,6 @@
 {
   "name": "pmcanvas-server",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -19,13 +19,15 @@
     "service:logs": "node scripts/manage.mjs logs",
     "backup": "node scripts/manage.mjs backup",
     "restore": "node scripts/manage.mjs restore",
-    "auth:check": "node --env-file-if-exists=.env scripts/check-auth.mjs"
+    "auth:check": "node --env-file-if-exists=.env scripts/check-auth.mjs",
+    "mail:check": "node --env-file-if-exists=.env scripts/check-mail.mjs"
   },
   "dependencies": {
     "@node-saml/node-saml": "5.1.0",
     "@xmldom/xmldom": "0.8.15",
     "exceljs": "4.4.0",
     "ldapts": "9.2.0",
+    "nodemailer": "10.2.1",
     "openid-client": "6.8.8",
     "pg": "8.23.1",
     "yauzl": "3.4.0"

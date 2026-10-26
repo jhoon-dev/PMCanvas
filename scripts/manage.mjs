@@ -62,7 +62,7 @@ async function main(){
    compose(['cp',source,'db:'+remote]);
    compose(['exec','-T','db','createdb','-U','postgres','-O','pmcanvas',target]);
    compose(['exec','-T','db','pg_restore','-U','postgres','--role=pmcanvas','--no-owner','--no-acl','--exit-on-error','--single-transaction','-d',target,remote]);
-   compose(['exec','-T','db','psql','-U','postgres','-d',target,'-v','ON_ERROR_STOP=1','-c',"DO $restore$ DECLARE t text; BEGIN FOREACH t IN ARRAY ARRAY['pm_sessions','pm_auth_transient','pm_auth_attempts'] LOOP IF to_regclass(t) IS NOT NULL THEN EXECUTE format('TRUNCATE %I',t); END IF; END LOOP; IF to_regclass('pm_admin_mfa') IS NOT NULL THEN EXECUTE 'UPDATE pm_admin_mfa SET recovery_hashes=ARRAY[]::text[]'; END IF; END $restore$;"]);
+   compose(['exec','-T','db','psql','-U','postgres','-d',target,'-v','ON_ERROR_STOP=1','-c',"DO $restore$ DECLARE t text; BEGIN FOREACH t IN ARRAY ARRAY['pm_sessions','pm_auth_transient','pm_auth_attempts','pm_password_resets'] LOOP IF to_regclass(t) IS NOT NULL THEN EXECUTE format('TRUNCATE %I',t); END IF; END LOOP; IF to_regclass('pm_admin_mfa') IS NOT NULL THEN EXECUTE 'UPDATE pm_admin_mfa SET recovery_hashes=ARRAY[]::text[]'; END IF; END $restore$;"]);
    console.log('Restored to '+target+'. To activate, set APP_DATABASE='+target+' in .env and run npm run service:up.');
   }finally{compose(['exec','-T','db','rm','-f',remote],{capture:true});}return;
  }

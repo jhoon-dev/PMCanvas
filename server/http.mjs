@@ -11,7 +11,7 @@ import {cleanProject,uuid} from './project.mjs';
 import {Federation} from './federation.mjs';
 import {registrationConfig} from './registration.mjs';
 
-export function createHandler({repo,origin='http://localhost:3000',basePath='',logger=console,trustProxies='',adminMfa=null,registration=registrationConfig(),federation=new Federation({repo,origin,basePath})}){
+export function createHandler({repo,origin='http://localhost:3000',basePath='',logger=console,trustProxies='',adminMfa=null,passwordReset=null,registration=registrationConfig(),federation=new Federation({repo,origin,basePath})}){
  if(new URL(origin).origin!==origin)throw Error('PUBLIC_ORIGIN must contain only scheme and host, without a path or trailing slash.');
  if(basePath&&!/^\/[a-zA-Z0-9_-]+(?:\/[a-zA-Z0-9_-]+)*$/.test(basePath))throw Error('BASE_PATH must be empty or a path without a trailing slash.');
  const secure=new URL(origin).protocol==='https:',reserve=requestLimiter(repo),trusted=proxyList(trustProxies);
@@ -48,7 +48,7 @@ export function createHandler({repo,origin='http://localhost:3000',basePath='',l
  const handler=async(req,res)=>{
   if(secure)res.setHeader('Strict-Transport-Security','max-age=31536000');
   res.setHeader('Permissions-Policy','camera=(), microphone=(), geolocation=()');
-  res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('X-Frame-Options','DENY');res.setHeader('Referrer-Policy','same-origin');
+  res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('X-Frame-Options','DENY');res.setHeader('Referrer-Policy','no-referrer');
   res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'");
   let auditPath='';
   try{
@@ -58,7 +58,7 @@ export function createHandler({repo,origin='http://localhost:3000',basePath='',l
    auditPath=path;const method=req.method;
    if(path==='/api/health'&&method==='GET'){try{await repo.health();return json(res,200,{ok:true});}catch{return json(res,503,{ok:false});}}
    req.clientIp=clientAddress(req,trusted);
-   if(path==='/api/auth/providers'&&method==='GET')return json(res,200,{providers:federation.list(),registration});
+   if(path==='/api/auth/providers'&&method==='GET')return json(res,200,{providers:federation.list(),registration,passwordReset:{enabled:!!passwordReset}});
    const sso=path.match(/^\/api\/auth\/sso\/([a-z][a-z0-9_-]{0,39})\/(start|callback|metadata)$/);
    if(sso){
     const [,id,action]=sso,p=federation.provider(id);
@@ -112,6 +112,17 @@ export function createHandler({repo,origin='http://localhost:3000',basePath='',l
      if(repo.clearAttempt)await repo.clearAttempt(digest('directory:'+key));req.actorId=result.user.id;await audit(req,'auth.directory.success',{provider:body.provider});const old=cookieValue(req,'pmcanvas_session');if(old)await repo.deleteSession(digest(old));
      return json(res,200,{user:result.user,csrf:result.csrf},{'Set-Cookie':result.cookie});
     }catch(error){if(error.status===403||error.code==='IDENTITY_UNLINKED')throw error;fail(401,'LOGIN_FAILED','디렉터리 인증에 실패했습니다. 계정 정보와 연결 설정을 확인해 주세요.');}
+   }
+   if((path==='/api/auth/forgot-password'||path==='/api/auth/reset-password')&&method==='POST'){
+    if(!passwordReset)fail(503,'RESET_UNAVAILABLE','현재 이메일 재설정을 사용할 수 없습니다. 관리자에게 문의해 주세요.');
+    const request=path.endsWith('/forgot-password');
+    await reserve(request?'reset-request-global':'reset-finish-global',request?100:200,request?3600000:900000);
+    if(req.clientIp)await reserve((request?'reset-request-ip:':'reset-finish-ip:')+req.clientIp,request?10:20,900000);
+    const body=await readJson(req,16384);
+    if(request){const email=emailAddress(body.email);req.loginHash=digest(email);await reserve('reset-request-email:'+email,3,3600000);passwordReset.request(email,req.clientIp?digest(req.clientIp):null);return json(res,202,{ok:true,message:'재설정 가능한 계정이라면 이메일을 보내드립니다. 받은 편지함과 스팸함을 확인해 주세요.'});}
+    if(typeof body.token==='string'&&body.token.length<=128)await reserve('reset-token:'+body.token,5,900000);
+    const result=await passwordReset.finish(body.token,body.newPassword,body.confirmPassword);req.actorId=result.id;await audit(req,'auth.password_reset.completed');
+    return json(res,200,{ok:true},{'Set-Cookie':sessionCookie('',{...cookieConfig,maxAge:0})});
    }
    if(path==='/api/auth/register'&&method==='POST'){
     if(registration.mode!=='approval')fail(403,'REGISTRATION_DISABLED','현재 회원가입을 받지 않습니다. 관리자에게 문의해 주세요.');

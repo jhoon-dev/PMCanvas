@@ -2,6 +2,10 @@ import {DraftStore} from './draft-store.js';
 import {api} from './api-client.js';
 import {WbsWorkspace} from './wbs-workspace.js';
 let currentUser=null,saveInFlight=false,mutationSequence=0,fetchSequence=0;
+const resetLanding=location.hash.startsWith('#reset-password');
+let passwordResetToken=location.hash.match(/^#reset-password=([A-Za-z0-9_-]{43})$/)?.[1]||'';
+if(resetLanding)history.replaceState(null,'',location.pathname+location.search);
+let resetEmailEnabled=false;
 let loginProvider='',registrationPolicy={mode:'disabled',domains:[]};
 import {csvText, wbsRows, completionRecords, completionRows} from './reports.js';
 import {today,addDays,daysBetween,workdays,working,shiftWorkday,nextWorkday,dateValue,validDate,taskHours,earned,progress,planned,summary,validateProject} from './engine.js';
@@ -187,7 +191,7 @@ $('#main').addEventListener('change',async e=>{
  }
 });
 $('#main').addEventListener('input',e=>{if(e.target.id==='taskSearch'){const pos=e.target.selectionStart;query=e.target.value;render();$('#taskSearch').focus();$('#taskSearch').setSelectionRange(pos,pos);}});
-window.addEventListener('hashchange',()=>{const next=normalizeView(location.hash.slice(1));if(next===view)return;if(wbs.dirty&&next!=='tasks'){history.replaceState(null,'','#tasks');toast('WBS 변경사항을 먼저 저장하거나 취소해 주세요.');return;}view=next;render();});
+window.addEventListener('hashchange',()=>{if(location.hash.startsWith('#reset-password')){const value=location.hash.match(/^#reset-password=([A-Za-z0-9_-]{43})$/)?.[1]||'';history.replaceState(null,'',location.pathname+location.search);if(wbs.dirty||storageError||saveInFlight){toast('현재 변경사항을 저장한 뒤 이메일의 재설정 링크를 다시 열어 주세요.');return;}passwordResetToken=value;showPasswordReset();return;}const next=normalizeView(location.hash.slice(1));if(next===view)return;if(wbs.dirty&&next!=='tasks'){history.replaceState(null,'','#tasks');toast('WBS 변경사항을 먼저 저장하거나 취소해 주세요.');return;}view=next;render();});
 $('#projectSelect').onchange=e=>{if(storageError||wbs.dirty){toast('WBS 변경사항을 먼저 저장하거나 취소해 주세요.');render();return;}state.activeId=e.target.value;ownerFilter='';statusFilter='';query='';render();};$('#mobileNewProject').onclick=()=>openEditor('project');
 $('#closeDialog').onclick=$('#cancelDialog').onclick=()=>$('#editorDialog').close();$('#closeInfo').onclick=()=>$('#infoDialog').close();$('#helpButton').onclick=help;$('#methodFooter').onclick=method;$('#newProjectSide').onclick=()=>openEditor('project');
 $('#backupButton').onclick=()=>{
@@ -256,7 +260,7 @@ function updateAccessUi(){
  document.querySelector('.side-bottom small').textContent=readOnly?'조회자 · 공동 프로젝트':'팀과 함께하는 프로젝트';
 }
 function showAuth(message=''){
- $('#authGate').hidden=false;$('#registrationForm')?.remove();$('#loginForm').hidden=false;$('#authError').textContent=message;
+ $('#authGate').hidden=false;$('#forgotPasswordForm')?.remove();$('#resetPasswordForm')?.remove();$('#registrationForm')?.remove();$('#loginForm').hidden=false;$('#authError').textContent=message;
  if(currentUser)$('#loginEmail').value=currentUser.email;
 }
 async function initializeAuthentication(){
@@ -264,7 +268,7 @@ async function initializeAuthentication(){
  const url=new URL(location.href),error=url.searchParams.get('authError');
  if(error){$('#authError').textContent=messages[error]||messages.SSO_FAILED;url.searchParams.delete('authError');history.replaceState(null,'',url);}
  try{
-  const {providers,registration}=await api('auth/providers');registrationPolicy=registration||registrationPolicy;$('#registerButton').hidden=registrationPolicy.mode!=='approval';$('#registrationDisabled').hidden=registrationPolicy.mode==='approval';if(!providers.length)return;
+  const {providers,registration,passwordReset}=await api('auth/providers');resetEmailEnabled=!!passwordReset?.enabled;registrationPolicy=registration||registrationPolicy;$('#registerButton').hidden=registrationPolicy.mode!=='approval';$('#registrationDisabled').hidden=registrationPolicy.mode==='approval';if(!providers.length)return;
   const group=document.createElement('div');group.className='federated-logins';
   group.innerHTML=providers.filter(p=>p.type!=='ldap').map(p=>'<button type="button" class="button sso-login" data-sso-provider="'+esc(p.id)+'">'+esc(p.label)+'로 로그인</button>').join('');
   const directory=providers.filter(p=>p.type==='ldap');
@@ -409,7 +413,7 @@ setInterval(async()=>{
  if(!currentUser||saveInFlight||storageError||wbs.dirty||wbs.interacting||document.visibilityState!=='visible'||$('#editorDialog').open||$('#infoDialog').open||!$('#authGate').hidden)return;
  try{await loadProjects();}catch(error){if(error.status===401)showAuth(error.message);}
 },15000);
-initializeAuthentication().finally(boot);
+initializeAuthentication().finally(()=>resetLanding?showPasswordReset():boot());
 
 let exportingExcel=false;
 async function exportExcel(){
@@ -446,8 +450,8 @@ document.addEventListener('click',e=>{document.querySelectorAll('.action-menu[op
 document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;document.querySelectorAll('.action-menu[open]').forEach(menu=>{if(menu.contains(document.activeElement)){menu.open=false;menu.querySelector('summary')?.focus();e.preventDefault();}});});
 
 function returnToLogin(email=''){
- $('#registrationForm')?.remove();$('#loginForm').hidden=false;$('#loginPassword').value='';$('#authError').textContent='';
- if(email){loginProvider='';const select=$('#loginProvider');if(select)select.value='';$('#loginEmail').type='email';$('#loginEmail').closest('label').firstChild.textContent='이메일';$('#loginEmail').value=email;$('#loginPassword').focus();}else $('#registerButton').focus();
+ $('#registrationForm')?.remove();$('#forgotPasswordForm')?.remove();$('#resetPasswordForm')?.remove();passwordResetToken='';$('#loginForm').hidden=false;$('#loginPassword').value='';$('#authError').textContent='';
+ if(email){loginProvider='';const select=$('#loginProvider');if(select)select.value='';$('#loginEmail').type='email';$('#loginEmail').closest('label').firstChild.textContent='이메일';$('#loginEmail').value=email;$('#loginPassword').focus();}else $('#loginEmail').focus();
 }
 $('#registerButton').addEventListener('click',()=>{
  if(registrationPolicy.mode!=='approval')return;
@@ -465,3 +469,33 @@ $('#registerButton').addEventListener('click',()=>{
  };
 });
 $('#authGate').addEventListener('click',e=>{const button=e.target.closest('[data-registration-back]');if(button)returnToLogin(button.dataset.email||'');});
+
+function authFlowForm(id){
+ $('#authGate').hidden=false;$('#loginForm').hidden=true;$('#loginPassword').value='';
+ for(const key of ['registrationForm','forgotPasswordForm','resetPasswordForm','mfaForm'])$('#'+key)?.remove();
+ const form=document.createElement('form');form.id=id;form.className='auth-card';$('#authGate').append(form);return form;
+}
+function showForgotPassword(){
+ if(currentUser&&(storageError||wbs.dirty)){toast('현재 변경사항을 먼저 저장하거나 백업해 주세요.');return;}
+ passwordResetToken='';const form=authFlowForm('forgotPasswordForm');
+ form.innerHTML='<span class="eyebrow">PM CANVAS</span><h1>비밀번호 찾기</h1><p>가입한 이메일로 재설정 링크를 보내드려요.</p>'+field('이메일','email','','email','required maxlength="254" autocomplete="email"')+'<small>회사 SSO·AD 계정은 회사 인증 서비스에서 변경하세요.</small><p class="form-error" role="alert">'+(resetEmailEnabled?'':'현재 이메일 재설정을 사용할 수 없습니다. 관리자에게 문의해 주세요.')+'</p><button type="submit" class="button primary" '+(resetEmailEnabled?'':'disabled')+'>재설정 메일 보내기</button><button type="button" class="auth-link" data-registration-back>로그인으로 돌아가기</button>';
+ if(!loginProvider)form.elements.email.value=$('#loginEmail').value;
+ form.elements.email.focus();form.onsubmit=async e=>{
+  e.preventDefault();const button=form.querySelector('[type=submit]'),error=form.querySelector('.form-error');button.disabled=true;error.textContent='';
+  try{const result=await api('auth/forgot-password',{method:'POST',body:{email:form.elements.email.value}});form.reset();form.innerHTML='<span class="eyebrow">PM CANVAS</span><h1>메일을 확인해 주세요</h1><p role="status">'+esc(result.message)+'</p><small>링크는 15분 동안 사용할 수 있어요.</small><button type="button" class="button primary" data-registration-back>로그인으로 돌아가기</button>';form.querySelector('h1').tabIndex=-1;form.querySelector('h1').focus();}
+  catch(err){error.textContent=err.message;}finally{button.disabled=!resetEmailEnabled;}
+ };
+}
+$('#forgotPasswordButton').addEventListener('click',showForgotPassword);
+function showPasswordReset(){
+ const form=authFlowForm('resetPasswordForm');
+ form.innerHTML='<span class="eyebrow">PM CANVAS</span><h1>새 비밀번호 설정</h1><p>변경하면 모든 기기에서 로그아웃됩니다.</p>'+field('새 비밀번호','newPassword','','password','required minlength="12" maxlength="256" autocomplete="new-password"')+field('새 비밀번호 확인','confirmPassword','','password','required minlength="12" maxlength="256" autocomplete="new-password"')+'<small>12자 이상으로 입력하세요.</small><p class="form-error" role="alert">'+(passwordResetToken?'':'유효하지 않은 링크입니다. 비밀번호 재설정을 다시 요청해 주세요.')+'</p><button type="submit" class="button primary" '+(passwordResetToken?'':'disabled')+'>비밀번호 변경</button><button type="button" class="auth-link" data-request-reset>재설정 메일 다시 요청</button><button type="button" class="auth-link" data-registration-back>로그인으로 돌아가기</button>';
+ form.elements.newPassword.focus();form.onsubmit=async e=>{
+  e.preventDefault();const button=form.querySelector('[type=submit]'),error=form.querySelector('.form-error'),password=form.elements.newPassword.value,confirmPassword=form.elements.confirmPassword.value;error.textContent='';
+  if(password!==confirmPassword){error.textContent='비밀번호 확인이 일치하지 않습니다.';form.elements.confirmPassword.focus();return;}
+  button.disabled=true;
+  try{await api('auth/reset-password',{method:'POST',body:{token:passwordResetToken,newPassword:password,confirmPassword}});passwordResetToken='';form.reset();form.innerHTML='<span class="eyebrow">PM CANVAS</span><h1>비밀번호를 변경했습니다</h1><p role="status">새 비밀번호로 다시 로그인해 주세요.</p><button class="button primary" type="button" data-registration-back>로그인하기</button>';form.querySelector('h1').tabIndex=-1;form.querySelector('h1').focus();}
+  catch(err){error.textContent=err.message;if(err.code==='RESET_INVALID'){passwordResetToken='';form.reset();}}finally{button.disabled=!passwordResetToken;}
+ };
+}
+$('#authGate').addEventListener('click',e=>{if(e.target.closest('[data-request-reset]'))showForgotPassword();});

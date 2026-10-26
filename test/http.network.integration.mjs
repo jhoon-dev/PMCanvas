@@ -1,16 +1,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {once} from 'node:events';
+import {createServer as netServer} from 'node:net';
 import {randomUUID} from 'node:crypto';
 import {createApplication} from '../server/http.mjs';
 import {hashPassword} from '../server/security.mjs';
 import {MemoryRepository} from './support/memory-repository.mjs';
+import {PasswordReset} from '../server/password-reset.mjs';
+import {createMailer} from '../server/mailer.mjs';
+import {smtpFixture,resetLink} from './support/smtp-fixture.mjs';
 const networkTest=(name,fn)=>test(name,{skip:process.env.RUN_HTTP_TESTS!=='1'},fn);
 const PASSWORD='a-test-password-12345',HASH=await hashPassword(PASSWORD);
 const ORIGIN='http://localhost:3000';
-async function fixture(t,{basePath=''}={}){
+async function fixture(t,{basePath='',mailer=null}={}){
  const users=[{id:randomUUID(),email:'owner@example.com',name:'소유자',password_hash:HASH,is_admin:true},{id:randomUUID(),email:'other@example.com',name:'팀원',password_hash:HASH,is_admin:false}];
- const repo=new MemoryRepository(users),server=createApplication({repo,origin:ORIGIN,basePath,logger:{error(){}}});
+ const repo=new MemoryRepository(users),reset=mailer?new PasswordReset({repo,mailer,origin:ORIGIN,basePath,logger:{error(){}}}):null,server=createApplication({repo,origin:ORIGIN,basePath,passwordReset:reset,logger:{error(){}}});
  server.listen(0,'127.0.0.1');await once(server,'listening');
  t.after(()=>{server.closeAllConnections();return new Promise(resolve=>server.close(resolve));});
  const base='http://127.0.0.1:'+server.address().port+basePath+'/api/';
@@ -22,7 +26,7 @@ async function fixture(t,{basePath=''}={}){
   return {status:response.status,data,headers:response.headers};
  }
  async function login(email){const c=client(),r=await call(c,'auth/login',{method:'POST',body:{email,password:PASSWORD}});assert.equal(r.status,200);return c;}
- return {repo,server,base,users,client,call,login};
+ return {repo,server,base,users,client,call,login,reset};
 }
 const project=()=>({id:randomUUID(),name:'팀 프로젝트',description:'',holidays:[],members:[{id:'m1',name:'개발자',grade:'고급',role:'개발',hours:8,allocation:100}],tasks:[{id:'t1',name:'기능 개발',phase:'개발',owner:'m1',start:'2026-10-19',end:'2026-10-23',predecessor:'',memo:'',items:[{id:'i1',title:'기능 구현',hours:8,doneDate:null}]}]});
 networkTest('로그인·쿠키·세션 만료·로그아웃',async t=>{
@@ -105,4 +109,22 @@ networkTest('회원가입 HTTP: 세션 없는 접수·승인 전 로그인 차�
  const admin=await f.login('owner@example.com'),user=await f.repo.findUserByEmail(body.email);
  assert.equal((await f.call(admin,'users/'+user.id,{method:'PATCH',body:{isActive:true}})).status,200);
  const logged=await f.call(c,'auth/login',{method:'POST',body});assert.equal(logged.status,200);assert.match(logged.headers.get('set-cookie'),/HttpOnly/);assert.equal((await f.call(c,'auth/me')).data.user.email,body.email);
+});
+
+networkTest('이메일 재설정 HTTP·TLS SMTP: 실제 메일 수신·링크 사용·새 비밀번호 로그인',async t=>{
+ const smtp=await smtpFixture();t.after(()=>smtp.close());
+ const mailer=createMailer({from:'sender@example.com',transport:{host:'127.0.0.1',port:smtp.port,secure:true,auth:{user:'fixture',pass:'test-only-secret'},tls:{ca:smtp.ca,servername:'localhost',rejectUnauthorized:true},connectionTimeout:2000,socketTimeout:3000,disableFileAccess:true,disableUrlAccess:true}});
+ t.after(()=>mailer.close());await mailer.verify();const f=await fixture(t,{basePath:'/pmcanvas',mailer}),guest=f.client();
+ const response=await f.call(guest,'auth/forgot-password',{method:'POST',body:{email:'other@example.com'}});assert.equal(response.status,202);await f.reset.idle();assert.equal(smtp.messages.length,1);
+ const link=resetLink(smtp.messages[0]);assert.equal(new URL(link).pathname,'/pmcanvas/');assert.equal(new URL(link).search,'');
+ const value=new URL(link).hash.slice('#reset-password='.length),body={token:value,newPassword:'network-reset-password-123',confirmPassword:'network-reset-password-123'};
+ assert.equal((await f.call(guest,'auth/reset-password',{method:'POST',body})).status,200);
+ assert.equal((await f.call(guest,'auth/login',{method:'POST',body:{email:'other@example.com',password:body.newPassword}})).status,200);
+ assert.equal((await f.call(guest,'auth/reset-password',{method:'POST',body})).data.error.code,'RESET_INVALID');
+});
+
+networkTest('SMTP STARTTLS 거절 시 평문 인증으로 전환하지 않는다',async t=>{
+ const commands=[],sockets=new Set(),server=netServer(socket=>{sockets.add(socket);socket.on('close',()=>sockets.delete(socket));socket.on('error',()=>{});socket.setEncoding('utf8');socket.write('220 localhost test\r\n');let buffer='';socket.on('data',chunk=>{buffer+=chunk;let end;while((end=buffer.indexOf('\r\n'))!==-1){const line=buffer.slice(0,end);buffer=buffer.slice(end+2);commands.push(line);socket.write(line.startsWith('EHLO')?'250-localhost\r\n250 AUTH PLAIN\r\n':'502 STARTTLS not available\r\n');}});});
+ server.listen(0,'127.0.0.1');await once(server,'listening');t.after(()=>new Promise(resolve=>{for(const socket of sockets)socket.destroy();server.close(resolve);}));
+ const mailer=createMailer({from:'sender@example.com',transport:{host:'127.0.0.1',port:server.address().port,secure:false,requireTLS:true,auth:{user:'fixture',pass:'test-only-secret'},connectionTimeout:2000,socketTimeout:2000}});t.after(()=>mailer.close());await assert.rejects(mailer.verify());assert.ok(commands.some(c=>c==='STARTTLS'));assert.equal(commands.some(c=>c.startsWith('AUTH')),false);
 });

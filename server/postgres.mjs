@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import {randomUUID} from 'node:crypto';
 import {fail} from './errors.mjs';
+import {digest} from './security.mjs';
 import {cleanProject,projectChanges} from './project.mjs';
 export const publicUser=u=>({id:u.id,email:u.email,name:u.name,isAdmin:!!u.is_admin,isActive:u.is_active!==false,localLogin:u.local_login!==false,registrationPending:!!u.registration_pending});
 
@@ -18,7 +19,7 @@ export async function migrate(pool){
  try{
   await client.query('BEGIN');await client.query('SELECT pg_advisory_xact_lock(726534001)');
   await client.query('CREATE TABLE IF NOT EXISTS pm_schema_migrations(version integer PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())');
-  for(const [version,file] of [[1,'001_initial.sql'],[2,'002_user_status.sql'],[3,'003_federated_auth.sql'],[4,'004_planning.sql'],[5,'005_security.sql'],[6,'006_registration.sql']]){
+  for(const [version,file] of [[1,'001_initial.sql'],[2,'002_user_status.sql'],[3,'003_federated_auth.sql'],[4,'004_planning.sql'],[5,'005_security.sql'],[6,'006_registration.sql'],[7,'007_password_reset.sql']]){
    const {rows}=await client.query('SELECT version FROM pm_schema_migrations WHERE version=$1',[version]);
    if(!rows.length){await client.query(fs.readFileSync(new URL('../migrations/'+file,import.meta.url),'utf8'));await client.query('INSERT INTO pm_schema_migrations(version) VALUES ($1)',[version]);}
   }
@@ -81,6 +82,7 @@ export class PgRepository{
    const result=await c.query('UPDATE pm_users SET password_hash=$3 WHERE id=$1 AND password_hash=$2 AND is_active AND local_login RETURNING id',[userId,expectedHash,passwordHash]);
    if(!result.rowCount)fail(409,'ACCOUNT_CHANGED','계정 정보가 변경되었습니다. 다시 로그인해 주세요.');
    await c.query('DELETE FROM pm_sessions WHERE user_id=$1',[userId]);
+   await c.query('DELETE FROM pm_password_resets WHERE user_id=$1',[userId]);
    return {ok:true};
   });
  }
@@ -94,7 +96,29 @@ export class PgRepository{
    if(passwordHash&&!target.local_login)fail(400,'EXTERNAL_PASSWORD','외부 인증 계정의 비밀번호는 인증 서버에서 변경해 주세요.');
    const {rows}=await c.query('UPDATE pm_users SET is_active=COALESCE($2,is_active),registration_pending=CASE WHEN $2 THEN false ELSE registration_pending END,password_hash=COALESCE($3,password_hash) WHERE id=$1 RETURNING *',[targetId,isActive??null,passwordHash??null]);
    await c.query('DELETE FROM pm_sessions WHERE user_id=$1',[targetId]);
+   if(passwordHash||isActive===false)await c.query('DELETE FROM pm_password_resets WHERE user_id=$1',[targetId]);
    return publicUser(rows[0]);
+  });
+ }
+ async issuePasswordReset({userId,passwordHash,hash,expires}){
+  return this.transaction(async c=>{
+   const user=(await c.query('SELECT * FROM pm_users WHERE id=$1 FOR UPDATE',[userId])).rows[0];
+   if(!user?.is_active||!user.local_login||user.registration_pending||user.password_hash!==passwordHash)return false;
+   await c.query('DELETE FROM pm_password_resets WHERE expires_at<now()');
+   await c.query('INSERT INTO pm_password_resets(user_id,token_hash,password_hash,expires_at) VALUES ($1,$2,$3,$4) ON CONFLICT(user_id) DO UPDATE SET token_hash=$2,password_hash=$3,expires_at=$4',[userId,hash,passwordHash,expires]);return true;
+  });
+ }
+ async revokePasswordReset(hash){await this.pool.query('DELETE FROM pm_password_resets WHERE token_hash=$1',[hash]);}
+ async consumePasswordReset(hash,passwordHash){
+  return this.transaction(async c=>{
+   const invalid=()=>fail(400,'RESET_INVALID','유효하지 않거나 만료된 링크입니다. 비밀번호 재설정을 다시 요청해 주세요.');
+   const entry=(await c.query('SELECT user_id FROM pm_password_resets WHERE token_hash=$1 AND expires_at>now()',[hash])).rows[0];if(!entry)invalid();
+   const user=(await c.query('SELECT * FROM pm_users WHERE id=$1 FOR UPDATE',[entry.user_id])).rows[0];
+   const reset=(await c.query('DELETE FROM pm_password_resets WHERE user_id=$1 AND token_hash=$2 AND expires_at>now() RETURNING password_hash',[entry.user_id,hash])).rows[0];
+   if(!reset||!user?.is_active||!user.local_login||user.registration_pending||reset.password_hash!==user.password_hash)invalid();
+   await c.query('UPDATE pm_users SET password_hash=$2 WHERE id=$1',[user.id,passwordHash]);
+   await c.query('DELETE FROM pm_sessions WHERE user_id=$1',[user.id]);
+   await c.query('DELETE FROM pm_auth_attempts WHERE key=$1',[digest('local:'+user.email)]);return {id:user.id};
   });
  }
  async putTransient(key,value,ttlMs=600000){

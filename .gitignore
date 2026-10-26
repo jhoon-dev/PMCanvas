@@ -20,3 +20,5 @@ dist/
 /*.png
 *.log
 *.dump
+
+!config/mail.example.json

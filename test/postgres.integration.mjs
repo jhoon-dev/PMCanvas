@@ -170,3 +170,19 @@ test('실제 PostgreSQL: 가입 신청 중복 원자성·대기 상태 제약·�
   await repo.manageUser(admin.id,pending.id,{isActive:false});assert.equal(await repo.findSession(session.hash),null);assert.equal((await repo.findUserByEmail(email)).registration_pending,false);
  }finally{for(const id of ids.reverse())await pool.query('DELETE FROM pm_users WHERE id=$1',[id]);await pool.end();}
 });
+
+test('실제 PostgreSQL: 재설정 링크 교체·동시 소비·세션 폐기·비밀번호 변경·비활성화 경합',{skip:process.env.RUN_POSTGRES_TESTS!=='1'},async()=>{
+ if(!/_test$/.test(process.env.PGDATABASE||''))throw Error('Use a dedicated _test database.');
+ const pool=await createPool(),repo=new PgRepository(pool),other=new PgRepository(pool),ids=[];
+ try{
+  await migrate(pool);await migrate(pool);const suffix=randomUUID(),admin=await repo.createUser({email:'reset-admin-'+suffix+'@example.com',name:'관리자',passwordHash:'original-hash',isAdmin:true}),user=await repo.createUser({email:'reset-user-'+suffix+'@example.com',name:'사용자',passwordHash:'original-hash'});ids.push(admin.id,user.id);
+  const issue=(hash,expires=new Date(Date.now()+60000),passwordHash='original-hash')=>repo.issuePasswordReset({userId:user.id,passwordHash,hash,expires});
+  const first=digest(token()),current=digest(token());assert.equal(await issue(first),true);assert.equal(await issue(current),true);await assert.rejects(repo.consumePasswordReset(first,'new-hash'),e=>e.code==='RESET_INVALID');
+  const session={hash:digest(token()),userId:user.id,csrf:token(),expires:new Date(Date.now()+60000),passwordHash:'original-hash'};await repo.createSession(session);
+  const results=await Promise.allSettled([repo.consumePasswordReset(current,'new-hash'),other.consumePasswordReset(current,'other-new-hash')]);assert.equal(results.filter(r=>r.status==='fulfilled').length,1);assert.equal(results.find(r=>r.status==='rejected').reason.code,'RESET_INVALID');assert.equal(await repo.findSession(session.hash),null);
+  const stored=await repo.findUserByEmail(user.email),stale=digest(token());assert.equal(await issue(stale,new Date(Date.now()+60000),stored.password_hash),true);await repo.changePassword(user.id,stored.password_hash,'original-hash');await assert.rejects(repo.consumePasswordReset(stale,'new-hash'),e=>e.code==='RESET_INVALID');
+  const expired=digest(token());await issue(expired,new Date(Date.now()-1000));await assert.rejects(repo.consumePasswordReset(expired,'new-hash'),e=>e.code==='RESET_INVALID');
+  const disabled=digest(token());await issue(disabled);await repo.manageUser(admin.id,user.id,{isActive:false});await repo.manageUser(admin.id,user.id,{isActive:true});await assert.rejects(repo.consumePasswordReset(disabled,'new-hash'),e=>e.code==='RESET_INVALID');
+  assert.equal(await repo.issuePasswordReset({userId:user.id,passwordHash:'wrong-snapshot',hash:digest(token()),expires:new Date(Date.now()+60000)}),false);
+ }finally{for(const id of ids.reverse())await pool.query('DELETE FROM pm_users WHERE id=$1',[id]);await pool.end();}
+});

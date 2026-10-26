@@ -1,0 +1,9 @@
+{
+  "enabled": false,
+  "host": "smtp.example.com",
+  "port": 587,
+  "secure": false,
+  "from": "pmcanvas@example.com",
+  "username": "pmcanvas@example.com",
+  "passwordFile": "secrets/smtp-password.txt"
+}

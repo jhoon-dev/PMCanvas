@@ -1,6 +1,7 @@
 // API contract tests only. PostgreSQL is exercised separately by postgres.integration.mjs.
 import {randomUUID} from 'node:crypto';
 import {fail} from '../../server/errors.mjs';
+import {digest} from '../../server/security.mjs';
 import {projectChanges} from '../../server/project.mjs';
 import {publicUser} from '../../server/postgres.mjs';
 export class MemoryRepository{
@@ -17,10 +18,13 @@ export class MemoryRepository{
   else{if(!state?.recovery_hashes.includes(recoveryHash))fail(401,'MFA_REPLAY','복구 코드 재사용');state.recovery_hashes=state.recovery_hashes.filter(h=>h!==recoveryHash);}
   this.transients.delete(key);
  }
- constructor(users=[]){this.users=new Map(users.map(u=>[u.id,u]));this.sessions=new Map();this.projects=new Map();this.events=new Map();this.transients=new Map();this.identities=new Map();}
+ constructor(users=[]){this.users=new Map(users.map(u=>[u.id,u]));this.sessions=new Map();this.projects=new Map();this.events=new Map();this.transients=new Map();this.identities=new Map();this.resets=new Map();}
  async health(){}
  async findUserByEmail(email){return [...this.users.values()].find(u=>u.email===email);}
  async listUsers(){return [...this.users.values()].map(publicUser);}
+ async issuePasswordReset({userId,passwordHash,hash,expires}){const u=this.users.get(userId);if(!u||u.is_active===false||u.local_login===false||u.registration_pending||u.password_hash!==passwordHash)return false;this.resets.set(userId,{userId,passwordHash,hash,expires});return true;}
+ async revokePasswordReset(hash){for(const [id,r]of this.resets)if(r.hash===hash)this.resets.delete(id);}
+ async consumePasswordReset(hash,passwordHash){const r=[...this.resets.values()].find(r=>r.hash===hash&&new Date(r.expires)>new Date()),u=r?this.users.get(r.userId):null;if(!u||u.is_active===false||u.local_login===false||u.registration_pending||u.password_hash!==r.passwordHash)fail(400,'RESET_INVALID','유효하지 않거나 만료된 링크입니다. 비밀번호 재설정을 다시 요청해 주세요.');this.resets.delete(u.id);u.password_hash=passwordHash;this.attempts?.delete(digest('local:'+u.email));this.revokeSessions(u.id);return {id:u.id};}
  async putTransient(key,value,ttlMs=600000){this.transients.set(key,{value:structuredClone(value),until:Date.now()+ttlMs});}
  async getTransient(key){const entry=this.transients.get(key);return entry&&entry.until>Date.now()?structuredClone(entry.value):null;}
  async takeTransient(key,browserHash=null){const value=await this.getTransient(key);if(!value||browserHash&&value.browserHash!==browserHash)return null;this.transients.delete(key);return value;}
@@ -37,7 +41,7 @@ export class MemoryRepository{
  async createSession({hash,passwordHash,...data}){const u=this.users.get(data.userId);if(!u||u.is_active===false||u.password_hash!==passwordHash)fail(401,'LOGIN_FAILED','계정 정보가 변경되었습니다.');this.sessions.set(hash,data);}
  async findSession(hash){const s=this.sessions.get(hash);if(!s||new Date(s.expires)<new Date())return null;const u=this.users.get(s.userId);if(!u||u.is_active===false)return null;return {user:publicUser(u),csrf:s.csrf};}
  async deleteSession(hash){this.sessions.delete(hash);}
- async changePassword(userId,expectedHash,passwordHash){const u=this.users.get(userId);if(!u||u.is_active===false||u.password_hash!==expectedHash)fail(409,'ACCOUNT_CHANGED','계정 정보가 변경되었습니다.');u.password_hash=passwordHash;this.revokeSessions(userId);return {ok:true};}
+ async changePassword(userId,expectedHash,passwordHash){const u=this.users.get(userId);if(!u||u.is_active===false||u.password_hash!==expectedHash)fail(409,'ACCOUNT_CHANGED','계정 정보가 변경되었습니다.');u.password_hash=passwordHash;this.resets.delete(userId);this.revokeSessions(userId);return {ok:true};}
  revokeSessions(userId){for(const [key,s]of this.sessions)if(s.userId===userId)this.sessions.delete(key);}
  async manageUser(actorId,targetId,{isActive,passwordHash}){
   const actor=this.users.get(actorId),target=this.users.get(targetId);
@@ -45,7 +49,7 @@ export class MemoryRepository{
   if(!target)fail(404,'USER_NOT_FOUND','계정이 없습니다.');
   if(target.is_admin||actorId===targetId)fail(403,'ADMIN_PROTECTED','관리자 계정은 보호됩니다.');
   if(isActive!==undefined)target.is_active=isActive;if(isActive===true)target.registration_pending=false;
-  if(passwordHash!==undefined)target.password_hash=passwordHash;
+  if(passwordHash!==undefined)target.password_hash=passwordHash;if(passwordHash||isActive===false)this.resets.delete(targetId);
   this.revokeSessions(targetId);return publicUser(target);
  }
  access(userId,id,minimum='viewer'){const p=this.projects.get(id),role=p?.roles[userId];if(!role)fail(404,'NOT_FOUND','프로젝트를 찾을 수 없습니다.');if(minimum==='owner'&&role!=='owner'||minimum==='editor'&&role==='viewer')fail(403,'FORBIDDEN','권한이 없습니다.');return p;}
