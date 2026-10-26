@@ -2,13 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {RegistrationEmail} from '../server/registration.mjs';
+import {createMailer} from '../server/mailer.mjs';
 import {digest,hashPassword,verifyPassword} from '../server/security.mjs';
 import {MemoryRepository} from './support/memory-repository.mjs';
 const PASSWORD='verified-owner-password-123',HASH=await hashPassword(PASSWORD);
 async function fixture(send={}){
  const admin=randomUUID(),repo=new MemoryRepository([{id:admin,is_admin:true,is_active:true}]);
  const u=await repo.createUser({email:'pending@example.com',name:'미인증',passwordHash:HASH,registrationPending:true}),mails=[];
- const options={repo,mailer:{sendVerification:async m=>mails.push(m),sendApproval:async m=>mails.push(m),...send},origin:'https://pm.example.com',basePath:'/pmcanvas',logger:{error(){}}};
+ const options={repo,mailer:{sendVerification:async m=>mails.push(m),sendApproval:async m=>mails.push(m),sendReviewRequest:async()=>{},...send},origin:'https://pm.example.com',basePath:'/pmcanvas',logger:{error(){}}};
  const service=new RegistrationEmail(options);return {repo,admin,u,mails,service,options,value:()=>new URL(mails.at(-1).url).hash.slice('#verify-email='.length)};
 }
 test('이메일 인증: 최신 링크만 유효·해시 저장·만료·동시 사용·메일 소유자의 자격 증명 확정',async()=>{
@@ -49,4 +50,34 @@ test('승인 알림: 만료된 작업만 회수하며 오래된 작업 결과는
  f.repo.notices.get(u.id).available=0;const recovered=await f.repo.claimApprovalNotification();assert.notEqual(first.lease,recovered.lease);
  await f.repo.finishApprovalNotification(u.id,first.lease,true);assert.equal(f.repo.notices.get(u.id).state,'sending');
  await f.repo.finishApprovalNotification(u.id,recovered.lease,true);assert.equal(f.repo.notices.get(u.id).state,'sent');
+});
+test('인증 완료 후 활성 관리자에게만 승인 요청, 재사용 무발송·관리자별 재시도·승인 후 중지',async()=>{
+ const requests=[],f=await fixture({sendReviewRequest:async m=>{requests.push(m);if(m.to==='admin2@example.com')throw Error('SMTP offline');}});
+ Object.assign(f.repo.users.get(f.admin),{email:'admin1@example.com'});
+ const second=randomUUID(),disabled=randomUUID(),ordinary=randomUUID();
+ f.repo.users.set(second,{id:second,email:'admin2@example.com',is_admin:true,is_active:true});f.repo.users.set(disabled,{id:disabled,email:'disabled@example.com',is_admin:true,is_active:false});f.repo.users.set(ordinary,{id:ordinary,email:'ordinary@example.com',is_admin:false,is_active:true});
+ f.service.request(f.u.email);await f.service.idle();assert.equal(requests.length,0);assert.equal(f.repo.reviewNotices.size,0);
+ const value=f.value();await f.service.finish(value,'메일 소유자',PASSWORD,PASSWORD);await f.service.idle();assert.equal(f.repo.reviewNotices.size,2);assert.deepEqual(requests.map(m=>m.to).sort(),['admin1@example.com','admin2@example.com']);
+ for(const m of requests){assert.equal(m.name,'메일 소유자');assert.equal(m.email,f.u.email);assert.equal(m.url,'https://pm.example.com/pmcanvas/#registration-approvals');assert.equal(JSON.stringify(m).includes(PASSWORD),false);}
+ await assert.rejects(f.service.finish(value,'다시',PASSWORD,PASSWORD),e=>e.code==='VERIFICATION_INVALID');await f.service.idle();assert.equal(requests.length,2);
+ const failed=f.repo.reviewNotices.get(f.u.id+'|'+second);
+ for(let i=0;i<2;i++){failed.available=0;f.service.notify();await f.service.idle();}assert.equal(failed.state,'failed');assert.equal(requests.filter(m=>m.to==='admin1@example.com').length,1);
+ assert.equal((await f.repo.listUsers()).find(u=>u.id===f.u.id).reviewMailStatus,'failed');
+ await assert.rejects(f.repo.retryApprovalNotification(ordinary,f.u.id,'review'),e=>e.status===403);await f.repo.retryApprovalNotification(f.admin,f.u.id,'review');
+ const restarted=new RegistrationEmail({...f.options,mailer:{...f.options.mailer,sendReviewRequest:async m=>requests.push(m)}});restarted.notify();await restarted.idle();assert.equal(failed.state,'sent');assert.equal(requests.filter(m=>m.to==='admin1@example.com').length,1);
+ await f.repo.manageUser(f.admin,f.u.id,{isActive:true});Object.assign(failed,{state:'pending',available:0});restarted.notify();await restarted.idle();assert.equal(requests.length,5);
+ await assert.rejects(f.repo.retryApprovalNotification(f.admin,f.u.id,'review'),e=>e.code==='NOTICE_UNAVAILABLE');
+});
+test('인증과 승인 요청 작업의 보관은 발송과 분리되며 수신자의 관리자 자격을 다시 검사',async()=>{
+ const f=await fixture(),admin=f.repo.users.get(f.admin);admin.email='admin@example.com';
+ const hash=digest('test-proof');await f.repo.issueEmailVerification({userId:f.u.id,passwordHash:HASH,hash,expires:new Date(Date.now()+60000)});await f.repo.consumeEmailVerification(hash,{name:'본인',passwordHash:HASH});
+ assert.equal(f.repo.reviewNotices.size,1);assert.equal((await f.repo.listUsers()).find(u=>u.id===f.u.id).reviewMailStatus,'pending');
+ admin.is_active=false;assert.equal(await f.repo.claimApprovalNotification(),null);admin.is_active=true;admin.is_admin=false;assert.equal(await f.repo.claimApprovalNotification(),null);admin.is_admin=true;
+ const job=await f.repo.claimApprovalNotification();assert.equal(job.kind,'review');assert.equal(job.recipientId,f.admin);assert.equal(job.userId,f.u.id);await f.repo.finishApprovalNotification(job.userId,job.lease,true);assert.equal(f.repo.reviewNotices.get(f.u.id+'|'+f.admin).state,'sent');
+});
+test('관리자 승인 요청 템플릿은 단일 수신자·고정 제목·평문 정보만 사용',async()=>{
+ const mails=[],mailer=createMailer({from:'sender@example.com',transport:{}},{createTransport:()=>({sendMail:async m=>{mails.push(m);return {accepted:['admin@example.com'],rejected:[]};}})});
+ await mailer.sendReviewRequest({to:'admin@example.com',name:'본인\r\n<script>alert(1)</script>',email:'applicant@example.com',url:'https://pm.example.com/pmcanvas/#registration-approvals'});
+ assert.equal(mails[0].subject,'[PM Canvas] 회원가입 승인 요청');assert.deepEqual(mails[0].to,{address:'admin@example.com'});assert.equal('html' in mails[0],false);assert.equal('attachments' in mails[0],false);assert.ok(mails[0].text.includes('신청자 이름: 본인  <script>'));assert.ok(mails[0].text.includes('관리자 계정으로 로그인'));
+ await assert.rejects(mailer.sendReviewRequest({to:'one,two@example.com',name:'본인',email:'applicant@example.com',url:'x'}),e=>e.status===400);
 });

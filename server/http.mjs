@@ -218,13 +218,13 @@ export function createHandler({repo,origin='http://localhost:3000',basePath='',l
      const result=method==='POST'?await repo.linkIdentity(user.id,{providerKey:p.key,subject:body.subject,email:emailAddress(body.email)}):await repo.unlinkIdentity(user.id,p.key,body.subject);await audit(req,method==='POST'?'account.identity.linked':'account.identity.unlinked',{provider:p.id});return json(res,200,result);
     }
    }
-   const noticeMatch=path.match(/^\/api\/users\/([^/]+)\/approval-notice$/);
+   const noticeMatch=path.match(/^\/api\/users\/([^/]+)\/(approval|review)-notice$/);
    if(noticeMatch&&method==='POST'){
     if(!user.isAdmin)fail(403,'FORBIDDEN','관리자 권한이 필요합니다.');
     if(!uuid(noticeMatch[1]))fail(404,'USER_NOT_FOUND','계정을 찾을 수 없습니다.');
     if(!registrationEmail)fail(503,'NOTICE_UNAVAILABLE','안내 메일 발송을 사용할 수 없습니다.');
     await reserve('approval-notice:'+noticeMatch[1],3,3600000);await reserve('approval-notice-global',100,3600000);
-    await repo.retryApprovalNotification(user.id,noticeMatch[1]);await audit(req,'account.approval_notice.retried',{targetId:noticeMatch[1]});registrationEmail.notify();
+    const kind=noticeMatch[2];await repo.retryApprovalNotification(user.id,noticeMatch[1],kind);await audit(req,kind==='review'?'account.review_notice.retried':'account.approval_notice.retried',{targetId:noticeMatch[1]});registrationEmail.notify();
     return json(res,202,{ok:true});
    }
    const userMatch=path.match(/^\/api\/users\/([^/]+)$/);

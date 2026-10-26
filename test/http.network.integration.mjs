@@ -16,7 +16,7 @@ const PASSWORD='a-test-password-12345',HASH=await hashPassword(PASSWORD);
 const ORIGIN='http://localhost:3000';
 async function fixture(t,{basePath='',mailer=null,mailSettingsFactory=null}={}){
  const users=[{id:randomUUID(),email:'owner@example.com',name:'소유자',password_hash:HASH,is_admin:true},{id:randomUUID(),email:'other@example.com',name:'팀원',password_hash:HASH,is_admin:false}];
- const repo=new MemoryRepository(users),mailSettings=mailSettingsFactory?mailSettingsFactory(repo):null,effectiveMailer=mailSettings||mailer,reset=effectiveMailer?new PasswordReset({repo,mailer:effectiveMailer,origin:ORIGIN,basePath,logger:{error(){}}}):null,registrationEmail=new RegistrationEmail({repo,mailer:effectiveMailer||{async sendVerification(){},async sendApproval(){}},origin:ORIGIN,basePath,logger:{error(){}}}),server=createApplication({repo,origin:ORIGIN,basePath,passwordReset:reset,registrationEmail,mailSettings,logger:{error(){}}});
+ const repo=new MemoryRepository(users),mailSettings=mailSettingsFactory?mailSettingsFactory(repo):null,effectiveMailer=mailSettings||mailer,reset=effectiveMailer?new PasswordReset({repo,mailer:effectiveMailer,origin:ORIGIN,basePath,logger:{error(){}}}):null,registrationEmail=new RegistrationEmail({repo,mailer:effectiveMailer||{async sendVerification(){},async sendApproval(){},async sendReviewRequest(){}},origin:ORIGIN,basePath,logger:{error(){}}}),server=createApplication({repo,origin:ORIGIN,basePath,passwordReset:reset,registrationEmail,mailSettings,logger:{error(){}}});
  server.listen(0,'127.0.0.1');await once(server,'listening');
  t.after(()=>{server.closeAllConnections();return new Promise(resolve=>server.close(resolve));});
  const base='http://127.0.0.1:'+server.address().port+basePath+'/api/';
@@ -124,10 +124,12 @@ networkTest('가입 이메일 HTTP·TLS SMTP: 인증 메일 수신·승인 전 �
  const link=verificationLink(smtp.messages[0]);assert.equal(new URL(link).pathname,'/pmcanvas/');assert.equal(new URL(link).search,'');assert.ok(mailText(smtp.messages[0]).includes('30분'));
  const u=await f.repo.findUserByEmail(email),route='users/'+u.id;assert.equal((await f.call(admin,route,{method:'PATCH',body:{isActive:true}})).data.error.code,'EMAIL_UNVERIFIED');
  const proof={token:new URL(link).hash.slice('#verify-email='.length),name:'인증한 가입자',newPassword:PASSWORD,confirmPassword:PASSWORD};assert.equal((await f.call(guest,'auth/verify-email',{method:'POST',body:proof})).status,200);
+ await f.registrationEmail.idle();assert.equal(smtp.messages.length,2);assert.ok(smtp.messages[1].includes('To: owner@example.com'));assert.ok(mailText(smtp.messages[1]).includes('인증한 가입자'));assert.ok(mailText(smtp.messages[1]).includes(email));assert.ok(mailText(smtp.messages[1]).includes('/pmcanvas/#registration-approvals'));assert.equal(mailText(smtp.messages[1]).includes(PASSWORD),false);
+ assert.equal((await f.call(guest,'auth/verify-email',{method:'POST',body:proof})).data.error.code,'VERIFICATION_INVALID');await f.registrationEmail.idle();assert.equal(smtp.messages.length,2);
  assert.equal((await f.call(guest,'auth/login',{method:'POST',body:{email,password:PASSWORD}})).data.error.code,'APPROVAL_PENDING');
- assert.equal((await f.call(admin,route,{method:'PATCH',body:{isActive:true}})).status,200);await f.registrationEmail.idle();assert.equal(smtp.messages.length,2);assert.ok(mailText(smtp.messages[1]).includes('회원가입이 승인되었습니다'));assert.equal(mailText(smtp.messages[1]).includes(PASSWORD),false);
+ assert.equal((await f.call(admin,route,{method:'PATCH',body:{isActive:true}})).status,200);await f.registrationEmail.idle();assert.equal(smtp.messages.length,3);assert.ok(mailText(smtp.messages[2]).includes('회원가입이 승인되었습니다'));assert.equal(mailText(smtp.messages[2]).includes(PASSWORD),false);
  assert.equal((await f.call(guest,'auth/login',{method:'POST',body:{email,password:PASSWORD}})).status,200);
- await f.call(admin,route,{method:'PATCH',body:{isActive:true}});await f.registrationEmail.idle();assert.equal(smtp.messages.length,2);
+ await f.call(admin,route,{method:'PATCH',body:{isActive:true}});await f.registrationEmail.idle();assert.equal(smtp.messages.length,3);
 });
 
 networkTest('이메일 재설정 HTTP·TLS SMTP: 실제 메일 수신·링크 사용·새 비밀번호 로그인',async t=>{

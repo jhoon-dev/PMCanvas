@@ -50,12 +50,14 @@ export class MailSettings{
    if(method==='sendReset')await mailer.sendReset(argument);
    else if(method==='sendVerification')await mailer.sendVerification(argument);
    else if(method==='sendApproval')await mailer.sendApproval(argument);
+   else if(method==='sendReviewRequest')await mailer.sendReviewRequest(argument);
    else await mailer.sendTest(argument);
   }finally{mailer?.close();this.sending--;}
  }
  sendReset(message){return this.#send('sendReset',message);}
  sendVerification(message){return this.#send('sendVerification',message);}
  sendApproval(message){return this.#send('sendApproval',message);}
+ sendReviewRequest(message){return this.#send('sendReviewRequest',message);}
  async test(to){
   to=mailAddress(to);
   try{await this.#send('sendTest',to);}catch(error){

@@ -6,7 +6,7 @@ const resetLanding=location.hash.startsWith('#reset-password'),verificationLandi
 let emailVerificationToken=location.hash.match(/^#verify-email=([A-Za-z0-9_-]{43})$/)?.[1]||'';
 let passwordResetToken=location.hash.match(/^#reset-password=([A-Za-z0-9_-]{43})$/)?.[1]||'';
 if(resetLanding||verificationLanding)history.replaceState(null,'',location.pathname+location.search);
-let resetEmailEnabled=false;
+let resetEmailEnabled=false,reviewLanding=location.hash==='#registration-approvals';
 let loginProvider='',registrationPolicy={mode:'disabled',domains:[]};
 import {csvText, wbsRows, completionRecords, completionRows} from './reports.js';
 import {today,addDays,daysBetween,workdays,working,shiftWorkday,nextWorkday,dateValue,validDate,taskHours,earned,progress,planned,summary,validateProject} from './engine.js';
@@ -192,7 +192,7 @@ $('#main').addEventListener('change',async e=>{
  }
 });
 $('#main').addEventListener('input',e=>{if(e.target.id==='taskSearch'){const pos=e.target.selectionStart;query=e.target.value;render();$('#taskSearch').focus();$('#taskSearch').setSelectionRange(pos,pos);}});
-window.addEventListener('hashchange',()=>{if(location.hash.startsWith('#verify-email')){const value=location.hash.match(/^#verify-email=([A-Za-z0-9_-]{43})$/)?.[1]||'';history.replaceState(null,'',location.pathname+location.search);if(wbs.dirty||storageError||saveInFlight){toast('현재 변경사항을 저장한 뒤 인증 링크를 다시 열어 주세요.');return;}emailVerificationToken=value;showEmailVerification();return;}if(location.hash.startsWith('#reset-password')){const value=location.hash.match(/^#reset-password=([A-Za-z0-9_-]{43})$/)?.[1]||'';history.replaceState(null,'',location.pathname+location.search);if(wbs.dirty||storageError||saveInFlight){toast('현재 변경사항을 저장한 뒤 이메일의 재설정 링크를 다시 열어 주세요.');return;}passwordResetToken=value;showPasswordReset();return;}const next=normalizeView(location.hash.slice(1));if(next===view)return;if(wbs.dirty&&next!=='tasks'){history.replaceState(null,'','#tasks');toast('WBS 변경사항을 먼저 저장하거나 취소해 주세요.');return;}view=next;render();});
+window.addEventListener('hashchange',()=>{if(location.hash==='#registration-approvals'){reviewLanding=true;if(currentUser)showApprovalInbox().catch(error=>toast(error.message));else showAuth();return;}if(location.hash.startsWith('#verify-email')){const value=location.hash.match(/^#verify-email=([A-Za-z0-9_-]{43})$/)?.[1]||'';history.replaceState(null,'',location.pathname+location.search);if(wbs.dirty||storageError||saveInFlight){toast('현재 변경사항을 저장한 뒤 인증 링크를 다시 열어 주세요.');return;}emailVerificationToken=value;showEmailVerification();return;}if(location.hash.startsWith('#reset-password')){const value=location.hash.match(/^#reset-password=([A-Za-z0-9_-]{43})$/)?.[1]||'';history.replaceState(null,'',location.pathname+location.search);if(wbs.dirty||storageError||saveInFlight){toast('현재 변경사항을 저장한 뒤 이메일의 재설정 링크를 다시 열어 주세요.');return;}passwordResetToken=value;showPasswordReset();return;}const next=normalizeView(location.hash.slice(1));if(next===view)return;if(wbs.dirty&&next!=='tasks'){history.replaceState(null,'','#tasks');toast('WBS 변경사항을 먼저 저장하거나 취소해 주세요.');return;}view=next;render();});
 $('#projectSelect').onchange=e=>{if(storageError||wbs.dirty){toast('WBS 변경사항을 먼저 저장하거나 취소해 주세요.');render();return;}state.activeId=e.target.value;ownerFilter='';statusFilter='';query='';render();};$('#mobileNewProject').onclick=()=>openEditor('project');
 $('#closeDialog').onclick=$('#cancelDialog').onclick=()=>$('#editorDialog').close();$('#closeInfo').onclick=()=>$('#infoDialog').close();$('#helpButton').onclick=help;$('#methodFooter').onclick=method;$('#newProjectSide').onclick=()=>openEditor('project');
 $('#backupButton').onclick=()=>{
@@ -289,7 +289,7 @@ async function loadProjects({force=false}={}){
  storageError='';render();return true;
 }
 async function boot(){
- try{const session=await api('auth/me');if(currentUser?.id!==session.user.id){wbs.persistDraft();wbs.draft=null;wbs.base=null;wbs.pending.clear();wbs.recovery=null;}currentUser=session.user;await loadProjects();$('#authGate').hidden=true;}
+ try{const session=await api('auth/me');if(currentUser?.id!==session.user.id){wbs.persistDraft();wbs.draft=null;wbs.base=null;wbs.pending.clear();wbs.recovery=null;}currentUser=session.user;await loadProjects();$('#authGate').hidden=true;await showApprovalInbox();}
  catch(error){if(error.status===401)showAuth($('#authError').textContent);else showAuth(error.message);}
 }
 async function reloadServer(){
@@ -313,6 +313,7 @@ async function refreshUsers(){
    const label=u.registrationPending?'가입 승인':u.isActive?'비활성화':'활성화';
    return '<article class="account-user"><div class="sharing-row"><span><strong>'+esc(u.name)+'</strong><small>'+esc(u.email)+' · '+(u.isAdmin?'관리자':u.registrationPending?(u.emailVerified?'이메일 인증 완료 · 승인 대기':'이메일 인증 대기'):u.isActive?'활성':'비활성')+'</small></span>'+
     (u.isAdmin?'<span class="badge neutral">관리자</span>':u.registrationPending&&!u.emailVerified?'<span class="badge neutral">인증 대기</span>':'<button class="button small '+(u.registrationPending?'primary':'')+'" data-user-status="'+esc(u.id)+'" data-registration-pending="'+!!u.registrationPending+'" data-next-active="'+!u.isActive+'" aria-label="'+esc(u.name)+' '+label+'">'+label+'</button>')+'</div>'+
+    (u.registrationPending&&u.reviewMailStatus?'<p class="subtle">관리자 승인 요청 · '+({pending:'발송 대기 · 실패 시 자동 재시도',sending:'발송 중',sent:'SMTP 전달 완료',failed:'일부 또는 전체 발송 실패'})[u.reviewMailStatus]+(u.reviewMailStatus==='failed'?' <button class="auth-link" data-retry-review="'+esc(u.id)+'">실패한 메일 다시 보내기</button>':'')+'</p>':'')+
     (u.approvalMailStatus?'<p class="subtle">승인 안내 메일 · '+({pending:'발송 대기 · 실패 시 자동 재시도',sending:'발송 중',sent:'SMTP 전달 완료',failed:'발송 실패'})[u.approvalMailStatus]+(u.approvalMailStatus==='failed'&&u.isActive?' <button class="auth-link" data-retry-notice="'+esc(u.id)+'">다시 보내기</button>':'')+'</p>':'')+
     (u.isAdmin||u.registrationPending?'':u.localLogin===false?'<p class="subtle">외부 인증 전용 계정</p>':'<details><summary>비밀번호 재설정 · '+esc(u.name)+'</summary><p class="subtle">새 비밀번호는 사용자에게 직접 전달하세요. 모든 기존 세션이 종료됩니다.</p><form class="server-form" data-reset-user="'+esc(u.id)+'">'+field('새 임시 비밀번호','password','','password','required minlength="12" maxlength="256" autocomplete="new-password"')+'<button class="button">비밀번호 재설정</button><p class="account-result" role="status"></p></form></details>')+'</article>';
   }).join('');
@@ -396,6 +397,7 @@ $('#infoBody').addEventListener('click',async e=>{
   try{await api('auth/connections',{method:'DELETE',body:{provider:unlink.dataset.unlinkProvider,subject:unlink.dataset.unlinkSubject}});await openConnections();}
   catch(error){toast(error.message);unlink.disabled=false;}return;
  }
+ const reviewRetry=e.target.closest('[data-retry-review]');if(reviewRetry){reviewRetry.disabled=true;try{await api('users/'+reviewRetry.dataset.retryReview+'/review-notice',{method:'POST',body:{}});await refreshUsers();toast('관리자 승인 요청 메일 발송을 다시 요청했습니다.');}catch(error){toast(error.message);reviewRetry.disabled=false;}return;}
  const retry=e.target.closest('[data-retry-notice]');if(retry){retry.disabled=true;try{await api('users/'+retry.dataset.retryNotice+'/approval-notice',{method:'POST',body:{}});await refreshUsers();toast('승인 안내 메일 발송을 다시 요청했습니다.');}catch(error){toast(error.message);retry.disabled=false;}return;}
  const status=e.target.closest('[data-user-status]');
  if(status){
@@ -434,11 +436,19 @@ async function exportExcel(){
 
 window.addEventListener('pagehide',()=>wbs.persistDraft());
 
+async function showApprovalInbox(){
+ if(!reviewLanding||!currentUser)return;
+ if(storageError||wbs.dirty||saveInFlight){toast('현재 변경사항을 저장한 뒤 승인 요청 링크를 다시 열어 주세요.');return;}
+ reviewLanding=false;if(location.hash==='#registration-approvals')history.replaceState(null,'',location.pathname+location.search);
+ if(!currentUser.isAdmin){toast('가입 승인 목록은 관리자만 확인할 수 있습니다.');return;}
+ await openAccount();$('#userList')?.scrollIntoView({block:'start'});
+}
 async function completeBrowserLogin(session){
  if(currentUser?.id!==session.user.id){wbs.persistDraft();if(currentUser)DraftStore.clearUser(currentUser.id);wbs.draft=null;wbs.base=null;wbs.pending.clear();wbs.recovery=null;}
  currentUser=session.user;$('#authGate').hidden=true;$('#loginForm').hidden=false;$('#mfaForm')?.remove();
  if(storageError||wbs.dirty)render();else await loadProjects();
- if(session.recoveryCodes)openInfo('MFA 복구 코드를 보관하세요','<p>인증 앱을 사용할 수 없을 때 아래 코드를 한 번씩 사용할 수 있습니다. 안전한 오프라인 장소에 보관하세요. 이 화면에서만 표시합니다.</p><pre>'+session.recoveryCodes.map(esc).join('\n')+'</pre>');
+ if(session.recoveryCodes){openInfo('MFA 복구 코드를 보관하세요','<p>인증 앱을 사용할 수 없을 때 아래 코드를 한 번씩 사용할 수 있습니다. 안전한 오프라인 장소에 보관하세요. 이 화면에서만 표시합니다.</p><pre>'+session.recoveryCodes.map(esc).join('\n')+'</pre>');if(reviewLanding)$('#infoDialog').addEventListener('close',()=>{showApprovalInbox().catch(error=>toast(error.message));},{once:true});}
+ else await showApprovalInbox();
 }
 function showMfaLogin(challenge){
  $('#loginForm').hidden=true;$('#mfaForm')?.remove();const form=document.createElement('form');form.id='mfaForm';form.className='auth-card';
@@ -528,7 +538,7 @@ async function openMailSettings(){
  openInfo('이메일 발송 설정','<div id="mailSettingsHost">불러오는 중…</div>');$('#infoDialog').classList.add('mail-settings-dialog');$('#infoDialog .eyebrow').textContent='관리자 설정';const host=$('#mailSettingsHost'),q=selector=>host.querySelector(selector);
  try{
   let {settings}=await api('admin/mail-settings');if(!host.isConnected)return;let busy=false;
-  host.innerHTML='<p>가입 인증·승인 안내·비밀번호 재설정에 사용할 메일 서버를 설정하세요. 저장하면 바로 적용됩니다.</p><form id="mailSettingsForm" class="server-form"><fieldset class="smtp-fields"><label class="mail-flag"><input name="enabled" type="checkbox">이메일 발송 사용</label><div class="mail-settings-grid">'+field('SMTP 서버','host','','text','maxlength="253" placeholder="smtp.example.com" autocomplete="off"')+field('포트','port','','number','required min="1" max="65535"')+'<label class="field">보안 연결<select name="security"><option value="starttls">STARTTLS · 보통 587번</option><option value="tls">TLS · 보통 465번</option></select></label>'+field('발신 이메일','from','','email','maxlength="254" placeholder="pmcanvas@example.com"')+'</div><label class="mail-flag"><input name="authEnabled" type="checkbox">SMTP 인증 사용</label><div class="mail-settings-grid" id="smtpAuthFields">'+field('인증 계정','username','','text','maxlength="254" autocomplete="off"')+field('SMTP 비밀번호','smtpPassword','','password','maxlength="4096" autocomplete="new-password"')+'</div><p class="subtle" id="smtpPasswordHint"></p></fieldset><div class="mail-save-row"><button type="submit" class="button primary">설정 저장</button><span id="mailEnabledStatus" class="subtle"></span></div><p class="account-result" role="status" id="mailSaveResult"></p></form><section class="account-section"><h3>테스트 메일</h3><p class="subtle" id="mailTestHint"></p><form id="mailTestForm" class="server-form">'+field('받는 이메일','to',currentUser.email,'email','required maxlength="254" autocomplete="email"')+'<button class="button" type="submit">테스트 메일 보내기</button><p class="account-result" role="status" id="mailTestResult"></p></form></section>';
+  host.innerHTML='<p>가입 인증·관리자 승인 요청·승인 안내·비밀번호 재설정에 사용할 메일 서버를 설정하세요. 저장하면 바로 적용됩니다.</p><form id="mailSettingsForm" class="server-form"><fieldset class="smtp-fields"><label class="mail-flag"><input name="enabled" type="checkbox">이메일 발송 사용</label><div class="mail-settings-grid">'+field('SMTP 서버','host','','text','maxlength="253" placeholder="smtp.example.com" autocomplete="off"')+field('포트','port','','number','required min="1" max="65535"')+'<label class="field">보안 연결<select name="security"><option value="starttls">STARTTLS · 보통 587번</option><option value="tls">TLS · 보통 465번</option></select></label>'+field('발신 이메일','from','','email','maxlength="254" placeholder="pmcanvas@example.com"')+'</div><label class="mail-flag"><input name="authEnabled" type="checkbox">SMTP 인증 사용</label><div class="mail-settings-grid" id="smtpAuthFields">'+field('인증 계정','username','','text','maxlength="254" autocomplete="off"')+field('SMTP 비밀번호','smtpPassword','','password','maxlength="4096" autocomplete="new-password"')+'</div><p class="subtle" id="smtpPasswordHint"></p></fieldset><div class="mail-save-row"><button type="submit" class="button primary">설정 저장</button><span id="mailEnabledStatus" class="subtle"></span></div><p class="account-result" role="status" id="mailSaveResult"></p></form><section class="account-section"><h3>테스트 메일</h3><p class="subtle" id="mailTestHint"></p><form id="mailTestForm" class="server-form">'+field('받는 이메일','to',currentUser.email,'email','required maxlength="254" autocomplete="email"')+'<button class="button" type="submit">테스트 메일 보내기</button><p class="account-result" role="status" id="mailTestResult"></p></form></section>';
   const form=q('#mailSettingsForm'),test=q('#mailTestForm'),e=form.elements;
   const value=()=>({enabled:e.enabled.checked,host:e.host.value.trim(),port:Number(e.port.value),secure:e.security.value==='tls',from:e.from.value.trim(),authEnabled:e.authEnabled.checked,username:e.username.value.trim(),password:e.smtpPassword.value,revision:settings.revision});
   const dirty=()=>{const v=value();return !!v.password||['enabled','host','port','secure','from','authEnabled','username'].some(k=>v[k]!==settings[k]);};

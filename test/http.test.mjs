@@ -15,7 +15,7 @@ const PASSWORD='a-test-password-12345',HASH=await hashPassword(PASSWORD);
 const ORIGIN='http://localhost:3000';
 async function fixture(t,{basePath='',providers=[],trustProxies='',mailer=null,mailSettingsFactory=null,registration=registrationConfig()}={}){
  const users=[{id:randomUUID(),email:'owner@example.com',name:'소유자',password_hash:HASH,is_admin:true},{id:randomUUID(),email:'other@example.com',name:'팀원',password_hash:HASH,is_admin:false}];
- const repo=new MemoryRepository(users),mailSettings=mailSettingsFactory?mailSettingsFactory(repo):null,effectiveMailer=mailSettings||mailer,reset=effectiveMailer?new PasswordReset({repo,mailer:effectiveMailer,origin:ORIGIN,basePath,logger:{error(){}}}):null,registrationEmail=new RegistrationEmail({repo,mailer:effectiveMailer||{async sendVerification(){},async sendApproval(){}},origin:ORIGIN,basePath,logger:{error(){}}}),handler=createHandler({repo,origin:ORIGIN,basePath,registration,trustProxies,passwordReset:reset,registrationEmail,mailSettings,federation:new Federation({repo,origin:ORIGIN,basePath,providers}),logger:{error(){}}});
+ const repo=new MemoryRepository(users),mailSettings=mailSettingsFactory?mailSettingsFactory(repo):null,effectiveMailer=mailSettings||mailer,reset=effectiveMailer?new PasswordReset({repo,mailer:effectiveMailer,origin:ORIGIN,basePath,logger:{error(){}}}):null,registrationEmail=new RegistrationEmail({repo,mailer:effectiveMailer||{async sendVerification(){},async sendApproval(){},async sendReviewRequest(){}},origin:ORIGIN,basePath,logger:{error(){}}}),handler=createHandler({repo,origin:ORIGIN,basePath,registration,trustProxies,passwordReset:reset,registrationEmail,mailSettings,federation:new Federation({repo,origin:ORIGIN,basePath,providers}),logger:{error(){}}});
  async function inject(url,{method='GET',body,headers={}}={}){
   const req=Readable.from(body===undefined?[]:[Buffer.from(JSON.stringify(body))]);
   Object.assign(req,{url,method,headers,socket:{remoteAddress:'127.0.0.1'}});
@@ -294,6 +294,16 @@ test('SMTP 미설정 시 가입 접수 차단, 승인 메일 재시도는 관리
  assert.equal((await f.call(admin,route,{method:'POST',body:{}})).status,202);await f.registrationEmail.idle();assert.equal(f.repo.notices.get(id).state,'sent');
 });
 const mailToken=mail=>new URL(mail.url).hash.slice('#reset-password='.length);
+test('관리자 승인 요청 재발송 API: 관리자·CSRF·Origin·실패 대상만 재발송',async t=>{
+ const requests=[],f=await fixture(t,{mailer:{async sendReviewRequest(m){requests.push(m);}}}),admin=await f.login('owner@example.com'),other=await f.login('other@example.com');
+ const u=await f.repo.createUser({email:'review@example.com',name:'인증한 신청자',passwordHash:HASH,registrationPending:true});f.repo.users.get(u.id).email_verified_at=new Date();
+ f.repo.reviewNotices.set(u.id+'|'+f.users[0].id,{userId:u.id,recipientId:f.users[0].id,state:'failed',attempts:3,available:0});const route='users/'+u.id+'/review-notice';
+ assert.equal((await f.call(f.client(),route,{method:'POST',body:{}})).status,401);assert.equal((await f.call(other,route,{method:'POST',body:{}})).status,403);
+ assert.equal((await f.call(admin,route,{method:'POST',body:{},headers:{'X-CSRF-Token':'bad'}})).status,403);assert.equal((await f.call(admin,route,{method:'POST',body:{},headers:{Origin:'https://evil.example'}})).status,403);
+ assert.equal((await f.call(admin,route,{method:'POST',body:{to:'attacker@example.com'}})).status,202);await f.registrationEmail.idle();assert.equal(requests.length,1);assert.equal(requests[0].to,'owner@example.com');assert.equal(requests[0].email,u.email);
+ const list=await f.call(admin,'users');assert.equal(list.data.users.find(x=>x.id===u.id).reviewMailStatus,'sent');assert.equal(list.data.users.filter(x=>x.id===u.id).length,1);
+ assert.equal((await f.call(admin,route,{method:'POST',body:{}})).status,409);assert.ok(f.repo.security.some(e=>e.kind==='account.review_notice.retried'));
+});
 test('이메일 재설정: 동일 접수 응답·Origin·확인값·세션 폐기·일회성 링크·자동 로그인 금지',async t=>{
  const mails=[],f=await fixture(t,{basePath:'/pmcanvas',mailer:{sendReset:async mail=>mails.push(mail)}}),a=await f.login('other@example.com'),b=await f.login('other@example.com'),guest=f.client();
  const request=email=>f.call(guest,'auth/forgot-password',{method:'POST',body:{email}});

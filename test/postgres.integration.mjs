@@ -4,6 +4,7 @@ import {captureBaseline,setParent} from '../public/planning.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
+import fs from 'node:fs';
 import {createPool,migrate,PgRepository} from '../server/postgres.mjs';
 import {cleanProject} from '../server/project.mjs';
 import {hashPassword,token,digest} from '../server/security.mjs';
@@ -188,7 +189,7 @@ test('실제 PostgreSQL: 이메일 인증 원자성·인증 전 활성화 제약
   const results=await Promise.allSettled([repo,other].map(r=>r.consumeEmailVerification(current,{name:'메일 소유자',passwordHash:'verified-hash'})));assert.equal(results.filter(r=>r.status==='fulfilled').length,1);assert.equal(results.find(r=>r.status==='rejected').reason.code,'VERIFICATION_INVALID');
   const verified=await repo.findUserByEmail(u.email);assert.equal(verified.password_hash,'verified-hash');assert.ok(verified.email_verified_at);assert.equal(verified.is_active,false);
   assert.equal(await repo.issueEmailVerification({...input,hash:digest(token()),passwordHash:'verified-hash'}),false);
-  const approved=await repo.manageUser(admin.id,u.id,{isActive:true});assert.equal(approved.approvalMailStatus,'pending');await repo.manageUser(admin.id,u.id,{isActive:true});assert.equal((await pool.query('SELECT count(*)::int AS n FROM pm_approval_notifications WHERE user_id=$1',[u.id])).rows[0].n,1);
+  const approved=await repo.manageUser(admin.id,u.id,{isActive:true});assert.equal(approved.approvalMailStatus,'pending');await repo.manageUser(admin.id,u.id,{isActive:true});assert.equal((await pool.query('SELECT count(*)::int AS n FROM pm_approval_notifications WHERE user_id=$1 AND kind=\'approval\'',[u.id])).rows[0].n,1);
   const claims=await Promise.all([repo.claimApprovalNotification(),other.claimApprovalNotification()]);assert.equal(claims.filter(Boolean).length,1);const original=claims.find(Boolean);assert.equal(original.userId,u.id);
   await pool.query("UPDATE pm_approval_notifications SET available_at=now()-interval '1 second' WHERE user_id=$1",[u.id]);const recovered=await other.claimApprovalNotification();assert.notEqual(recovered.lease,original.lease);
   await repo.finishApprovalNotification(u.id,original.lease,true);assert.equal((await repo.listUsers()).find(x=>x.id===u.id).approvalMailStatus,'sending');
@@ -197,6 +198,36 @@ test('실제 PostgreSQL: 이메일 인증 원자성·인증 전 활성화 제약
   await assert.rejects(repo.retryApprovalNotification(u.id,u.id),e=>e.status===403);await repo.retryApprovalNotification(admin.id,u.id);const retried=await repo.claimApprovalNotification();await repo.finishApprovalNotification(u.id,retried.lease,true);assert.equal((await repo.listUsers()).find(x=>x.id===u.id).approvalMailStatus,'sent');
   await assert.rejects(repo.retryApprovalNotification(admin.id,u.id),e=>e.code==='NOTICE_UNAVAILABLE');
  }finally{for(const id of ids.reverse())await pool.query('DELETE FROM pm_users WHERE id=$1',[id]);await pool.end();}
+});
+
+test('실제 PostgreSQL: 관리자별 승인 요청 원자 보관·중복 방지·수신 권한·독립 재시도',{skip:process.env.RUN_POSTGRES_TESTS!=='1'},async()=>{
+ if(!/_test$/.test(process.env.PGDATABASE||''))throw Error('Use a dedicated _test database.');
+ const pool=await createPool(),repo=new PgRepository(pool),ids=[];
+ try{
+  await migrate(pool);const suffix=randomUUID(),add=async(name,isAdmin=false,pending=false)=>{const u=await repo.createUser({email:name+'-'+suffix+'@example.com',name,passwordHash:'hash',isAdmin,registrationPending:pending});ids.push(u.id);return u;};
+  const a=await add('admin1',true),b=await add('admin2',true),disabled=await add('disabled',true),u=await add('applicant',false,true);await pool.query('UPDATE pm_users SET is_active=false WHERE id=$1',[disabled.id]);
+  const hash=digest(token());await repo.issueEmailVerification({userId:u.id,passwordHash:'hash',hash,expires:new Date(Date.now()+60000)});
+  const results=await Promise.allSettled([0,1].map(()=>repo.consumeEmailVerification(hash,{name:'본인',passwordHash:'verified'})));assert.equal(results.filter(r=>r.status==='fulfilled').length,1);
+  assert.equal((await pool.query("SELECT count(*)::int AS n FROM pm_approval_notifications WHERE user_id=$1 AND kind='review'",[u.id])).rows[0].n,2);
+  const claims=await Promise.all([repo.claimApprovalNotification(),repo.claimApprovalNotification()]);assert.deepEqual(new Set(claims.map(j=>j.recipientId)),new Set([a.id,b.id]));assert.ok(claims.every(j=>j.kind==='review'&&j.applicantName==='본인'&&j.applicantEmail===u.email));assert.equal(await repo.claimApprovalNotification(),null);
+  const success=claims.find(j=>j.recipientId===a.id),failure=claims.find(j=>j.recipientId===b.id);await repo.finishApprovalNotification(u.id,success.lease,true);await repo.finishApprovalNotification(u.id,failure.lease,false);
+  for(let i=0;i<2;i++){await pool.query("UPDATE pm_approval_notifications SET available_at=now()-interval '1 second' WHERE user_id=$1 AND kind='review' AND recipient_id=$2",[u.id,b.id]);const job=await repo.claimApprovalNotification();await repo.finishApprovalNotification(u.id,job.lease,false);}
+  assert.equal((await repo.listUsers()).find(x=>x.id===u.id).reviewMailStatus,'failed');await assert.rejects(repo.retryApprovalNotification(u.id,u.id,'review'),e=>e.status===403);await repo.retryApprovalNotification(a.id,u.id,'review');
+  await pool.query('UPDATE pm_users SET is_admin=false WHERE id=$1',[b.id]);assert.equal(await repo.claimApprovalNotification(),null);await pool.query('UPDATE pm_users SET is_admin=true,is_active=false WHERE id=$1',[b.id]);assert.equal(await repo.claimApprovalNotification(),null);await pool.query('UPDATE pm_users SET is_active=true WHERE id=$1',[b.id]);
+  const retried=await repo.claimApprovalNotification();assert.equal(retried.recipientId,b.id);await repo.finishApprovalNotification(u.id,retried.lease,true);assert.equal((await repo.listUsers()).filter(x=>x.id===u.id).length,1);assert.equal((await repo.listUsers()).find(x=>x.id===u.id).reviewMailStatus,'sent');
+  await repo.manageUser(a.id,u.id,{isActive:true});await pool.query("UPDATE pm_approval_notifications SET state='pending',available_at=now() WHERE user_id=$1 AND kind='review'",[u.id]);const approved=await repo.claimApprovalNotification();assert.equal(approved.kind,'approval');assert.equal(approved.email,u.email);await repo.finishApprovalNotification(u.id,approved.lease,true);assert.equal(await repo.claimApprovalNotification(),null);await assert.rejects(repo.retryApprovalNotification(a.id,u.id,'review'),e=>e.code==='NOTICE_UNAVAILABLE');
+ }finally{for(const id of ids.reverse())await pool.query('DELETE FROM pm_users WHERE id=$1',[id]);await pool.end();}
+});
+test('실제 PostgreSQL: 010 업그레이드는 기존 발송 기록을 유지하고 인증된 대기 신청만 관리자에게 알린다',{skip:process.env.RUN_POSTGRES_TESTS!=='1'},async()=>{
+ if(!/_test$/.test(process.env.PGDATABASE||''))throw Error('Use a dedicated _test database.');
+ const pool=await createPool(),c=await pool.connect();
+ try{
+  await c.query('BEGIN');await c.query('CREATE TEMP TABLE pm_users(id uuid PRIMARY KEY,is_admin boolean,is_active boolean,registration_pending boolean,email_verified_at timestamptz)');
+  await c.query("CREATE TEMP TABLE pm_approval_notifications(user_id uuid PRIMARY KEY REFERENCES pm_users(id),state text DEFAULT 'pending',attempts integer DEFAULT 0,lease uuid,available_at timestamptz DEFAULT now(),updated_at timestamptz DEFAULT now())");
+  const admin=randomUUID(),pending=randomUUID(),unverified=randomUUID(),approved=randomUUID(),inactive=randomUUID();await c.query("INSERT INTO pm_users VALUES ($1,true,true,false,NULL),($2,false,false,true,now()),($3,false,false,true,NULL),($4,false,true,false,now()),($5,true,false,false,NULL)",[admin,pending,unverified,approved,inactive]);await c.query("INSERT INTO pm_approval_notifications(user_id,state,attempts) VALUES ($1,'sent',2)",[approved]);
+  await c.query(fs.readFileSync(new URL('../migrations/010_registration_review.sql',import.meta.url),'utf8'));
+  const rows=(await c.query('SELECT user_id,recipient_id,kind,state,attempts FROM pm_approval_notifications ORDER BY kind')).rows;assert.equal(rows.length,2);assert.deepEqual(rows.find(r=>r.kind==='approval'),{user_id:approved,recipient_id:approved,kind:'approval',state:'sent',attempts:2});assert.equal(rows.find(r=>r.kind==='review').user_id,pending);assert.equal(rows.find(r=>r.kind==='review').recipient_id,admin);
+ }finally{await c.query('ROLLBACK');c.release();await pool.end();}
 });
 
 test('실제 PostgreSQL: 재설정 링크 교체·동시 소비·세션 폐기·비밀번호 변경·비활성화 경합',{skip:process.env.RUN_POSTGRES_TESTS!=='1'},async()=>{

@@ -31,7 +31,8 @@ export class RegistrationEmail{
   if(typeof value!=='string'||!/^[A-Za-z0-9_-]{43}$/.test(value))fail(400,'VERIFICATION_INVALID','유효하지 않거나 만료된 링크입니다. 인증 메일을 다시 요청해 주세요.');
   if(typeof name!=='string'||!name.trim()||name.length>80)fail(400,'INVALID_NAME','이름은 1~80자로 입력해 주세요.');
   if(password!==confirmation)fail(400,'PASSWORD_MISMATCH','비밀번호 확인이 일치하지 않습니다.');
-  return this.repo.consumeEmailVerification(digest(value),{name:name.trim(),passwordHash:await hashPassword(password)});
+  const result=await this.repo.consumeEmailVerification(digest(value),{name:name.trim(),passwordHash:await hashPassword(password)});
+  this.notify();return result;
  }
  notify(){
   if(!this.notifying)this.notifying=this.deliverApprovals().catch(()=>this.logger.error('Approval notification processing failed.')).finally(()=>{this.notifying=null;});
@@ -40,10 +41,15 @@ export class RegistrationEmail{
   for(let i=0;i<20;i++){
    const job=await this.repo.claimApprovalNotification();if(!job)return;
    let sent=false;
-   try{await this.mailer.sendApproval({to:job.email,url:new URL((this.basePath||'')+'/',this.origin).href});sent=true;}
+   const review=job.kind==='review',url=new URL((this.basePath||'')+'/',this.origin);if(review)url.hash='registration-approvals';
+   try{
+    if(review)await this.mailer.sendReviewRequest({to:job.email,url:url.href,name:job.applicantName,email:job.applicantEmail});
+    else await this.mailer.sendApproval({to:job.email,url:url.href});
+    sent=true;
+   }
    catch{this.logger.error('Approval notification delivery failed. Will retry.');}
    await this.repo.finishApprovalNotification(job.userId,job.lease,sent);
-   await this.repo.securityEvent?.({kind:sent?'account.approval_notice.sent':'account.approval_notice.delivery_failed',details:{targetId:job.userId}});
+   await this.repo.securityEvent?.({kind:review?(sent?'account.review_notice.sent':'account.review_notice.delivery_failed'):(sent?'account.approval_notice.sent':'account.approval_notice.delivery_failed'),details:{targetId:job.userId,recipientId:job.recipientId}});
   }
  }
  start(){if(!this.timer){this.notify();this.timer=setInterval(()=>this.notify(),30000);this.timer.unref();}}

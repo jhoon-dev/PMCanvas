@@ -3,7 +3,7 @@ import {randomUUID} from 'node:crypto';
 import {fail} from './errors.mjs';
 import {digest} from './security.mjs';
 import {cleanProject,projectChanges} from './project.mjs';
-export const publicUser=u=>({id:u.id,email:u.email,name:u.name,isAdmin:!!u.is_admin,isActive:u.is_active!==false,localLogin:u.local_login!==false,registrationPending:!!u.registration_pending,emailVerified:!!u.email_verified_at,approvalMailStatus:u.approval_mail_status||null});
+export const publicUser=u=>({id:u.id,email:u.email,name:u.name,isAdmin:!!u.is_admin,isActive:u.is_active!==false,localLogin:u.local_login!==false,registrationPending:!!u.registration_pending,emailVerified:!!u.email_verified_at,approvalMailStatus:u.approval_mail_status||null,reviewMailStatus:u.review_mail_status||null});
 
 export async function createPool(env=process.env){
  const {Pool}=await import('pg');
@@ -19,7 +19,7 @@ export async function migrate(pool){
  try{
   await client.query('BEGIN');await client.query('SELECT pg_advisory_xact_lock(726534001)');
   await client.query('CREATE TABLE IF NOT EXISTS pm_schema_migrations(version integer PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())');
-  for(const [version,file] of [[1,'001_initial.sql'],[2,'002_user_status.sql'],[3,'003_federated_auth.sql'],[4,'004_planning.sql'],[5,'005_security.sql'],[6,'006_registration.sql'],[7,'007_password_reset.sql'],[8,'008_mail_settings.sql'],[9,'009_registration_email.sql']]){
+  for(const [version,file] of [[1,'001_initial.sql'],[2,'002_user_status.sql'],[3,'003_federated_auth.sql'],[4,'004_planning.sql'],[5,'005_security.sql'],[6,'006_registration.sql'],[7,'007_password_reset.sql'],[8,'008_mail_settings.sql'],[9,'009_registration_email.sql'],[10,'010_registration_review.sql']]){
    const {rows}=await client.query('SELECT version FROM pm_schema_migrations WHERE version=$1',[version]);
    if(!rows.length){await client.query(fs.readFileSync(new URL('../migrations/'+file,import.meta.url),'utf8'));await client.query('INSERT INTO pm_schema_migrations(version) VALUES ($1)',[version]);}
   }
@@ -63,7 +63,7 @@ export class PgRepository{
   try{const {rows}=await this.pool.query('INSERT INTO pm_users(id,email,name,password_hash,is_admin,is_active,registration_pending,email_verification_required) VALUES ($1,$2,$3,$4,$5,$6,$7,$7) RETURNING *',[randomUUID(),email,name,passwordHash,isAdmin,!registrationPending,registrationPending]);return publicUser(rows[0]);}
   catch(error){if(error.code==='23505')fail(409,'EMAIL_EXISTS','이미 등록된 이메일입니다.');throw error;}
  }
- async listUsers(){return (await this.pool.query('SELECT u.*,n.state AS approval_mail_status FROM pm_users u LEFT JOIN pm_approval_notifications n ON n.user_id=u.id ORDER BY u.registration_pending DESC,u.created_at')).rows.map(publicUser);}
+ async listUsers(){return (await this.pool.query('SELECT u.id,u.email,u.name,u.is_admin,u.is_active,u.local_login,u.registration_pending,u.email_verified_at,n.state AS approval_mail_status,(SELECT r.state FROM pm_approval_notifications r JOIN pm_users a ON a.id=r.recipient_id WHERE r.user_id=u.id AND r.kind=\'review\' AND a.is_admin AND a.is_active ORDER BY CASE WHEN r.state IN (\'pending\',\'sending\') THEN 0 WHEN r.state=\'failed\' THEN 1 ELSE 2 END LIMIT 1) AS review_mail_status FROM pm_users u LEFT JOIN pm_approval_notifications n ON n.user_id=u.id AND n.kind=\'approval\' ORDER BY u.registration_pending DESC,u.created_at')).rows.map(publicUser);}
  async createSession({hash,userId,csrf,expires,passwordHash}){
   return this.transaction(async c=>{
    const user=(await c.query('SELECT password_hash,is_active,local_login FROM pm_users WHERE id=$1 FOR UPDATE',[userId])).rows[0];
@@ -99,7 +99,7 @@ export class PgRepository{
    const {rows}=await c.query('UPDATE pm_users SET is_active=COALESCE($2,is_active),registration_pending=CASE WHEN $2 THEN false ELSE registration_pending END,password_hash=COALESCE($3,password_hash) WHERE id=$1 RETURNING *',[targetId,isActive??null,passwordHash??null]);
    await c.query('DELETE FROM pm_sessions WHERE user_id=$1',[targetId]);
    if(passwordHash||isActive===false)await c.query('DELETE FROM pm_password_resets WHERE user_id=$1',[targetId]);
-   if(approving){await c.query('INSERT INTO pm_approval_notifications(user_id) VALUES ($1) ON CONFLICT(user_id) DO NOTHING',[targetId]);rows[0].approval_mail_status='pending';}
+   if(approving){await c.query('INSERT INTO pm_approval_notifications(user_id,recipient_id) VALUES ($1,$1) ON CONFLICT DO NOTHING',[targetId]);rows[0].approval_mail_status='pending';}
    return publicUser(rows[0]);
   });
  }
@@ -121,26 +121,27 @@ export class PgRepository{
    if(!proof||!u?.registration_pending||!u.local_login||u.email_verified_at||proof.password_hash!==u.password_hash)invalid();
    // The mailbox owner chooses credentials, including after an unsolicited pre-registration.
    await c.query('UPDATE pm_users SET email_verified_at=now(),password_hash=$2,name=$3 WHERE id=$1',[u.id,passwordHash,name]);
+   await c.query("INSERT INTO pm_approval_notifications(user_id,kind,recipient_id) SELECT $1,'review',id FROM pm_users WHERE is_admin AND is_active ON CONFLICT DO NOTHING",[u.id]);
    await c.query('DELETE FROM pm_sessions WHERE user_id=$1',[u.id]);
    await c.query('DELETE FROM pm_auth_attempts WHERE key=$1',[digest('local:'+u.email)]);return {id:u.id};
   });
  }
  async claimApprovalNotification(){
   return this.transaction(async c=>{
-   const row=(await c.query("SELECT n.user_id,u.email FROM pm_approval_notifications n JOIN pm_users u ON u.id=n.user_id WHERE u.is_active AND NOT u.registration_pending AND u.email_verified_at IS NOT NULL AND n.state IN ('pending','sending') AND n.available_at<=now() ORDER BY n.available_at FOR UPDATE OF n SKIP LOCKED LIMIT 1")).rows[0];
+   const row=(await c.query("SELECT n.user_id,n.kind,n.recipient_id,a.email,u.name AS applicant_name,u.email AS applicant_email FROM pm_approval_notifications n JOIN pm_users u ON u.id=n.user_id JOIN pm_users a ON a.id=n.recipient_id WHERE a.is_active AND u.email_verified_at IS NOT NULL AND ((n.kind='approval' AND u.is_active AND NOT u.registration_pending) OR (n.kind='review' AND u.registration_pending AND a.is_admin)) AND n.state IN ('pending','sending') AND n.available_at<=now() ORDER BY n.available_at FOR UPDATE OF n SKIP LOCKED LIMIT 1")).rows[0];
    if(!row)return null;
-   const lease=randomUUID();await c.query("UPDATE pm_approval_notifications SET state='sending',attempts=attempts+1,lease=$2,available_at=now()+interval '2 minutes',updated_at=now() WHERE user_id=$1",[row.user_id,lease]);return {userId:row.user_id,email:row.email,lease};
+   const lease=randomUUID();await c.query("UPDATE pm_approval_notifications SET state='sending',attempts=attempts+1,lease=$2,available_at=now()+interval '2 minutes',updated_at=now() WHERE user_id=$1 AND kind=$3 AND recipient_id=$4",[row.user_id,lease,row.kind,row.recipient_id]);return {userId:row.user_id,email:row.email,lease,kind:row.kind,recipientId:row.recipient_id,applicantName:row.applicant_name,applicantEmail:row.applicant_email};
   });
  }
  async finishApprovalNotification(userId,lease,sent){
   await this.pool.query("UPDATE pm_approval_notifications SET state=CASE WHEN $3 THEN 'sent' WHEN attempts>=3 THEN 'failed' ELSE 'pending' END,lease=NULL,available_at=now()+interval '1 minute',updated_at=now() WHERE user_id=$1 AND lease=$2 AND state='sending'",[userId,lease,sent]);
  }
- async retryApprovalNotification(actorId,targetId){
+ async retryApprovalNotification(actorId,targetId,kind='approval'){
   return this.transaction(async c=>{
    const actor=(await c.query('SELECT is_admin,is_active FROM pm_users WHERE id=$1 FOR UPDATE',[actorId])).rows[0];if(!actor?.is_admin||!actor.is_active)fail(403,'FORBIDDEN','관리자 권한이 필요합니다.');
    const u=(await c.query('SELECT * FROM pm_users WHERE id=$1 FOR UPDATE',[targetId])).rows[0];
-   if(!u?.is_active||u.registration_pending||!u.email_verified_at)fail(409,'NOTICE_UNAVAILABLE','가입 승인이 완료된 계정만 안내 메일을 보낼 수 있습니다.');
-   const r=await c.query("UPDATE pm_approval_notifications SET state='pending',attempts=0,lease=NULL,available_at=now(),updated_at=now() WHERE user_id=$1 AND state='failed' RETURNING user_id",[targetId]);
+   if(!['approval','review'].includes(kind)||!u?.email_verified_at||(kind==='review'?!u.registration_pending:!u.is_active||u.registration_pending))fail(409,'NOTICE_UNAVAILABLE','현재 가입 상태에서는 안내 메일을 다시 요청할 수 없습니다.');
+   const r=await c.query("UPDATE pm_approval_notifications SET state='pending',attempts=0,lease=NULL,available_at=now(),updated_at=now() WHERE user_id=$1 AND kind=$2 AND state='failed' AND EXISTS (SELECT 1 FROM pm_users a WHERE a.id=recipient_id AND a.is_active AND ($2='approval' OR a.is_admin)) RETURNING user_id",[targetId,kind]);
    if(!r.rowCount)fail(409,'NOTICE_UNAVAILABLE','발송에 실패한 안내 메일만 다시 요청할 수 있습니다.');
   });
  }
