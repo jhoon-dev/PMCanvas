@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { fail } from './errors.mjs';
 import { deletedTaskBundle, restoreTaskBundle } from './workspace-model.mjs';
-export class WorkspaceOperations {
+import { AlertRepository } from './operation-alerts.mjs';
+export class WorkspaceOperations extends AlertRepository {
   async decideRegistration(actorId, targetId, { decision, reason, grants }) {
     return this.transaction(async (c) => {
       await c.query('SELECT pg_advisory_xact_lock(726534011)');

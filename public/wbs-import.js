@@ -1,3 +1,4 @@
+import { ui } from './i18n.js';
 import { columns, newTask, setCell, checkDraft } from './wbs-model.js';
 import { hierarchy } from './planning.js';
 const esc = (s) =>
@@ -19,8 +20,9 @@ export function suggestMapping(headers) {
     importFields.map(([key, label]) => [
       key,
       (aliases[key] || [])
-        .map((a) => headers.findIndex((h) => String(h).trim() === a))
-        .find((i) => i >= 0) ?? headers.findIndex((h) => label === String(h).trim()),
+        .map((a) => headers.findIndex((h) => String(h).trim() === a || String(h).trim() === ui(a)))
+        .find((i) => i >= 0) ??
+        headers.findIndex((h) => label === String(h).trim() || ui(label) === String(h).trim()),
     ]),
   );
 }
@@ -31,9 +33,9 @@ export function previewImport(project, rows, mapping, { mode = 'append' } = {}) 
     entries = [],
     seen = new Set();
   if (['name', 'start', 'end'].some((k) => !Number.isInteger(mapping[k]) || mapping[k] < 0))
-    throw Error('업무명·시작일·종료일 열을 연결해 주세요.');
+    throw Error(ui('업무명·시작일·종료일 열을 연결해 주세요.'));
   if (mode === 'update' && mapping.id < 0)
-    throw Error('기존 업무 갱신에는 업무 ID 열이 필요합니다.');
+    throw Error(ui('기존 업무 갱신에는 업무 ID 열이 필요합니다.'));
   rows.forEach((row, index) => {
     if (row.every((v) => v === '' || v == null)) return;
     const value = (key) => (mapping[key] >= 0 ? String(row[mapping[key]] ?? '').trim() : '');
@@ -42,8 +44,8 @@ export function previewImport(project, rows, mapping, { mode = 'append' } = {}) 
       if (mode === 'update') {
         const id = value('id');
         task = p.tasks.find((t) => t.id === id);
-        if (!task) throw Error('현재 프로젝트에 없는 업무 ID입니다.');
-        if (seen.has(id)) throw Error('업무 ID가 중복됩니다.');
+        if (!task) throw Error(ui('현재 프로젝트에 없는 업무 ID입니다.'));
+        if (seen.has(id)) throw Error(ui('업무 ID가 중복됩니다.'));
         seen.add(id);
       } else {
         task = newTask(p);
@@ -65,7 +67,7 @@ export function previewImport(project, rows, mapping, { mode = 'append' } = {}) 
         end: task.end,
       });
     } catch (error) {
-      errors.push({ row: index + 2, message: error.message });
+      errors.push({ row: index + 2, message: ui(error.message) });
     }
   });
   // Resolve exported IDs and names only after every new row exists.
@@ -73,7 +75,7 @@ export function previewImport(project, rows, mapping, { mode = 'append' } = {}) 
   for (const e of entries)
     if (e.value('id')) {
       if (importedIds.has(e.value('id')))
-        errors.push({ row: e.index + 2, message: '업무 ID가 중복됩니다.' });
+        errors.push({ row: e.index + 2, message: ui('업무 ID가 중복됩니다.') });
       importedIds.set(e.value('id'), e.task.id);
     }
   for (const e of entries)
@@ -88,15 +90,15 @@ export function previewImport(project, rows, mapping, { mode = 'append' } = {}) 
         e.task.parentId = importedIds.get(parent) || parent;
       }
     } catch (error) {
-      errors.push({ row: e.index + 2, message: error.message });
+      errors.push({ row: e.index + 2, message: ui(error.message) });
     }
   try {
     checkDraft(p);
     hierarchy(p);
   } catch (error) {
-    errors.push({ row: '전체', message: error.message });
+    errors.push({ row: ui('전체'), message: ui(error.message) });
   }
-  if (!changes.length) errors.push({ row: '전체', message: '가져올 업무가 없습니다.' });
+  if (!changes.length) errors.push({ row: ui('전체'), message: ui('가져올 업무가 없습니다.') });
   return { project: p, errors, changes };
 }
 
@@ -107,14 +109,15 @@ export function openExcelImport(workspace, readFile) {
   let sheets = [],
     preview = null,
     version = 0;
-  dialog.innerHTML =
-    '<form method="dialog"><button class="button" value="cancel">닫기</button></form><h2>Excel 가져오기</h2><p>파일은 4MB 이하 · 머리글 1행 · 업무 500행까지. 미리보기 적용 후 WBS 저장으로 반영합니다. 갱신은 업무 ID가 일치하는 행만 수정하고, 생략한 업무는 유지합니다.</p><label>Excel 파일<input type="file" accept=".xlsx" id="excelFile"></label><label>시트<select id="excelSheet"></select></label><label>가져오기 방식<select id="excelMode"><option value="append">새 업무 추가</option><option value="update">기존 업무 갱신 (업무 ID)</option></select></label><div id="excelMapping"></div><button class="button" type="button" id="excelPreview">미리보기</button><button class="button primary" type="button" id="excelApply" disabled>초안에 적용</button><div id="excelResult" role="status"></div>';
+  dialog.innerHTML = ui(
+    '<form method="dialog"><button class="button" value="cancel">닫기</button></form><h2>Excel 가져오기</h2><p>파일은 4MB 이하 · 머리글 1행 · 업무 500행까지. 미리보기 적용 후 WBS 저장으로 반영합니다. 갱신은 업무 ID가 일치하는 행만 수정하고, 생략한 업무는 유지합니다.</p><label>Excel 파일<input type="file" accept=".xlsx" id="excelFile"></label><label>시트<select id="excelSheet"></select></label><label>가져오기 방식<select id="excelMode"><option value="append">새 업무 추가</option><option value="update">기존 업무 갱신 (업무 ID)</option></select></label><div id="excelMapping"></div><button class="button" type="button" id="excelPreview">미리보기</button><button class="button primary" type="button" id="excelApply" disabled>초안에 적용</button><div id="excelResult" role="status"></div>',
+  );
   const $ = (id) => dialog.querySelector('#' + id),
     invalidate = () => {
       version++;
       preview = null;
       $('excelApply').disabled = true;
-      $('excelResult').textContent = '열 연결을 확인한 뒤 미리보기를 눌러 주세요.';
+      $('excelResult').textContent = ui('열 연결을 확인한 뒤 미리보기를 눌러 주세요.');
     };
   const mapping = () =>
     Object.fromEntries(
@@ -133,7 +136,7 @@ export function openExcelImport(workspace, readFile) {
           label +
           '<select data-map="' +
           field +
-          '"><option value="-1">가져오지 않음</option>' +
+          ui('"><option value="-1">가져오지 않음</option>') +
           headers
             .map(
               (h, i) =>
@@ -142,7 +145,7 @@ export function openExcelImport(workspace, readFile) {
                 '" ' +
                 (suggested[field] === i ? 'selected' : '') +
                 '>' +
-                esc(h || '열 ' + (i + 1)) +
+                esc(h || ui('열 ') + (i + 1)) +
                 '</option>',
             )
             .join('') +
@@ -156,10 +159,10 @@ export function openExcelImport(workspace, readFile) {
       file = $('excelFile').files[0];
     if (!file) return;
     if (file.size > 4 * 1024 * 1024) {
-      $('excelResult').textContent = '4MB 이하의 파일을 선택해 주세요.';
+      $('excelResult').textContent = ui('4MB 이하의 파일을 선택해 주세요.');
       return;
     }
-    $('excelResult').textContent = '파일을 읽는 중…';
+    $('excelResult').textContent = ui('파일을 읽는 중…');
     try {
       const result = await readFile(file);
       if (request !== version || !dialog.isConnected) return;
@@ -178,7 +181,7 @@ export function openExcelImport(workspace, readFile) {
         .join('');
       setSheet();
     } catch (error) {
-      $('excelResult').textContent = error.message;
+      $('excelResult').textContent = ui(error.message);
     }
   };
   $('excelSheet').onchange = setSheet;
@@ -188,7 +191,7 @@ export function openExcelImport(workspace, readFile) {
     invalidate();
     try {
       const sheet = sheets[Number($('excelSheet').value)];
-      if (!sheet) throw Error('먼저 Excel 파일을 선택해 주세요.');
+      if (!sheet) throw Error(ui('먼저 Excel 파일을 선택해 주세요.'));
       if (sheet.error) throw Error(sheet.error);
       preview = previewImport(workspace.draft, sheet.rows.slice(1), mapping(), {
         mode: $('excelMode').value,
@@ -196,13 +199,15 @@ export function openExcelImport(workspace, readFile) {
       $('excelResult').innerHTML =
         '<p>' +
         preview.changes.length +
-        '개 업무 · 오류 ' +
+        ui('개 업무 · 오류 ') +
         preview.errors.length +
-        '건</p>' +
+        ui('건</p>') +
         preview.errors
-          .map((e) => '<p class="wbs-error">' + esc(e.row) + '행: ' + esc(e.message) + '</p>')
+          .map((e) => '<p class="wbs-error">' + esc(e.row) + ui('행: ') + esc(e.message) + '</p>')
           .join('') +
-        '<table><thead><tr><th>Excel 행</th><th>업무</th><th>시작일</th><th>종료일</th></tr></thead><tbody>' +
+        ui(
+          '<table><thead><tr><th>Excel 행</th><th>업무</th><th>시작일</th><th>종료일</th></tr></thead><tbody>',
+        ) +
         preview.changes
           .slice(0, 500)
           .map(
@@ -221,17 +226,19 @@ export function openExcelImport(workspace, readFile) {
         '</tbody></table>';
       $('excelApply').disabled = preview.errors.length > 0;
     } catch (error) {
-      $('excelResult').textContent = error.message;
+      $('excelResult').textContent = ui(error.message);
     }
   };
   $('excelApply').onclick = () => {
     if (!preview || preview.errors.length) return;
     try {
       workspace.changed(preview.project);
-      workspace.options.toast('가져온 업무를 초안에 적용했습니다. 확인 후 WBS 저장을 눌러 주세요.');
+      workspace.options.toast(
+        ui('가져온 업무를 초안에 적용했습니다. 확인 후 WBS 저장을 눌러 주세요.'),
+      );
       dialog.close();
     } catch (error) {
-      $('excelResult').textContent = error.message;
+      $('excelResult').textContent = ui(error.message);
     }
   };
   dialog.addEventListener('close', () => dialog.remove(), { once: true });

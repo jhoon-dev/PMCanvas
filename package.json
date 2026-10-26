@@ -1,6 +1,6 @@
 {
   "name": "pmcanvas-server",
-  "version": "0.19.4",
+  "version": "0.20.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -13,6 +13,8 @@
     "test:postgres": "node --env-file-if-exists=.env --test test/postgres.integration.mjs",
     "migrate": "node --env-file-if-exists=.env scripts/migrate.mjs",
     "test:http": "node --test test/http.network.integration.mjs",
+    "test:browser": "playwright test",
+    "test:performance": "node scripts/benchmark.mjs",
     "setup": "node scripts/manage.mjs setup",
     "service:up": "node scripts/manage.mjs up",
     "service:status": "node scripts/manage.mjs status",
@@ -22,8 +24,8 @@
     "restore": "node scripts/manage.mjs restore",
     "auth:check": "node --env-file-if-exists=.env scripts/check-auth.mjs",
     "mail:check": "node --env-file-if-exists=.env scripts/check-mail.mjs",
-    "format": "prettier --write public server scripts test package.json .prettierrc.json",
-    "format:check": "prettier --check public server scripts test package.json .prettierrc.json"
+    "format": "prettier --write public server scripts test package.json playwright.config.mjs .prettierrc.json",
+    "format:check": "prettier --check public server scripts test package.json playwright.config.mjs .prettierrc.json"
   },
   "dependencies": {
     "@node-saml/node-saml": "5.1.0",
@@ -36,6 +38,7 @@
     "yauzl": "3.4.0"
   },
   "devDependencies": {
+    "@playwright/test": "1.64.1",
     "prettier": "3.9.10",
     "selfsigned": "5.5.0",
     "xml-crypto": "6.4.0"

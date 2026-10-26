@@ -148,6 +148,11 @@ export function createHandler({
       'info-dialog.js',
       'mail-settings-ui.js',
       'backup-settings-ui.js',
+      'i18n.js',
+      'locales/en.js',
+      'project-merge.js',
+      'conflict-ui.js',
+      'alerts-ui.js',
     ].map((f) => ['/' + f, f]),
   ]);
   const dummyHash = hashPassword('constant-timing-placeholder-password');
@@ -725,6 +730,21 @@ export function createHandler({
         if (!user.isAdmin) fail(403, 'FORBIDDEN', '관리자 권한이 필요합니다.');
         return json(res, 200, await repo.adminSummary());
       }
+      if (path === '/api/admin/alerts' || path === '/api/admin/alerts/acknowledge') {
+        if (!user.isAdmin) fail(403, 'FORBIDDEN', '관리자 권한이 필요합니다.');
+        if (path.endsWith('/acknowledge') && method === 'POST') {
+          const body = await readJson(req, 16384);
+          const result = await repo.acknowledgeAlert(user.id, body.kind, body.count);
+          await audit(req, 'operations.alert.acknowledged', { kind: body.kind });
+          return json(res, 200, result);
+        }
+        if (method === 'GET') return json(res, 200, await repo.operationAlerts());
+        if (path === '/api/admin/alerts' && method === 'PUT') {
+          const result = await repo.saveAlertSettings(user.id, await readJson(req, 16384));
+          await audit(req, 'operations.alert_settings.updated');
+          return json(res, 200, result);
+        }
+      }
       if (path === '/api/admin/backups' || path === '/api/admin/backups/run') {
         if (!user.isAdmin) fail(403, 'FORBIDDEN', '관리자 권한이 필요합니다.');
         if (path.endsWith('/run') && method === 'POST') {
@@ -850,6 +870,7 @@ export function createHandler({
         )
           fail(400, 'INVALID_SELECTION', '출력할 업무를 확인해 주세요.');
         const buffer = await projectWorkbook(project, body.asOf, ids, {
+          language: body.language === 'en' ? 'en' : 'ko',
           draft: JSON.stringify(project) !== JSON.stringify(cleanProject(saved)),
         });
         res.setHeader(

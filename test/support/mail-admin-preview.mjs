@@ -13,6 +13,8 @@ import { createApplication } from '../../server/http.mjs';
 import { hashPassword } from '../../server/security.mjs';
 import { escapeHtml } from '../../public/html.js';
 const walkthrough = process.env.RUN_WALKTHROUGH_PREVIEW === '1';
+const previewPort = Number(process.env.PM_PREVIEW_PORT || 4183),
+  mailboxPort = Number(process.env.PM_PREVIEW_MAIL_PORT || 4182);
 const smtp = await smtpFixture(),
   key = Buffer.alloc(32, 7),
   hash = await hashPassword('preview-admin-password'),
@@ -84,7 +86,7 @@ if (process.env.RUN_WORKSPACE_PREVIEW === '1') {
   await repo.setMemberAccount(admin.id, p.id, { memberId: 'm1', userId: admin.id });
 }
 const mailSettings = new MailSettings({ repo, key, makeMailer }),
-  origin = 'http://localhost:4183',
+  origin = 'http://localhost:' + previewPort,
   basePath = '/pmcanvas',
   passwordReset = new PasswordReset({ repo, mailer: mailSettings, origin, basePath });
 if (process.env.RUN_REGISTRATION_REVIEW_PREVIEW === '1')
@@ -178,6 +180,12 @@ const app = createApplication({
         port: smtp.port,
         count: smtp.messages.length,
         links: smtp.messages.map(verificationLink).filter(Boolean),
+        verifications: smtp.messages
+          .filter((m) => verificationLink(m))
+          .map((m) => ({ to: m.match(/^To: (.+)$/im)?.[1].trim(), url: verificationLink(m) })),
+        approvalRecipients: smtp.messages
+          .filter((m) => mailText(m).includes('회원가입이 승인되었습니다'))
+          .map((m) => m.match(/^To: (.+)$/im)?.[1].trim()),
         reviewLinks: smtp.messages
           .map((m) => mailText(m).match(/https?:\/\/[^\s<>]+#registration-approvals/)?.[0])
           .filter(Boolean),
@@ -192,8 +200,8 @@ const app = createApplication({
       }),
     );
   });
-app.listen(4183, '127.0.0.1');
-mailbox.listen(4182, '127.0.0.1');
+app.listen(previewPort, '127.0.0.1');
+mailbox.listen(mailboxPort, '127.0.0.1');
 console.log('Disposable SMTP admin preview: ' + origin + basePath + '/');
 async function stop() {
   app.closeAllConnections();

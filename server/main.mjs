@@ -8,6 +8,7 @@ import { Federation } from './federation.mjs';
 import { registrationConfig, RegistrationEmail } from './registration.mjs';
 import { MailSettings, legacyMailSettings } from './mail-settings.mjs';
 import { PasswordReset } from './password-reset.mjs';
+import { OperationAlerts } from './operation-alerts.mjs';
 const pool = await createPool(),
   repo = new PgRepository(pool);
 try {
@@ -53,6 +54,8 @@ try {
     passwordReset = new PasswordReset({ repo, mailer, origin, basePath });
   const registrationEmail = new RegistrationEmail({ repo, mailer, origin, basePath });
   registrationEmail.start();
+  const operationAlerts = new OperationAlerts({ repo, mailer, origin, basePath });
+  operationAlerts.start();
   const server = createApplication({
     repo,
     origin,
@@ -83,6 +86,7 @@ try {
     clearInterval(trashCleanup);
     server.close(async () => {
       await registrationEmail.close();
+      await operationAlerts.close();
       await passwordReset?.idle();
       mailer?.close();
       await pool.end();

@@ -1,3 +1,4 @@
+import { ui } from './i18n.js';
 export function createInfoDialog({ toast, confirm = window.confirm.bind(window) }) {
   const dialog = document.querySelector('#infoDialog');
   let guard = () => true;
@@ -11,10 +12,10 @@ export function createInfoDialog({ toast, confirm = window.confirm.bind(window) 
     processing = busy;
     guard = () => {
       if (busy()) {
-        toast('처리가 끝날 때까지 잠시 기다려 주세요.');
+        toast(ui('처리가 끝날 때까지 잠시 기다려 주세요.'));
         return false;
       }
-      return !dirty() || confirm('저장하지 않은 설정이 있습니다. 변경을 취소하고 이동할까요?');
+      return !dirty() || confirm(ui('저장하지 않은 설정이 있습니다. 변경을 취소하고 이동할까요?'));
     };
   }
   function resetGuard() {

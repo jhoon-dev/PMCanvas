@@ -74,7 +74,9 @@ export function mailText(message) {
     : body
         .replace(/=\r?\n/g, '')
         .replace(/=([0-9A-F]{2})/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
-  return decoded;
+  return /^Content-Transfer-Encoding: quoted-printable\r?$/im.test(message)
+    ? Buffer.from(decoded, 'latin1').toString('utf8')
+    : decoded;
 }
 export function resetLink(message) {
   return mailText(message).match(/https?:\/\/[^\s<>]+#reset-password=[A-Za-z0-9_-]{43}/)?.[0];

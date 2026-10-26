@@ -1,3 +1,4 @@
+import { ui } from './i18n.js';
 import { escapeHtml as esc } from './html.js';
 import { field } from './view-ui.js';
 
@@ -10,8 +11,8 @@ export function readAuthLink(hash) {
 }
 export function loginRequest({ email, password, provider = '', user = null, unsaved = false }) {
   if (unsaved && user && email.trim().toLowerCase() !== user.email)
-    throw Error('저장하지 못한 변경사항이 있습니다. 기존 계정으로 다시 로그인해 주세요.');
-  if (unsaved && provider) throw Error('현재 변경사항을 먼저 저장하거나 백업해 주세요.');
+    throw Error(ui('저장하지 못한 변경사항이 있습니다. 기존 계정으로 다시 로그인해 주세요.'));
+  if (unsaved && provider) throw Error(ui('현재 변경사항을 먼저 저장하거나 백업해 주세요.'));
   return {
     path: provider ? 'auth/directory' : 'auth/login',
     body: provider ? { provider, username: email, password } : { email, password },
@@ -53,11 +54,11 @@ export function createAuthUi({
   }
   async function initializeAuthentication() {
     const messages = {
-      SSO_FAILED: '외부 인증에 실패했거나 요청이 만료되었습니다. 다시 시작해 주세요.',
-      IDENTITY_UNLINKED: '관리자에게 외부 계정 연결을 요청해 주세요.',
-      DOMAIN_DENIED: '허용된 조직 계정이 아닙니다.',
-      ACCOUNT_DISABLED: '비활성화된 계정입니다. 관리자에게 문의해 주세요.',
-      UNVERIFIED_EMAIL: '인증 서버의 이메일 검증 설정을 관리자에게 확인해 주세요.',
+      SSO_FAILED: ui('외부 인증에 실패했거나 요청이 만료되었습니다. 다시 시작해 주세요.'),
+      IDENTITY_UNLINKED: ui('관리자에게 외부 계정 연결을 요청해 주세요.'),
+      DOMAIN_DENIED: ui('허용된 조직 계정이 아닙니다.'),
+      ACCOUNT_DISABLED: ui('비활성화된 계정입니다. 관리자에게 문의해 주세요.'),
+      UNVERIFIED_EMAIL: ui('인증 서버의 이메일 검증 설정을 관리자에게 확인해 주세요.'),
     };
     const url = new URL(location.href),
       error = url.searchParams.get('authError');
@@ -83,13 +84,15 @@ export function createAuthUi({
             esc(p.id) +
             '">' +
             esc(p.label) +
-            '로 로그인</button>',
+            ui('로 로그인</button>'),
         )
         .join('');
       const directory = providers.filter((p) => p.type === 'ldap');
       if (directory.length)
         group.innerHTML +=
-          '<label class="field">로그인 방식<select id="loginProvider"><option value="">PM Canvas 계정</option>' +
+          ui(
+            '<label class="field">로그인 방식<select id="loginProvider"><option value="">PM Canvas 계정</option>',
+          ) +
           directory
             .map((p) => '<option value="' + esc(p.id) + '">' + esc(p.label) + '</option>')
             .join('') +
@@ -99,8 +102,9 @@ export function createAuthUi({
         const b = e.target.closest('[data-sso-provider]');
         if (!b) return;
         if (hasUnsaved() || isBusy()) {
-          $('#authError').textContent =
-            '현재 변경사항을 먼저 저장하거나 백업한 뒤 외부 로그인을 진행해 주세요.';
+          $('#authError').textContent = ui(
+            '현재 변경사항을 먼저 저장하거나 백업한 뒤 외부 로그인을 진행해 주세요.',
+          );
           return;
         }
         location.assign(
@@ -112,14 +116,15 @@ export function createAuthUi({
         const input = $('#loginEmail');
         input.type = loginProvider ? 'text' : 'email';
         input.closest('label').firstChild.textContent = loginProvider
-          ? '디렉터리 사용자명'
-          : '이메일';
+          ? ui('디렉터리 사용자명')
+          : ui('이메일');
         input.value = '';
         $('#authError').textContent = '';
       });
     } catch {
-      $('#authError').textContent =
-        '외부 인증 목록을 불러오지 못했습니다. 연결을 확인하거나 PM Canvas 계정으로 로그인해 주세요.';
+      $('#authError').textContent = ui(
+        '외부 인증 목록을 불러오지 못했습니다. 연결을 확인하거나 PM Canvas 계정으로 로그인해 주세요.',
+      );
     }
   }
   $('#loginForm').addEventListener('submit', async (e) => {
@@ -142,13 +147,13 @@ export function createAuthUi({
       }
       await completeBrowserLogin(session);
     } catch (error) {
-      $('#authError').textContent = error.message;
+      $('#authError').textContent = ui(error.message);
       if (error.code === 'EMAIL_UNVERIFIED') {
         const link = document.createElement('button');
         link.type = 'button';
         link.className = 'auth-link';
         link.dataset.resendVerification = '';
-        link.textContent = '인증 메일 다시 받기';
+        link.textContent = ui('인증 메일 다시 받기');
         $('#authError').append(link);
       }
     } finally {
@@ -163,8 +168,10 @@ export function createAuthUi({
     await refreshWorkspace();
     if (session.recoveryCodes) {
       openInfo(
-        'MFA 복구 코드를 보관하세요',
-        '<p>인증 앱을 사용할 수 없을 때 아래 코드를 한 번씩 사용할 수 있습니다. 안전한 오프라인 장소에 보관하세요. 이 화면에서만 표시합니다.</p><pre>' +
+        ui('MFA 복구 코드를 보관하세요'),
+        ui(
+          '<p>인증 앱을 사용할 수 없을 때 아래 코드를 한 번씩 사용할 수 있습니다. 안전한 오프라인 장소에 보관하세요. 이 화면에서만 표시합니다.</p><pre>',
+        ) +
           session.recoveryCodes.map(esc).join('\n') +
           '</pre>',
       );
@@ -172,7 +179,7 @@ export function createAuthUi({
         $('#infoDialog').addEventListener(
           'close',
           () => {
-            onApproval().catch((error) => toast(error.message));
+            onApproval().catch((error) => toast(ui(error.message)));
           },
           { once: true },
         );
@@ -185,13 +192,17 @@ export function createAuthUi({
     form.id = 'mfaForm';
     form.className = 'auth-card';
     form.innerHTML =
-      '<h2>관리자 2단계 인증</h2>' +
+      ui('<h2>관리자 2단계 인증</h2>') +
       (challenge.enrollment
-        ? '<p>인증 앱에 아래 설정 키를 등록하고 표시되는 6자리 코드를 입력하세요.</p><label class="field">설정 키<input id="mfaSecret" readonly value="' +
+        ? ui(
+            '<p>인증 앱에 아래 설정 키를 등록하고 표시되는 6자리 코드를 입력하세요.</p><label class="field">설정 키<input id="mfaSecret" readonly value="',
+          ) +
           esc(challenge.secret) +
-          '"></label><p>계정: PMCanvas · SHA1 · 6자리 · 30초</p>'
-        : '<p>인증 앱 코드 또는 일회용 복구 코드를 입력하세요.</p>') +
-      '<label class="field">인증 코드<input id="mfaCode" autocomplete="one-time-code" maxlength="64" required autofocus></label><p class="form-error" role="alert"></p><button class="button primary">인증</button><button class="button" type="button" id="cancelMfa">다시 로그인</button>';
+          ui('"></label><p>계정: PMCanvas · SHA1 · 6자리 · 30초</p>')
+        : ui('<p>인증 앱 코드 또는 일회용 복구 코드를 입력하세요.</p>')) +
+      ui(
+        '<label class="field">인증 코드<input id="mfaCode" autocomplete="one-time-code" maxlength="64" required autofocus></label><p class="form-error" role="alert"></p><button class="button primary">인증</button><button class="button" type="button" id="cancelMfa">다시 로그인</button>',
+      );
     $('#authGate').append(form);
     $('#mfaCode').focus();
     $('#cancelMfa').onclick = () => {
@@ -209,7 +220,7 @@ export function createAuthUi({
         });
         await completeBrowserLogin(session);
       } catch (error) {
-        form.querySelector('.form-error').textContent = error.message;
+        form.querySelector('.form-error').textContent = ui(error.message);
       } finally {
         button.disabled = false;
       }
@@ -231,7 +242,7 @@ export function createAuthUi({
       const select = $('#loginProvider');
       if (select) select.value = '';
       $('#loginEmail').type = 'email';
-      $('#loginEmail').closest('label').firstChild.textContent = '이메일';
+      $('#loginEmail').closest('label').firstChild.textContent = ui('이메일');
       $('#loginEmail').value = email;
       $('#loginPassword').focus();
     } else $('#loginEmail').focus();
@@ -239,7 +250,7 @@ export function createAuthUi({
   $('#registerButton').addEventListener('click', () => {
     if (registrationPolicy.mode !== 'approval') return;
     if (user() && hasUnsaved()) {
-      toast('현재 계정의 변경사항을 먼저 저장하거나 백업해 주세요.');
+      toast(ui('현재 계정의 변경사항을 먼저 저장하거나 백업해 주세요.'));
       return;
     }
     $('#loginForm').hidden = true;
@@ -249,14 +260,18 @@ export function createAuthUi({
     form.id = 'registrationForm';
     form.className = 'auth-card';
     form.innerHTML =
-      '<span class="eyebrow">PM CANVAS</span><h1>회원가입</h1><p>이메일 인증과 관리자 승인 후 사용할 수 있어요.</p>' +
+      ui(
+        '<span class="eyebrow">PM CANVAS</span><h1>회원가입</h1><p>이메일 인증과 관리자 승인 후 사용할 수 있어요.</p>',
+      ) +
       (registrationPolicy.domains.length
-        ? '<p class="registration-domains">가입 가능 이메일: ' +
+        ? ui('<p class="registration-domains">가입 가능 이메일: ') +
           registrationPolicy.domains.map(esc).join(', ') +
           '</p>'
         : '') +
-      field('이메일', 'email', '', 'email', 'required maxlength="254" autocomplete="email"') +
-      '<small>메일의 인증 링크에서 이름과 비밀번호를 한 번만 입력합니다.</small><p class="form-error" role="alert"></p><button class="button primary" type="submit">인증 메일 보내기</button><button class="auth-link" type="button" data-resend-verification>이미 신청했나요? 인증 메일 다시 받기</button><button class="auth-link" type="button" data-registration-back>로그인으로 돌아가기</button>';
+      field(ui('이메일'), 'email', '', 'email', 'required maxlength="254" autocomplete="email"') +
+      ui(
+        '<small>메일의 인증 링크에서 이름과 비밀번호를 한 번만 입력합니다.</small><p class="form-error" role="alert"></p><button class="button primary" type="submit">인증 메일 보내기</button><button class="auth-link" type="button" data-resend-verification>이미 신청했나요? 인증 메일 다시 받기</button><button class="auth-link" type="button" data-registration-back>로그인으로 돌아가기</button>',
+      );
     $('#authGate').append(form);
     form.elements.email.focus();
     form.onsubmit = async (e) => {
@@ -275,15 +290,17 @@ export function createAuthUi({
         const email = String(data.get('email'));
         form.reset();
         form.innerHTML =
-          '<span class="eyebrow">PM CANVAS</span><h1>신청 완료</h1><p role="status">' +
-          esc(result.message) +
-          '</p><small>인증 링크는 30분 동안 유효합니다. 승인 결과도 메일로 알려드립니다.</small><button class="auth-link" type="button" data-resend-verification>인증 메일 다시 받기</button><button class="button primary" type="button" data-registration-back>로그인으로 돌아가기</button>';
+          ui('<span class="eyebrow">PM CANVAS</span><h1>신청 완료</h1><p role="status">') +
+          esc(ui(result.message)) +
+          ui(
+            '</p><small>인증 링크는 30분 동안 유효합니다. 승인 결과도 메일로 알려드립니다.</small><button class="auth-link" type="button" data-resend-verification>인증 메일 다시 받기</button><button class="button primary" type="button" data-registration-back>로그인으로 돌아가기</button>',
+          );
         form.querySelector('[data-registration-back]').dataset.email = email;
         form.querySelector('[data-resend-verification]').dataset.email = email;
         form.querySelector('h1').tabIndex = -1;
         form.querySelector('h1').focus();
       } catch (err) {
-        error.textContent = err.message;
+        error.textContent = ui(err.message);
       } finally {
         button.disabled = false;
       }
@@ -315,15 +332,25 @@ export function createAuthUi({
   }
   function showResendVerification(email = '') {
     if (user() && hasUnsaved()) {
-      toast('현재 변경사항을 먼저 저장하거나 백업해 주세요.');
+      toast(ui('현재 변경사항을 먼저 저장하거나 백업해 주세요.'));
       return;
     }
     emailVerificationToken = '';
     const form = authFlowForm('resendVerificationForm');
     form.innerHTML =
-      '<span class="eyebrow">PM CANVAS</span><h1>인증 메일 다시 받기</h1><p>가입 신청에 사용한 이메일을 입력하세요.</p>' +
-      field('이메일', 'email', email, 'email', 'required maxlength="254" autocomplete="email"') +
-      '<p class="form-error" role="alert"></p><button type="submit" class="button primary">인증 메일 보내기</button><button type="button" class="auth-link" data-registration-back>로그인으로 돌아가기</button>';
+      ui(
+        '<span class="eyebrow">PM CANVAS</span><h1>인증 메일 다시 받기</h1><p>가입 신청에 사용한 이메일을 입력하세요.</p>',
+      ) +
+      field(
+        ui('이메일'),
+        'email',
+        email,
+        'email',
+        'required maxlength="254" autocomplete="email"',
+      ) +
+      ui(
+        '<p class="form-error" role="alert"></p><button type="submit" class="button primary">인증 메일 보내기</button><button type="button" class="auth-link" data-registration-back>로그인으로 돌아가기</button>',
+      );
     form.elements.email.focus();
     form.onsubmit = async (e) => {
       e.preventDefault();
@@ -338,13 +365,17 @@ export function createAuthUi({
         });
         form.reset();
         form.innerHTML =
-          '<span class="eyebrow">PM CANVAS</span><h1>메일을 확인해 주세요</h1><p role="status">' +
-          esc(result.message) +
-          '</p><small>가장 최근에 받은 링크를 30분 안에 사용하세요.</small><button type="button" class="button primary" data-registration-back>로그인으로 돌아가기</button>';
+          ui(
+            '<span class="eyebrow">PM CANVAS</span><h1>메일을 확인해 주세요</h1><p role="status">',
+          ) +
+          esc(ui(result.message)) +
+          ui(
+            '</p><small>가장 최근에 받은 링크를 30분 안에 사용하세요.</small><button type="button" class="button primary" data-registration-back>로그인으로 돌아가기</button>',
+          );
         form.querySelector('h1').tabIndex = -1;
         form.querySelector('h1').focus();
       } catch (err) {
-        error.textContent = err.message;
+        error.textContent = ui(err.message);
       } finally {
         button.disabled = false;
       }
@@ -353,27 +384,35 @@ export function createAuthUi({
   function showEmailVerification() {
     const form = authFlowForm('verifyEmailForm');
     form.innerHTML =
-      '<span class="eyebrow">PM CANVAS</span><h1>이메일 인증</h1><p>본인의 이름과 로그인 비밀번호를 설정하면 인증이 완료됩니다.</p>' +
-      field('이름', 'name', '', 'text', 'required maxlength="80" autocomplete="name"') +
+      ui(
+        '<span class="eyebrow">PM CANVAS</span><h1>이메일 인증</h1><p>본인의 이름과 로그인 비밀번호를 설정하면 인증이 완료됩니다.</p>',
+      ) +
+      field(ui('이름'), 'name', '', 'text', 'required maxlength="80" autocomplete="name"') +
       field(
-        '로그인 비밀번호',
+        ui('로그인 비밀번호'),
         'newPassword',
         '',
         'password',
         'required minlength="12" maxlength="256" autocomplete="new-password"',
       ) +
       field(
-        '비밀번호 확인',
+        ui('비밀번호 확인'),
         'confirmPassword',
         '',
         'password',
         'required minlength="12" maxlength="256" autocomplete="new-password"',
       ) +
-      '<small>비밀번호는 12자 이상으로 설정하세요. 인증 후 관리자 승인이 필요합니다.</small><p class="form-error" role="alert">' +
-      (emailVerificationToken ? '' : '유효하지 않은 링크입니다. 인증 메일을 다시 요청해 주세요.') +
+      ui(
+        '<small>비밀번호는 12자 이상으로 설정하세요. 인증 후 관리자 승인이 필요합니다.</small><p class="form-error" role="alert">',
+      ) +
+      (emailVerificationToken
+        ? ''
+        : ui('유효하지 않은 링크입니다. 인증 메일을 다시 요청해 주세요.')) +
       '</p><button type="submit" class="button primary" ' +
       (emailVerificationToken ? '' : 'disabled') +
-      '>이메일 인증 완료</button><button type="button" class="auth-link" data-resend-verification>인증 메일 다시 받기</button><button type="button" class="auth-link" data-registration-back>로그인으로 돌아가기</button>';
+      ui(
+        '>이메일 인증 완료</button><button type="button" class="auth-link" data-resend-verification>인증 메일 다시 받기</button><button type="button" class="auth-link" data-registration-back>로그인으로 돌아가기</button>',
+      );
     form.elements.name.focus();
     form.onsubmit = async (e) => {
       e.preventDefault();
@@ -382,7 +421,7 @@ export function createAuthUi({
         data = new FormData(form);
       error.textContent = '';
       if (data.get('newPassword') !== data.get('confirmPassword')) {
-        error.textContent = '비밀번호 확인이 일치하지 않습니다.';
+        error.textContent = ui('비밀번호 확인이 일치하지 않습니다.');
         form.elements.confirmPassword.focus();
         return;
       }
@@ -395,13 +434,15 @@ export function createAuthUi({
         emailVerificationToken = '';
         form.reset();
         form.innerHTML =
-          '<span class="eyebrow">PM CANVAS</span><h1>이메일 인증 완료</h1><p role="status">' +
-          esc(result.message) +
-          '</p><button type="button" class="button primary" data-registration-back>로그인으로 돌아가기</button>';
+          ui('<span class="eyebrow">PM CANVAS</span><h1>이메일 인증 완료</h1><p role="status">') +
+          esc(ui(result.message)) +
+          ui(
+            '</p><button type="button" class="button primary" data-registration-back>로그인으로 돌아가기</button>',
+          );
         form.querySelector('h1').tabIndex = -1;
         form.querySelector('h1').focus();
       } catch (err) {
-        error.textContent = err.message;
+        error.textContent = ui(err.message);
         if (err.code === 'VERIFICATION_INVALID') {
           emailVerificationToken = '';
           form.reset();
@@ -418,21 +459,27 @@ export function createAuthUi({
   });
   function showForgotPassword() {
     if (user() && hasUnsaved()) {
-      toast('현재 변경사항을 먼저 저장하거나 백업해 주세요.');
+      toast(ui('현재 변경사항을 먼저 저장하거나 백업해 주세요.'));
       return;
     }
     passwordResetToken = '';
     const form = authFlowForm('forgotPasswordForm');
     form.innerHTML =
-      '<span class="eyebrow">PM CANVAS</span><h1>비밀번호 찾기</h1><p>가입한 이메일로 재설정 링크를 보내드려요.</p>' +
-      field('이메일', 'email', '', 'email', 'required maxlength="254" autocomplete="email"') +
-      '<small>회사 SSO·AD 계정은 회사 인증 서비스에서 변경하세요.</small><p class="form-error" role="alert">' +
+      ui(
+        '<span class="eyebrow">PM CANVAS</span><h1>비밀번호 찾기</h1><p>가입한 이메일로 재설정 링크를 보내드려요.</p>',
+      ) +
+      field(ui('이메일'), 'email', '', 'email', 'required maxlength="254" autocomplete="email"') +
+      ui(
+        '<small>회사 SSO·AD 계정은 회사 인증 서비스에서 변경하세요.</small><p class="form-error" role="alert">',
+      ) +
       (resetEmailEnabled
         ? ''
-        : '현재 이메일 재설정을 사용할 수 없습니다. 관리자에게 문의해 주세요.') +
+        : ui('현재 이메일 재설정을 사용할 수 없습니다. 관리자에게 문의해 주세요.')) +
       '</p><button type="submit" class="button primary" ' +
       (resetEmailEnabled ? '' : 'disabled') +
-      '>재설정 메일 보내기</button><button type="button" class="auth-link" data-registration-back>로그인으로 돌아가기</button>';
+      ui(
+        '>재설정 메일 보내기</button><button type="button" class="auth-link" data-registration-back>로그인으로 돌아가기</button>',
+      );
     if (!loginProvider) form.elements.email.value = $('#loginEmail').value;
     form.elements.email.focus();
     form.onsubmit = async (e) => {
@@ -448,13 +495,17 @@ export function createAuthUi({
         });
         form.reset();
         form.innerHTML =
-          '<span class="eyebrow">PM CANVAS</span><h1>메일을 확인해 주세요</h1><p role="status">' +
-          esc(result.message) +
-          '</p><small>링크는 15분 동안 사용할 수 있어요.</small><button type="button" class="button primary" data-registration-back>로그인으로 돌아가기</button>';
+          ui(
+            '<span class="eyebrow">PM CANVAS</span><h1>메일을 확인해 주세요</h1><p role="status">',
+          ) +
+          esc(ui(result.message)) +
+          ui(
+            '</p><small>링크는 15분 동안 사용할 수 있어요.</small><button type="button" class="button primary" data-registration-back>로그인으로 돌아가기</button>',
+          );
         form.querySelector('h1').tabIndex = -1;
         form.querySelector('h1').focus();
       } catch (err) {
-        error.textContent = err.message;
+        error.textContent = ui(err.message);
       } finally {
         button.disabled = !resetEmailEnabled;
       }
@@ -464,28 +515,32 @@ export function createAuthUi({
   function showPasswordReset() {
     const form = authFlowForm('resetPasswordForm');
     form.innerHTML =
-      '<span class="eyebrow">PM CANVAS</span><h1>새 비밀번호 설정</h1><p>변경하면 모든 기기에서 로그아웃됩니다.</p>' +
+      ui(
+        '<span class="eyebrow">PM CANVAS</span><h1>새 비밀번호 설정</h1><p>변경하면 모든 기기에서 로그아웃됩니다.</p>',
+      ) +
       field(
-        '새 비밀번호',
+        ui('새 비밀번호'),
         'newPassword',
         '',
         'password',
         'required minlength="12" maxlength="256" autocomplete="new-password"',
       ) +
       field(
-        '새 비밀번호 확인',
+        ui('새 비밀번호 확인'),
         'confirmPassword',
         '',
         'password',
         'required minlength="12" maxlength="256" autocomplete="new-password"',
       ) +
-      '<small>12자 이상으로 입력하세요.</small><p class="form-error" role="alert">' +
+      ui('<small>12자 이상으로 입력하세요.</small><p class="form-error" role="alert">') +
       (passwordResetToken
         ? ''
-        : '유효하지 않은 링크입니다. 비밀번호 재설정을 다시 요청해 주세요.') +
+        : ui('유효하지 않은 링크입니다. 비밀번호 재설정을 다시 요청해 주세요.')) +
       '</p><button type="submit" class="button primary" ' +
       (passwordResetToken ? '' : 'disabled') +
-      '>비밀번호 변경</button><button type="button" class="auth-link" data-request-reset>재설정 메일 다시 요청</button><button type="button" class="auth-link" data-registration-back>로그인으로 돌아가기</button>';
+      ui(
+        '>비밀번호 변경</button><button type="button" class="auth-link" data-request-reset>재설정 메일 다시 요청</button><button type="button" class="auth-link" data-registration-back>로그인으로 돌아가기</button>',
+      );
     form.elements.newPassword.focus();
     form.onsubmit = async (e) => {
       e.preventDefault();
@@ -495,7 +550,7 @@ export function createAuthUi({
         confirmPassword = form.elements.confirmPassword.value;
       error.textContent = '';
       if (password !== confirmPassword) {
-        error.textContent = '비밀번호 확인이 일치하지 않습니다.';
+        error.textContent = ui('비밀번호 확인이 일치하지 않습니다.');
         form.elements.confirmPassword.focus();
         return;
       }
@@ -507,12 +562,13 @@ export function createAuthUi({
         });
         passwordResetToken = '';
         form.reset();
-        form.innerHTML =
-          '<span class="eyebrow">PM CANVAS</span><h1>비밀번호를 변경했습니다</h1><p role="status">새 비밀번호로 다시 로그인해 주세요.</p><button class="button primary" type="button" data-registration-back>로그인하기</button>';
+        form.innerHTML = ui(
+          '<span class="eyebrow">PM CANVAS</span><h1>비밀번호를 변경했습니다</h1><p role="status">새 비밀번호로 다시 로그인해 주세요.</p><button class="button primary" type="button" data-registration-back>로그인하기</button>',
+        );
         form.querySelector('h1').tabIndex = -1;
         form.querySelector('h1').focus();
       } catch (err) {
-        error.textContent = err.message;
+        error.textContent = ui(err.message);
         if (err.code === 'RESET_INVALID') {
           passwordResetToken = '';
           form.reset();
@@ -533,8 +589,8 @@ export function createAuthUi({
     if (hasUnsaved() || isBusy()) {
       toast(
         link.kind === 'verify'
-          ? '현재 변경사항을 저장한 뒤 인증 링크를 다시 열어 주세요.'
-          : '현재 변경사항을 저장한 뒤 이메일의 재설정 링크를 다시 열어 주세요.',
+          ? ui('현재 변경사항을 저장한 뒤 인증 링크를 다시 열어 주세요.')
+          : ui('현재 변경사항을 저장한 뒤 이메일의 재설정 링크를 다시 열어 주세요.'),
       );
       return true;
     }

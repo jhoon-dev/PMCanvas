@@ -1,4 +1,6 @@
-# PM Canvas 0.19.4
+# PM Canvas 0.20.0
+
+[English](README.en.md) · 한국어
 
 팀의 업무·일정·완료 기록을 관리하는 설치형 웹 앱입니다. 표에 업무를 입력하고, 간트 차트에서 일정을 조정하며, 여러 프로젝트의 내 업무를 모아 확인합니다.
 
@@ -32,6 +34,8 @@ Linux에서는 실행 계정의 UID/GID를 자동 감지합니다. `npm run serv
 
 ## 주요 기능
 
+로그인 화면과 상단의 언어 선택에서 한국어·영어를 전환합니다. 브라우저 언어를 기본으로 사용하며 선택을 보관합니다. 미저장 변경이나 열린 편집 화면이 있으면 전환을 막아 입력을 보호합니다. 업무명·메모·인력 정보는 번역하지 않으며, CSV·Excel의 화면 문구와 헤더만 선택 언어로 출력합니다.
+
 | 기능 | 사용 위치·안내 |
 | --- | --- |
 | 표 입력·WBS·간트·Excel 가져오기/내려받기 | 업무 · 일정 · [WBS](docs/WBS.md), [Excel](docs/EXCEL.md) |
@@ -42,6 +46,8 @@ Linux에서는 실행 계정의 UID/GID를 자동 감지합니다. `npm run serv
 | OIDC·SAML·AD LDAPS | 컨피그 및 관리자 설정 → 인증·보안 · [인증 연결](docs/AUTHENTICATION.md) |
 | 30일 업무·프로젝트 복구 | 파일 → 휴지통 · [운영 안내](docs/OPERATIONS.md) |
 | 자동 DB 백업·실제 복원 점검 | 관리자 설정 → 백업 · [백업과 복구](docs/OPERATIONS.md) |
+| 동시 수정 비교·선택 병합 | 저장 충돌 때 표시 · [업무·일정](docs/WBS.md) |
+| 운영 실패 확인·이메일 알림 | 관리자 설정 → 인증·보안 → 운영 상태 · [운영 안내](docs/OPERATIONS.md) |
 
 관리자 메뉴는 사용자·메일·인증·보안·백업 네 영역으로 모았습니다. 잘 쓰지 않는 설정·관리 작업은 펼쳐서 사용합니다. 관리자 MFA, CSRF, 프로젝트별 권한, 동시 수정 충돌 검사와 감사 로그를 적용합니다. [보안 운영](docs/SECURITY.md)
 
@@ -67,6 +73,9 @@ npm run service:stop
 npm ci --ignore-scripts
 npm run format:check
 npm test
+npx playwright install chromium --only-shell
+npm run test:browser
+npm run test:performance
 ```
 
 실제 HTTP/SMTP 테스트는 `RUN_HTTP_TESTS=1 npm run test:http`, PostgreSQL 테스트는 별도 `_test` DB와 `RUN_POSTGRES_TESTS=1 npm run test:postgres`로 실행합니다. [개발 지침](CONTRIBUTING.md) · [검증 기록](docs/validation/) · [변경 이력](CHANGELOG.md) · [코드 리뷰 반영](docs/REVIEW.md)

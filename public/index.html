@@ -20,6 +20,13 @@
   <body>
     <section id="authGate" class="auth-gate">
       <form id="loginForm" class="auth-card">
+        <label class="language-control"
+          ><span>Language / 언어</span
+          ><select class="language-select" aria-label="Language / 언어">
+            <option value="ko">한국어</option>
+            <option value="en">English</option>
+          </select></label
+        >
         <span class="eyebrow">PROJECT WORKSPACE</span>
         <h1>PM Canvas</h1>
         <p>팀의 오늘을 기록하고, 프로젝트의 내일을 확인하세요.</p>
@@ -86,6 +93,13 @@
           </button>
         </div>
         <div class="top-actions">
+          <label class="language-control"
+            ><span class="sr-only">Language / 언어</span
+            ><select class="language-select" aria-label="Language / 언어">
+              <option value="ko">한국어</option>
+              <option value="en">English</option>
+            </select></label
+          >
           <span id="saveStatus" class="save-status">저장됨</span>
           <details class="action-menu top-file-menu">
             <summary class="button ghost small">파일</summary>
@@ -104,13 +118,14 @@
           <button id="accountButton" class="button ghost small">계정</button>
         </div>
       </header>
-      <main id="main"></main>
+      <a class="skip-link" href="#main">본문으로 건너뛰기</a>
+      <main id="main" tabindex="-1"></main>
       <footer>
         <span>작은 체크가 모여, 프로젝트의 다음이 보입니다.</span
         ><button id="methodFooter">진척률 · 예상일 계산 방법 ↗</button>
       </footer>
     </div>
-    <dialog id="editorDialog">
+    <dialog id="editorDialog" aria-labelledby="dialogTitle" aria-describedby="formError">
       <form id="editorForm">
         <div class="dialog-head">
           <div>
@@ -129,7 +144,7 @@
         </div>
       </form>
     </dialog>
-    <dialog id="infoDialog">
+    <dialog id="infoDialog" aria-labelledby="infoTitle">
       <div class="dialog-head">
         <div>
           <span class="eyebrow">HOW IT WORKS</span>

@@ -1,3 +1,5 @@
+import { ui } from './i18n.js';
+import { getLanguage } from './i18n.js';
 import { escapeHtml as esc } from './html.js';
 import { num } from './view-ui.js';
 import { today, addDays, summary, validateProject } from './engine.js';
@@ -7,17 +9,19 @@ export function historyBody(p, historyQuery, asOf) {
     hours = rows.reduce((s, r) => s + r.hours, 0);
   const body =
     '<div class="report-filters">' +
-    '<label class="field">시작일<input id="historyFrom" type="date" value="' +
+    ui('<label class="field">시작일<input id="historyFrom" type="date" value="') +
     esc(historyQuery.from) +
     '" max="' +
     esc(asOf) +
     '" required></label>' +
-    '<label class="field">종료일<input id="historyTo" type="date" value="' +
+    ui('<label class="field">종료일<input id="historyTo" type="date" value="') +
     esc(historyQuery.to) +
     '" max="' +
     asOf +
     '" required></label>' +
-    '<label class="field">담당자<select id="historyOwner"><option value="">전체 담당자</option>' +
+    ui(
+      '<label class="field">담당자<select id="historyOwner"><option value="">전체 담당자</option>',
+    ) +
     p.members
       .map(
         (m) =>
@@ -33,14 +37,18 @@ export function historyBody(p, historyQuery, asOf) {
     '</select></label></div>' +
     '<div class="report-summary"><strong>' +
     rows.length +
-    '개 완료 · ' +
+    ui('개 완료 · ') +
     num(hours) +
-    'h 예상 공수</strong><button class="button small" data-action="export-history" ' +
+    ui('h 예상 공수</strong><button class="button small" data-action="export-history" ') +
     (!rows.length ? 'disabled' : '') +
-    '>CSV 출력</button></div>' +
-    '<p class="subtle">완료한 항목에 배정된 예상 공수입니다. 실제 근무시간 합계는 아닙니다.</p>' +
+    ui('>CSV 출력</button></div>') +
+    ui(
+      '<p class="subtle">완료한 항목에 배정된 예상 공수입니다. 실제 근무시간 합계는 아닙니다.</p>',
+    ) +
     (rows.length
-      ? '<div class="table-scroll"><table class="task-table report-table"><thead><tr><th>완료일</th><th>담당자</th><th>업무 / 세부 작업</th><th>예상 공수</th></tr></thead><tbody>' +
+      ? ui(
+          '<div class="table-scroll"><table class="task-table report-table"><thead><tr><th>완료일</th><th>담당자</th><th>업무 / 세부 작업</th><th>예상 공수</th></tr></thead><tbody>',
+        ) +
         rows
           .slice(0, 200)
           .map(
@@ -59,24 +67,26 @@ export function historyBody(p, historyQuery, asOf) {
           )
           .join('') +
         '</tbody></table></div>'
-      : '<div class="calm-state">선택한 기간에 완료한 작업이 없습니다.</div>') +
+      : ui('<div class="calm-state">선택한 기간에 완료한 작업이 없습니다.</div>')) +
     (rows.length > 200
-      ? '<p class="subtle">최근 200건을 표시합니다. CSV에는 조회된 ' +
+      ? ui('<p class="subtle">최근 200건을 표시합니다. CSV에는 조회된 ') +
         rows.length +
-        '건을 모두 출력합니다.</p>'
+        ui('건을 모두 출력합니다.</p>')
       : '') +
-    '<p class="view-note">현재 남아 있는 완료 기록을 조회합니다. 체크 취소·작업 삭제는 이 내역에 반영됩니다. 변경 전 기록은 대시보드의 변경 이력에서 확인할 수 있습니다.</p>';
+    ui(
+      '<p class="view-note">현재 남아 있는 완료 기록을 조회합니다. 체크 취소·작업 삭제는 이 내역에 반영됩니다. 변경 전 기록은 대시보드의 변경 이력에서 확인할 수 있습니다.</p>',
+    );
 
   return body;
 }
 export function importedProject(data, uid = () => crypto.randomUUID()) {
   if (data.format !== 'pm-canvas-project' || data.version !== 1)
-    throw Error('PM Canvas 프로젝트 백업 파일이 아닙니다.');
+    throw Error(ui('PM Canvas 프로젝트 백업 파일이 아닙니다.'));
   const p = validateProject(data.project);
   delete p._revision;
   delete p._role;
   p.id = uid();
-  p.name = p.name + ' (불러옴)';
+  p.name = p.name + ui(' (불러옴)');
   if (p.name.length > 120) p.name = p.name.slice(0, 120);
 
   return p;
@@ -107,7 +117,7 @@ export function createReportUi({
   $('#backupButton').onclick = () => {
     const p = wbs.dirty && wbs.draft.id === project()?.id ? wbs.snapshot() : project();
     if (!p) {
-      toast('백업할 프로젝트가 없습니다.');
+      toast(ui('백업할 프로젝트가 없습니다.'));
       return;
     }
     const blob = new Blob(
@@ -131,11 +141,11 @@ export function createReportUi({
     a.download = 'PM-Canvas-' + p.name.replace(/[\\/:*?"<>|]/g, '_') + '-' + TODAY + '.json';
     a.click();
     schedule(() => URL.revokeObjectURL(url), 1000);
-    toast('프로젝트 백업을 내려받았습니다.');
+    toast(ui('프로젝트 백업을 내려받았습니다.'));
   };
   $('#importButton').onclick = () => {
     if (hasStorageError() || wbs.dirty) {
-      toast('현재 변경사항을 먼저 저장하거나 백업한 뒤 취소해 주세요.');
+      toast(ui('현재 변경사항을 먼저 저장하거나 백업한 뒤 취소해 주세요.'));
       return;
     }
     $('#importFile').click();
@@ -144,7 +154,7 @@ export function createReportUi({
     const file = e.target.files[0];
     if (!file) return;
     try {
-      if (file.size > 8 * 1024 * 1024) throw Error('8MB 이하의 백업 파일을 선택해 주세요.');
+      if (file.size > 8 * 1024 * 1024) throw Error(ui('8MB 이하의 백업 파일을 선택해 주세요.'));
       const data = JSON.parse(await file.text());
       const p = importedProject(data, uid);
       onImport(p);
@@ -152,11 +162,11 @@ export function createReportUi({
       render();
       toast(
         saved
-          ? '기존 프로젝트를 유지하고 백업을 새 프로젝트로 불러왔습니다.'
-          : '불러왔지만 저장에 실패했습니다. 백업을 보관해 주세요.',
+          ? ui('기존 프로젝트를 유지하고 백업을 새 프로젝트로 불러왔습니다.')
+          : ui('불러왔지만 저장에 실패했습니다. 백업을 보관해 주세요.'),
       );
     } catch (error) {
-      toast('불러오기 실패: ' + error.message);
+      toast(ui('불러오기 실패: ') + ui(error.message));
     }
     e.target.value = '';
   };
@@ -173,13 +183,13 @@ export function createReportUi({
     a.click();
     a.remove();
     schedule(() => URL.revokeObjectURL(url), 1000);
-    toast('CSV를 내려받았습니다. Excel에서 열 수 있어요.');
+    toast(ui('CSV를 내려받았습니다. Excel에서 열 수 있어요.'));
   }
   function exportWbs() {
     const p = getView() === 'tasks' ? wbs.snapshot() : project(),
       tasks = getView() === 'tasks' ? wbs.visible({ includeCollapsed: true }) : filterDailyTasks(p);
     if (!tasks.length) {
-      toast('출력할 업무가 없습니다. 검색 조건을 확인해 주세요.');
+      toast(ui('출력할 업무가 없습니다. 검색 조건을 확인해 주세요.'));
       return;
     }
     downloadReport(
@@ -189,7 +199,7 @@ export function createReportUi({
   }
   function openHistory() {
     historyQuery = { from: addDays(getDate(), -13), to: getDate(), owner: getOwner() };
-    openInfo('일자별 완료 내역', '');
+    openInfo(ui('일자별 완료 내역'), '');
     $('#infoDialog').classList.add('report-dialog');
     renderHistory();
   }
@@ -200,7 +210,7 @@ export function createReportUi({
   function exportHistory() {
     downloadReport(
       completionRows(project(), completionRecords(project(), historyQuery)),
-      '완료내역-' + historyQuery.from + '_' + historyQuery.to,
+      ui('완료내역-') + historyQuery.from + '_' + historyQuery.to,
     );
   }
   $('#infoBody').addEventListener('change', (e) => {
@@ -211,12 +221,12 @@ export function createReportUi({
       owner: $('#historyOwner').value,
     };
     try {
-      if (next.to > getDate()) throw Error('보고 기준일 이후의 날짜는 조회할 수 없습니다.');
+      if (next.to > getDate()) throw Error(ui('보고 기준일 이후의 날짜는 조회할 수 없습니다.'));
       completionRecords(project(), next);
       historyQuery = next;
       renderHistory();
     } catch (error) {
-      toast(error.message);
+      toast(ui(error.message));
       renderHistory();
     }
   });
@@ -232,14 +242,14 @@ export function createReportUi({
         ).map((t) => t.id),
         at = getDate();
       if (!taskIds.length) {
-        toast('출력할 업무가 없습니다. 검색 조건을 확인해 주세요.');
+        toast(ui('출력할 업무가 없습니다. 검색 조건을 확인해 주세요.'));
         return;
       }
       exportingExcel = true;
       const blob = await api('projects/' + p.id + '/export.xlsx', {
         method: 'POST',
         responseType: 'blob',
-        body: { project: p, taskIds, asOf: at },
+        body: { project: p, taskIds, asOf: at, language: getLanguage() },
       });
       const url = URL.createObjectURL(blob),
         a = document.createElement('a');
@@ -249,7 +259,7 @@ export function createReportUi({
       a.click();
       a.remove();
       schedule(() => URL.revokeObjectURL(url), 1000);
-      toast('Excel 파일을 내려받았습니다.');
+      toast(ui('Excel 파일을 내려받았습니다.'));
     } catch (e) {
       if (e.status === 401) showAuth();
       toast(e.message);

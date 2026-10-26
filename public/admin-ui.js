@@ -1,3 +1,4 @@
+import { ui } from './i18n.js';
 import { escapeHtml as esc } from './html.js';
 import { field } from './view-ui.js';
 import { accountRows } from './account-ui.js';
@@ -54,42 +55,61 @@ export function createAdminUi({
   async function openAccount() {
     if (!user()) return showAuth();
     openInfo(
-      '계정 관리',
+      ui('계정 관리'),
       '<p><strong>' +
         esc(user().name) +
         '</strong><br>' +
         esc(user().email) +
-        '</p><button class="button" data-action="logout">로그아웃</button><section class="account-section"><label><input type="checkbox" id="draftPersist" ' +
+        ui(
+          '</p><button class="button" data-action="logout">로그아웃</button><section class="account-section"><label><input type="checkbox" id="draftPersist" ',
+        ) +
         (DraftStore.persistent(user().id) ? 'checked' : '') +
-        '>브라우저를 닫은 후에도 초안 보관 (최대 8시간)</label><p>기본값은 현재 탭에서만 보관입니다. 보관 초안은 암호화되지 않으며 로그아웃 시 삭제됩니다.</p></section>' +
+        ui(
+          '>브라우저를 닫은 후에도 초안 보관 (최대 8시간)</label><p>기본값은 현재 탭에서만 보관입니다. 보관 초안은 암호화되지 않으며 로그아웃 시 삭제됩니다.</p></section>',
+        ) +
         (user().isAdmin
-          ? '<div class="admin-account-actions"><button class="button primary" data-action="admin">관리자 설정</button></div><p>관리자 인증 앱 MFA가 적용됩니다. 복구 코드는 한 번만 사용할 수 있습니다.</p>'
+          ? ui(
+              '<div class="admin-account-actions"><button class="button primary" data-action="admin">관리자 설정</button></div><p>관리자 인증 앱 MFA가 적용됩니다. 복구 코드는 한 번만 사용할 수 있습니다.</p>',
+            )
+          : '') +
+        (user().isAdmin && $('#accountButton').dataset.alerts
+          ? '<p class="notice"><button class="button" data-action="operation-alerts">' +
+            ui('운영 실패 알림') +
+            ' · ' +
+            esc($('#accountButton').dataset.alerts) +
+            '</button></p>'
           : '') +
         (user().localLogin === false
-          ? '<section class="account-section"><p>외부 인증 계정입니다. 비밀번호는 회사 인증 서버에서 변경해 주세요.</p></section>'
-          : '<section class="account-section"><details><summary>내 비밀번호 변경</summary><p class="subtle">변경하면 모든 기기에서 로그아웃됩니다.</p><form id="changePasswordForm" class="server-form">' +
+          ? ui(
+              '<section class="account-section"><p>외부 인증 계정입니다. 비밀번호는 회사 인증 서버에서 변경해 주세요.</p></section>',
+            )
+          : ui(
+              '<section class="account-section"><details><summary>내 비밀번호 변경</summary><p class="subtle">변경하면 모든 기기에서 로그아웃됩니다.</p><form id="changePasswordForm" class="server-form">',
+            ) +
             field(
-              '현재 비밀번호',
+              ui('현재 비밀번호'),
               'currentPassword',
               '',
               'password',
               'required maxlength="256" autocomplete="current-password"',
             ) +
             field(
-              '새 비밀번호',
+              ui('새 비밀번호'),
               'newPassword',
               '',
               'password',
               'required minlength="12" maxlength="256" autocomplete="new-password"',
             ) +
             field(
-              '새 비밀번호 확인',
+              ui('새 비밀번호 확인'),
               'confirmPassword',
               '',
               'password',
               'required minlength="12" maxlength="256" autocomplete="new-password"',
             ) +
-            '<button class="button primary">비밀번호 변경</button><p class="account-result" role="status"></p></form></details></section>'),
+            ui(
+              '<button class="button primary">비밀번호 변경</button><p class="account-result" role="status"></p></form></details></section>',
+            )),
     );
   }
   let knownUsers = [];
@@ -103,7 +123,7 @@ export function createAdminUi({
       users.sort((a, b) => Number(b.registrationPending) - Number(a.registrationPending));
       list.innerHTML = accountRows(ops.filterUsers(users), field);
     } catch (error) {
-      if (list.isConnected) list.textContent = error.message;
+      if (list.isConnected) list.textContent = ui(error.message);
     }
   }
 
@@ -129,14 +149,15 @@ export function createAdminUi({
           },
         });
         form.reset();
-        form.querySelector('.account-result').textContent =
-          '계정을 만들었습니다. 프로젝트 공유에서 추가할 수 있습니다.';
+        form.querySelector('.account-result').textContent = ui(
+          '계정을 만들었습니다. 프로젝트 공유에서 추가할 수 있습니다.',
+        );
         await refreshUsers();
       } else if (form.id === 'changePasswordForm') {
         if (isBusy() || hasUnsaved())
-          throw Error('현재 변경사항을 먼저 저장하거나 백업한 뒤 진행해 주세요.');
+          throw Error(ui('현재 변경사항을 먼저 저장하거나 백업한 뒤 진행해 주세요.'));
         if (data.get('newPassword') !== data.get('confirmPassword'))
-          throw Error('새 비밀번호 확인이 일치하지 않습니다.');
+          throw Error(ui('새 비밀번호 확인이 일치하지 않습니다.'));
         await api('auth/password', {
           method: 'POST',
           body: {
@@ -146,22 +167,23 @@ export function createAdminUi({
         });
         form.reset();
         $('#infoDialog').close();
-        showAuth('비밀번호를 변경했습니다. 새 비밀번호로 로그인해 주세요.');
+        showAuth(ui('비밀번호를 변경했습니다. 새 비밀번호로 로그인해 주세요.'));
       } else if (form.dataset.resetUser) {
-        if (!confirm('이 사용자의 비밀번호를 재설정하고 모든 기기에서 로그아웃할까요?')) return;
+        if (!confirm(ui('이 사용자의 비밀번호를 재설정하고 모든 기기에서 로그아웃할까요?'))) return;
         await api('users/' + form.dataset.resetUser, {
           method: 'PATCH',
           body: { password: data.get('password') },
         });
         form.reset();
-        form.querySelector('.account-result').textContent =
-          '비밀번호를 재설정했습니다. 사용자에게 새 비밀번호를 전달해 주세요.';
+        form.querySelector('.account-result').textContent = ui(
+          '비밀번호를 재설정했습니다. 사용자에게 새 비밀번호를 전달해 주세요.',
+        );
       }
     } catch (error) {
-      (form.querySelector('.account-result') || $('#shareResult')).textContent = error.message;
+      (form.querySelector('.account-result') || $('#shareResult')).textContent = ui(error.message);
       if (error.status === 401) {
         $('#infoDialog').close();
-        showAuth(error.message);
+        showAuth(ui(error.message));
       }
     } finally {
       button.disabled = false;
@@ -177,9 +199,9 @@ export function createAdminUi({
           body: {},
         });
         await refreshUsers();
-        toast('관리자 승인 요청 메일 발송을 다시 요청했습니다.');
+        toast(ui('관리자 승인 요청 메일 발송을 다시 요청했습니다.'));
       } catch (error) {
-        toast(error.message);
+        toast(ui(error.message));
         reviewRetry.disabled = false;
       }
       return;
@@ -193,9 +215,9 @@ export function createAdminUi({
           body: {},
         });
         await refreshUsers();
-        toast('승인 안내 메일 발송을 다시 요청했습니다.');
+        toast(ui('승인 안내 메일 발송을 다시 요청했습니다.'));
       } catch (error) {
-        toast(error.message);
+        toast(ui(error.message));
         retry.disabled = false;
       }
       return;
@@ -206,10 +228,12 @@ export function createAdminUi({
       if (
         !confirm(
           status.dataset.registrationPending === 'true'
-            ? '이메일과 소속을 확인한 계정의 가입을 승인할까요?'
+            ? ui('이메일과 소속을 확인한 계정의 가입을 승인할까요?')
             : isActive
-              ? '이 계정을 다시 활성화할까요?'
-              : '이 계정을 비활성화하고 모든 기기에서 로그아웃할까요? 프로젝트 데이터는 보존됩니다.',
+              ? ui('이 계정을 다시 활성화할까요?')
+              : ui(
+                  '이 계정을 비활성화하고 모든 기기에서 로그아웃할까요? 프로젝트 데이터는 보존됩니다.',
+                ),
         )
       )
         return;
@@ -219,13 +243,13 @@ export function createAdminUi({
         await refreshUsers();
         toast(
           status.dataset.registrationPending === 'true'
-            ? '가입을 승인했습니다. 안내 메일을 발송합니다.'
+            ? ui('가입을 승인했습니다. 안내 메일을 발송합니다.')
             : isActive
-              ? '계정을 활성화했습니다.'
-              : '계정을 비활성화했습니다.',
+              ? ui('계정을 활성화했습니다.')
+              : ui('계정을 비활성화했습니다.'),
         );
       } catch (error) {
-        toast(error.message);
+        toast(ui(error.message));
         status.disabled = false;
       }
       return;
@@ -238,15 +262,16 @@ export function createAdminUi({
         wbs.persistDraft();
       } catch {
         e.target.checked = !e.target.checked;
-        toast('초안 보관 설정을 바꾸지 못했습니다. 저장 공간 설정을 확인해 주세요.');
+        toast(ui('초안 보관 설정을 바꾸지 못했습니다. 저장 공간 설정을 확인해 주세요.'));
       }
   });
   function logout() {
     if (isBusy()) {
-      toast('저장 완료 후 로그아웃해 주세요.');
+      toast(ui('저장 완료 후 로그아웃해 주세요.'));
       return;
     }
-    if (hasUnsaved() && !confirm('미저장 변경사항과 보관 초안을 삭제하고 로그아웃할까요?')) return;
+    if (hasUnsaved() && !confirm(ui('미저장 변경사항과 보관 초안을 삭제하고 로그아웃할까요?')))
+      return;
     api('auth/logout', { method: 'POST', body: {} })
       .then(() => {
         DraftStore.clearUser(user().id);
@@ -287,7 +312,7 @@ export function createAdminUi({
   });
   const trashButton = document.createElement('button');
   trashButton.className = 'button ghost small';
-  trashButton.textContent = '휴지통';
+  trashButton.textContent = ui('휴지통');
   trashButton.id = 'trashButton';
   trashButton.onclick = () => {
     trashButton.closest('details').open = false;

@@ -10,6 +10,71 @@ import { createPool, migrate, PgRepository } from '../server/postgres.mjs';
 import { cleanProject } from '../server/project.mjs';
 import { hashPassword, token, digest } from '../server/security.mjs';
 import { pasteCells, duplicateTasks, reorderTasks, moveSchedule } from '../public/wbs-model.js';
+test(
+  '실제 PostgreSQL: 운영 알림 설정 충돌·실패 집계·원자 lease·확인 경합과 재시도 제한',
+  { skip: process.env.RUN_POSTGRES_TESTS !== '1' },
+  async () => {
+    if (!/_test$/.test(process.env.PGDATABASE || ''))
+      throw Error('Use a dedicated _test database.');
+    const pool = await createPool(),
+      repo = new PgRepository(pool);
+    let admin;
+    try {
+      await migrate(pool);
+      await pool.query('DELETE FROM pm_operation_alerts');
+      admin = await repo.createUser({
+        email: randomUUID() + '@example.com',
+        name: '알림 테스트',
+        passwordHash: 'unused',
+        isAdmin: true,
+      });
+      const initial = (await repo.operationAlerts()).settings;
+      const outcomes = await Promise.allSettled(
+        [0, 1].map(() =>
+          repo.saveAlertSettings(admin.id, {
+            ...initial,
+            enabled: true,
+            recipients: ['alerts@example.com'],
+          }),
+        ),
+      );
+      assert.equal(outcomes.filter((x) => x.status === 'fulfilled').length, 1);
+      await Promise.all(Array.from({ length: 20 }, () => repo.recordOperationFailure('backup')));
+      assert.equal((await repo.operationAlerts()).alerts[0].occurrences, 20);
+      const claimed = (
+        await Promise.all([repo.claimOperationAlert(), repo.claimOperationAlert()])
+      ).filter(Boolean);
+      assert.equal(claimed.length, 1);
+      assert.deepEqual(claimed[0].recipients, ['alerts@example.com']);
+      await repo.recordOperationFailure('backup');
+      await repo.finishOperationAlert(claimed[0], true);
+      let row = (await repo.operationAlerts()).alerts[0];
+      assert.equal(row.notified, 20);
+      assert.equal(row.occurrences, 21);
+      assert.equal(await repo.claimOperationAlert(), null);
+      await repo.acknowledgeAlert(admin.id, 'backup', 20);
+      row = (await repo.operationAlerts()).alerts[0];
+      assert.equal(row.acknowledged, 20);
+      assert.equal(row.occurrences, 21);
+      for (let i = 0; i < 3; i++) {
+        await pool.query("UPDATE pm_operation_alerts SET next_at=now()-interval '1 second'");
+        const job = await repo.claimOperationAlert();
+        assert.ok(job);
+        await repo.finishOperationAlert(job, false);
+      }
+      await pool.query("UPDATE pm_operation_alerts SET next_at=now()-interval '1 second'");
+      assert.equal(await repo.claimOperationAlert(), null);
+      await repo.acknowledgeAlert(admin.id, 'backup', 21);
+      await repo.recordOperationFailure('backup');
+      assert.ok(await repo.claimOperationAlert());
+    } finally {
+      await pool.query('DELETE FROM pm_operation_alerts');
+      await pool.query("UPDATE pm_alert_settings SET enabled=false,recipients='{}'");
+      if (admin) await pool.query('DELETE FROM pm_users WHERE id=$1', [admin.id]);
+      await pool.end();
+    }
+  },
+);
 
 test(
   '실제 PostgreSQL: WBS 일괄 입력·복제·행 이동·간트 일정 저장과 완료 기록 보존',

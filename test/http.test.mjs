@@ -14,6 +14,61 @@ import { MailSettings } from '../server/mail-settings.mjs';
 const PASSWORD = 'a-test-password-12345',
   HASH = await hashPassword(PASSWORD);
 const ORIGIN = 'http://localhost:3000';
+test('운영 알림 API는 관리자·CSRF·설정 revision을 검증하고 확인한 횟수 이후 실패를 보존', async (t) => {
+  const f = await fixture(t),
+    admin = await f.login('owner@example.com'),
+    member = await f.login('other@example.com');
+  assert.equal((await f.call(f.client(), 'admin/alerts')).status, 401);
+  assert.equal((await f.call(member, 'admin/alerts')).status, 403);
+  const config = { enabled: true, recipients: ['admin@example.com'], revision: 0 };
+  assert.equal(
+    (
+      await f.call(admin, 'admin/alerts', {
+        method: 'PUT',
+        body: config,
+        headers: { 'X-CSRF-Token': '' },
+      })
+    ).status,
+    403,
+  );
+  assert.equal((await f.call(admin, 'admin/alerts', { method: 'PUT', body: config })).status, 200);
+  assert.equal((await f.call(admin, 'admin/alerts', { method: 'PUT', body: config })).status, 409);
+  assert.equal(
+    (
+      await f.call(admin, 'admin/alerts', {
+        method: 'PUT',
+        body: { ...config, revision: 1, recipients: 'Bcc: secret@example.com' },
+      })
+    ).status,
+    400,
+  );
+  await f.repo.recordOperationFailure('mail');
+  await f.repo.recordOperationFailure('mail');
+  assert.equal(
+    (
+      await f.call(member, 'admin/alerts/acknowledge', {
+        method: 'POST',
+        body: { kind: 'mail', count: 1 },
+      })
+    ).status,
+    403,
+  );
+  const result = await f.call(admin, 'admin/alerts/acknowledge', {
+    method: 'POST',
+    body: { kind: 'mail', count: 1 },
+  });
+  assert.equal(result.data.alerts[0].occurrences, 2);
+  assert.equal(result.data.alerts[0].acknowledged, 1);
+  assert.equal(
+    (
+      await f.call(admin, 'admin/alerts/acknowledge', {
+        method: 'POST',
+        body: { kind: 'mail', count: -1 },
+      })
+    ).status,
+    400,
+  );
+});
 async function fixture(
   t,
   {
@@ -567,6 +622,11 @@ test('하위 경로 /pmcanvas에서 화면과 API 실행, 임의 파일은 비�
     'sharing-ui.js',
     'security-ui.js',
     'help-ui.js',
+    'i18n.js',
+    'locales/en.js',
+    'project-merge.js',
+    'conflict-ui.js',
+    'alerts-ui.js',
   ]) {
     const response = await f.inject('/pmcanvas/' + file);
     assert.equal(response.status, 200);

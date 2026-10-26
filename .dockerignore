@@ -17,3 +17,6 @@ test
 config
 .playwright-mcp
 *.png
+playwright-report
+test-results
+releases

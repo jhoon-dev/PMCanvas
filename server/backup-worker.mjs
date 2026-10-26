@@ -5,6 +5,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { createPool } from './pg-pool.mjs';
 import { migrationFiles } from './migrations.mjs';
+import { recordFailure } from './operation-alerts.mjs';
 
 export function runCommand(command, args, env) {
   return new Promise((resolve, reject) => {
@@ -39,6 +40,7 @@ export class BackupWorker {
         await c.query('UPDATE pm_backup_settings SET lease_id=NULL,lease_until=NULL WHERE id=true');
         s.lease_id = null;
         s.lease_until = null;
+        await recordFailure(c, 'backup');
       }
       if (
         !s ||
@@ -186,6 +188,9 @@ export class BackupWorker {
             ' 단계에서 실패했습니다.' +
             (cleanupFailed ? ' 점검용 DB 수동 정리가 필요합니다.' : ''),
         ],
+      );
+      await recordFailure(this.pool, /복원|점검/.test(stage) ? 'restore' : 'backup').catch(
+        () => {},
       );
     } finally {
       clearInterval(heartbeat);

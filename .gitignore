@@ -23,3 +23,5 @@ dist/
 *.dump
 
 !config/mail.example.json
+playwright-report/
+test-results/

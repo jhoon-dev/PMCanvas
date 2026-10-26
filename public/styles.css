@@ -1895,6 +1895,11 @@ dialog::backdrop {
   .filter-controls input {
     max-width: 120px;
   }
+  .filter-controls select,
+  #reportDate {
+    min-height: 44px;
+    font-size: 16px;
+  }
   .legend {
     font-size: 8px;
   }
@@ -2806,4 +2811,161 @@ button:disabled {
 }
 .approval-project select:disabled {
   opacity: 0.45;
+}
+/* Keyboard focus and touch targets are shared by every feature screen. */
+:focus-visible {
+  outline: 3px solid #2965d9;
+  outline-offset: 3px;
+}
+.skip-link {
+  position: fixed;
+  left: 12px;
+  top: -100px;
+  z-index: 2000;
+  background: white;
+  padding: 12px;
+  border: 2px solid #2965d9;
+}
+.skip-link:focus {
+  top: 12px;
+}
+.language-control {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  font-size: 12px;
+}
+.language-select {
+  max-width: 100px;
+  min-height: 34px;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  background: white;
+  color: #243b53;
+  padding: 5px 7px;
+}
+.auth-card .language-control {
+  margin-bottom: 16px;
+}
+.merge-dialog {
+  width: min(760px, calc(100vw - 24px));
+  max-height: 90dvh;
+  overflow: auto;
+}
+.merge-field {
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  margin: 16px 0;
+  padding: 12px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.merge-field legend {
+  font-weight: 600;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.merge-choice {
+  min-width: 0;
+  cursor: pointer;
+  padding: 8px;
+}
+.merge-choice input {
+  margin-right: 8px;
+}
+.merge-choice pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 200px;
+  overflow: auto;
+  font: inherit;
+  font-size: 12px;
+}
+.operation-alert-list {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 700px) {
+  .topbar {
+    height: auto;
+    min-height: 64px;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 12px;
+  }
+  .topbar .breadcrumb {
+    display: none;
+  }
+  .topbar .mobile-projects {
+    flex: 1;
+    min-width: 100px;
+    max-width: 100%;
+  }
+  .top-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  #accountButton {
+    max-width: 110px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .nav-item {
+    font-size: 11px;
+    line-height: 1.25;
+    min-height: 54px;
+  }
+  button.button,
+  summary.button,
+  .icon-button,
+  .language-select {
+    min-height: 44px;
+  }
+  .check-item {
+    min-height: 58px;
+    padding: 12px;
+    gap: 10px;
+  }
+  input[type='checkbox'],
+  input[type='radio'] {
+    min-width: 22px;
+    min-height: 22px;
+  }
+  .filter-controls {
+    flex-wrap: wrap;
+  }
+  .filter-controls > * {
+    min-width: 0;
+    max-width: 100%;
+  }
+  .filter-controls input {
+    flex: 1 1 100%;
+    font-size: 16px;
+  }
+  .check-task-head,
+  .task-meta,
+  .section-toolbar {
+    flex-wrap: wrap;
+  }
+  .merge-field {
+    grid-template-columns: 1fr;
+  }
+  dialog input:not([type='checkbox']):not([type='radio']),
+  dialog textarea,
+  dialog select,
+  .auth-card input {
+    font-size: 16px;
+  }
+  dialog {
+    max-width: calc(100vw - 24px);
+    max-height: 90dvh;
+  }
+  #infoBody,
+  #dialogBody,
+  .server-form {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
 }

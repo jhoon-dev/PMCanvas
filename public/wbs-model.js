@@ -1,4 +1,5 @@
 import { hierarchy, validatePlanning } from './planning.js';
+import { ui } from './i18n.js';
 import {
   today,
   validDate,
@@ -39,14 +40,14 @@ export function newTask(project, { date = today(), id = newId } = {}) {
   const start = nextWorkday(date, project.holidays);
   return {
     id: id(),
-    name: '새 업무',
+    name: ui('새 업무'),
     phase: '',
     owner: '',
     start,
     end: shiftWorkday(start, 4, project.holidays),
     predecessor: '',
     memo: '',
-    items: [{ id: id(), title: '완료 확인', hours: 8, doneDate: null }],
+    items: [{ id: id(), title: ui('완료 확인'), hours: 8, doneDate: null }],
   };
 }
 export function checkDraft(project) {
@@ -111,7 +112,14 @@ export function normalizeDate(value) {
   return result;
 }
 function reference(rows, value, label) {
-  if (!value || value === '미지정' || value === '없음') return '';
+  if (
+    !value ||
+    value === '미지정' ||
+    value === '없음' ||
+    (['Unassigned', 'None'].includes(value) &&
+      !rows.some((row) => row.name === value || row.id === value))
+  )
+    return '';
   const byId = rows.find((x) => x.id === value);
   if (byId) return byId.id;
   const matches = rows.filter((x) => x.name === value);
@@ -177,7 +185,7 @@ export function pasteCells(
   if (
     columnIndex === 0 &&
     rows[0]?.length === layout.length &&
-    rows[0].every((v, i) => v.trim() === layout[i][1])
+    rows[0].every((v, i) => v.trim() === layout[i][1] || v.trim() === ui(layout[i][1], 'en'))
   )
     rows.shift();
   const deferred = [];

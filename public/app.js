@@ -1,4 +1,8 @@
+import { ui } from './i18n.js';
+import { installLanguage } from './i18n.js';
 import { createProjectEditor } from './project-editor.js';
+import { openConflict } from './conflict-ui.js';
+import { createAlertsUi } from './alerts-ui.js';
 import { createReportUi } from './report-ui.js';
 import { createAdminUi } from './admin-ui.js';
 import { createHelpUi } from './help-ui.js';
@@ -21,6 +25,7 @@ let currentUser = null,
   myProjects = [],
   dailyMode = 'mine';
 let reviewLanding = location.hash === '#registration-approvals';
+let alertLanding = location.hash === '#operation-alerts';
 const $ = (s) => document.querySelector(s),
   TODAY = today();
 let state = { version: 1, projects: [], activeId: null },
@@ -32,7 +37,9 @@ let state = { version: 1, projects: [], activeId: null },
   query = '',
   onlyPending = false;
 const project = () => state.projects.find((p) => p.id === state.activeId);
+const savedProjects = new Map();
 const wbs = new WbsView({
+  resolveConflict: openConflict,
   getDraftStore: () => (currentUser ? new DraftStore(currentUser.id) : null),
   getProject: project,
   request: api,
@@ -43,6 +50,7 @@ const wbs = new WbsView({
   },
   onSettled: () => setBusy(false),
   acceptProject: (p) => {
+    savedProjects.set(p.id, structuredClone(p));
     state.projects[state.projects.findIndex((x) => x.id === p.id)] = p;
     storageError = '';
   },
@@ -58,24 +66,38 @@ async function persist() {
   if (!p || saveInFlight) return false;
   mutationSequence++;
   setBusy(true);
-  $('#saveStatus').textContent = '서버 저장 중…';
+  $('#saveStatus').textContent = ui('서버 저장 중…');
   try {
     const result = await api('projects' + (p._revision ? '/' + p.id : ''), {
       method: p._revision ? 'PUT' : 'POST',
       body: { project: p, ...(p._revision ? { revision: p._revision } : {}) },
     });
     state.projects[state.projects.findIndex((x) => x.id === p.id)] = result.project;
+    savedProjects.set(p.id, structuredClone(result.project));
     storageError = '';
-    $('#saveStatus').textContent = '서버에 저장됨';
+    $('#saveStatus').textContent = ui('서버에 저장됨');
     $('#saveStatus').classList.remove('error');
     refreshMyWork();
     return true;
   } catch (error) {
-    storageError = error.message;
-    $('#saveStatus').textContent = '저장 실패 · 백업 필요';
+    storageError = ui(error.message);
+    if (error.status === 409 && savedProjects.has(p.id)) {
+      try {
+        const { project: latest } = await api('projects/' + p.id);
+        const resolved = await openConflict(savedProjects.get(p.id), p, latest);
+        if (resolved) {
+          savedProjects.set(p.id, structuredClone(latest));
+          state.projects[state.projects.findIndex((x) => x.id === p.id)] = resolved.project;
+          storageError = ui('선택한 변경을 초안에 반영했습니다. 확인 후 저장해 주세요.');
+        }
+      } catch (conflictError) {
+        storageError = ui(conflictError.message);
+      }
+    }
+    $('#saveStatus').textContent = ui('저장 실패 · 백업 필요');
     $('#saveStatus').classList.add('error');
-    toast(error.message);
-    if (error.status === 401) showAuth(error.message);
+    toast(storageError);
+    if (error.status === 401) showAuth(ui(error.message));
     return false;
   } finally {
     setBusy(false);
@@ -90,7 +112,7 @@ function toast(text) {
 function render() {
   document.body.dataset.appView = view;
   if (!state.projects.length) {
-    $('#breadcrumbProject').textContent = '프로젝트 시작하기';
+    $('#breadcrumbProject').textContent = ui('프로젝트 시작하기');
     $('#projectSelect').innerHTML = '';
     $('#projectList').innerHTML = '';
     $('#taskNavCount').textContent = '';
@@ -99,15 +121,15 @@ function render() {
         ? myWorkView({ projects: myProjects, esc, progress, today: TODAY, projectMode: '' })
         : pageHead(
             'PROJECT WORKSPACE',
-            '팀의 프로젝트를 시작하세요',
-            '프로젝트를 만들고 팀원과 함께 업무를 관리하세요.',
-            btn('새 프로젝트', 'project', 'primary'),
+            ui('팀의 프로젝트를 시작하세요'),
+            ui('프로젝트를 만들고 팀원과 함께 업무를 관리하세요.'),
+            btn(ui('새 프로젝트'), 'project', 'primary'),
           ) +
           empty(
-            '아직 접근할 수 있는 프로젝트가 없습니다',
-            '새 프로젝트를 만들거나 소유자에게 공유 권한을 요청하세요.',
+            ui('아직 접근할 수 있는 프로젝트가 없습니다'),
+            ui('새 프로젝트를 만들거나 소유자에게 공유 권한을 요청하세요.'),
             'project',
-            '새 프로젝트',
+            ui('새 프로젝트'),
           );
     updateAccessUi();
     hydrateIcons();
@@ -117,7 +139,7 @@ function render() {
   const p = project(),
     s = summary(p, asOf);
   $('#breadcrumbProject').textContent =
-    view === 'daily' && dailyMode === 'mine' ? '전체 프로젝트 · 내 업무' : p.name;
+    view === 'daily' && dailyMode === 'mine' ? ui('전체 프로젝트 · 내 업무') : p.name;
   $('#projectSelect').innerHTML = state.projects
     .map(
       (x) =>
@@ -143,7 +165,7 @@ function render() {
         esc(x.id) +
         '"><span class="project-bullet"></span>' +
         esc(x.name) +
-        (x.demo ? '<small>예시</small>' : '') +
+        (x.demo ? ui('<small>예시</small>') : '') +
         '</button>',
     )
     .join('');
@@ -152,14 +174,16 @@ function render() {
       ? '<div class="notice error-notice" role="alert">' +
         esc(storageError) +
         ' ' +
-        btn('다시 저장', 'retry-save', 'small') +
+        btn(ui('다시 저장'), 'retry-save', 'small') +
         ' ' +
-        btn('서버 다시 읽기', 'reload-server', 'small') +
+        btn(ui('서버 다시 읽기'), 'reload-server', 'small') +
         '</div>'
       : '') +
     (p.demo
-      ? '<div class="demo-notice"><span><span class="demo-pill">SAMPLE</span> 예시 데이터로 먼저 둘러보세요. 실제 업무는 새 프로젝트에서 시작할 수 있어요.</span>' +
-        btn('새 프로젝트 만들기 ↗', 'project', 'link') +
+      ? ui(
+          '<div class="demo-notice"><span><span class="demo-pill">SAMPLE</span> 예시 데이터로 먼저 둘러보세요. 실제 업무는 새 프로젝트에서 시작할 수 있어요.</span>',
+        ) +
+        btn(ui('새 프로젝트 만들기 ↗'), 'project', 'link') +
         '</div>'
       : '');
   let content;
@@ -212,7 +236,7 @@ function normalizeView(value) {
 function navigate(v) {
   v = normalizeView(v);
   if (wbs.dirty && v !== 'tasks') {
-    toast('WBS 변경사항을 먼저 저장하거나 취소해 주세요.');
+    toast(ui('WBS 변경사항을 먼저 저장하거나 취소해 주세요.'));
     return;
   }
   view = v;
@@ -244,7 +268,7 @@ document.addEventListener('click', (e) => {
   const sw = e.target.closest('[data-project]');
   if (sw) {
     if (storageError || wbs.dirty) {
-      toast('현재 변경사항을 먼저 저장하거나 백업한 뒤 취소해 주세요.');
+      toast(ui('현재 변경사항을 먼저 저장하거나 백업한 뒤 취소해 주세요.'));
       return;
     }
     state.activeId = sw.dataset.project;
@@ -278,7 +302,7 @@ document.addEventListener('click', (e) => {
   else if (a === 'retry-save')
     persist().then((saved) => {
       render();
-      if (saved) toast('서버에 저장했습니다.');
+      if (saved) toast(ui('서버에 저장했습니다.'));
     });
   else if (a === 'reload-server') reloadServer();
   else if (a === 'sharing') admin.sharing();
@@ -286,6 +310,7 @@ document.addEventListener('click', (e) => {
   else if (a === 'connections') admin.connections();
   else if (a === 'mail-settings') admin.mail();
   else if (a === 'security-audit') admin.securityAudit();
+  else if (a === 'operation-alerts') alertsUi();
   else if (a === 'logout') admin.logout();
   else openEditor(a);
 });
@@ -293,7 +318,7 @@ $('#main').addEventListener('change', async (e) => {
   const el = e.target;
   if (el.id === 'reportDate') {
     if (!validDate(el.value) || el.value > TODAY) {
-      toast('오늘까지의 날짜만 조회할 수 있어요.');
+      toast(ui('오늘까지의 날짜만 조회할 수 있어요.'));
       el.value = asOf;
       return;
     }
@@ -335,9 +360,15 @@ $('#main').addEventListener('input', (e) => {
   }
 });
 window.addEventListener('hashchange', () => {
+  if (location.hash === '#operation-alerts') {
+    alertLanding = true;
+    if (currentUser) showApprovalInbox().catch((error) => toast(ui(error.message)));
+    else showAuth();
+    return;
+  }
   if (location.hash === '#registration-approvals') {
     reviewLanding = true;
-    if (currentUser) showApprovalInbox().catch((error) => toast(error.message));
+    if (currentUser) showApprovalInbox().catch((error) => toast(ui(error.message)));
     else showAuth();
     return;
   }
@@ -346,7 +377,7 @@ window.addEventListener('hashchange', () => {
   if (next === view) return;
   if (wbs.dirty && next !== 'tasks') {
     history.replaceState(null, '', '#tasks');
-    toast('WBS 변경사항을 먼저 저장하거나 취소해 주세요.');
+    toast(ui('WBS 변경사항을 먼저 저장하거나 취소해 주세요.'));
     return;
   }
   view = next;
@@ -354,7 +385,7 @@ window.addEventListener('hashchange', () => {
 });
 $('#projectSelect').onchange = (e) => {
   if (storageError || wbs.dirty) {
-    toast('WBS 변경사항을 먼저 저장하거나 취소해 주세요.');
+    toast(ui('WBS 변경사항을 먼저 저장하거나 취소해 주세요.'));
     render();
     return;
   }
@@ -391,21 +422,22 @@ function updateAccessUi() {
   const account = $('#accountButton');
   if (account)
     account.textContent =
-      (currentUser?.name || '계정') +
-      (account.dataset.pending ? ' · 승인 ' + account.dataset.pending : '');
+      (currentUser?.name || ui('계정')) +
+      (account.dataset.pending ? ui(' · 승인 ') + account.dataset.pending : '') +
+      (account.dataset.alerts ? ui(' · 운영 알림 ') + account.dataset.alerts : '');
   $('#saveStatus').textContent = saveInFlight
-    ? '서버 저장 중…'
+    ? ui('서버 저장 중…')
     : storageError
-      ? '저장 실패 · 백업 필요'
+      ? ui('저장 실패 · 백업 필요')
       : wbs.dirty
-        ? 'WBS 미저장 변경사항'
+        ? ui('WBS 미저장 변경사항')
         : readOnly
-          ? '조회 권한 · 서버 저장'
-          : '서버에 저장됨';
+          ? ui('조회 권한 · 서버 저장')
+          : ui('서버에 저장됨');
   $('#saveStatus').classList.toggle('error', !!storageError);
   document.querySelector('.side-bottom small').textContent = readOnly
-    ? '조회자 · 공동 프로젝트'
-    : '팀과 함께하는 프로젝트';
+    ? ui('조회자 · 공동 프로젝트')
+    : ui('팀과 함께하는 프로젝트');
 }
 function showAuth(message = '') {
   auth.show(message);
@@ -432,6 +464,8 @@ async function loadProjects({ force = false } = {}) {
       : data.projects[0]?.id || null,
   };
   myProjects = mine.projects;
+  savedProjects.clear();
+  for (const p of data.projects) savedProjects.set(p.id, structuredClone(p));
   storageError = '';
   render();
   admin.summary();
@@ -453,23 +487,23 @@ async function boot() {
     await showApprovalInbox();
   } catch (error) {
     if (error.status === 401) showAuth($('#authError').textContent);
-    else showAuth(error.message);
+    else showAuth(ui(error.message));
   }
 }
 async function reloadServer() {
   if (
     storageError &&
     !confirm(
-      '현재 변경사항을 버리고 서버에서 다시 읽을까요? 필요한 내용은 먼저 JSON으로 백업하세요.',
+      ui('현재 변경사항을 버리고 서버에서 다시 읽을까요? 필요한 내용은 먼저 JSON으로 백업하세요.'),
     )
   )
     return;
   try {
     const loaded = await loadProjects({ force: true });
-    if (loaded) toast('서버의 최신 내용을 읽었습니다.');
+    if (loaded) toast(ui('서버의 최신 내용을 읽었습니다.'));
   } catch (error) {
-    toast(error.message);
-    if (error.status === 401) showAuth(error.message);
+    toast(ui(error.message));
+    if (error.status === 401) showAuth(ui(error.message));
   }
 }
 window.addEventListener('beforeunload', (e) => {
@@ -494,23 +528,30 @@ setInterval(async () => {
   try {
     await loadProjects();
   } catch (error) {
-    if (error.status === 401) showAuth(error.message);
+    if (error.status === 401) showAuth(ui(error.message));
   }
 }, 15000);
 
 window.addEventListener('pagehide', () => wbs.persistDraft());
 
 async function showApprovalInbox() {
+  if (alertLanding && currentUser && !storageError && !wbs.dirty && !saveInFlight) {
+    alertLanding = false;
+    history.replaceState(null, '', location.pathname + location.search);
+    if (currentUser.isAdmin) await alertsUi();
+    else toast(ui('관리자 권한이 필요합니다.'));
+    return;
+  }
   if (!reviewLanding || !currentUser) return;
   if (storageError || wbs.dirty || saveInFlight) {
-    toast('현재 변경사항을 저장한 뒤 승인 요청 링크를 다시 열어 주세요.');
+    toast(ui('현재 변경사항을 저장한 뒤 승인 요청 링크를 다시 열어 주세요.'));
     return;
   }
   reviewLanding = false;
   if (location.hash === '#registration-approvals')
     history.replaceState(null, '', location.pathname + location.search);
   if (!currentUser.isAdmin) {
-    toast('가입 승인 목록은 관리자만 확인할 수 있습니다.');
+    toast(ui('가입 승인 목록은 관리자만 확인할 수 있습니다.'));
     return;
   }
   await admin.open('pending');
@@ -533,7 +574,7 @@ document.addEventListener('keydown', (e) => {
 
 function opsCanChange() {
   if (wbs.dirty || storageError || saveInFlight) {
-    toast('현재 변경사항을 먼저 저장하거나 취소해 주세요.');
+    toast(ui('현재 변경사항을 먼저 저장하거나 취소해 주세요.'));
     return false;
   }
   return true;
@@ -548,10 +589,19 @@ async function refreshMyWork() {
   }
 }
 const info = createInfoDialog({ toast });
+const alertsUi = createAlertsUi({
+  api,
+  user: () => currentUser,
+  openInfo,
+  dialog: info,
+  toast,
+  onChange: () => admin.summary(),
+});
 function filterDailyTasks(p) {
   return filteredTasks(p, { asOf, ownerFilter, statusFilter, query });
 }
 const editorUi = createProjectEditor({
+  failureMessage: () => storageError,
   project,
   wbs,
   hasStorageError: () => !!storageError,
@@ -656,8 +706,22 @@ const auth = createAuthUi({
     else await loadProjects();
   },
   openInfo,
-  approvalPending: () => reviewLanding,
+  approvalPending: () => reviewLanding || alertLanding,
   onApproval: showApprovalInbox,
   toast,
+});
+installLanguage({
+  toast,
+  canChange: () =>
+    !saveInFlight &&
+    !storageError &&
+    !wbs.dirty &&
+    !$('#editorDialog').open &&
+    !$('#infoDialog').open &&
+    !document.querySelector('dialog[open]') &&
+    ($('#authGate').hidden ||
+      ![...document.querySelectorAll('#authGate input:not([readonly])')].some(
+        (input) => input.value,
+      )),
 });
 auth.start(boot);

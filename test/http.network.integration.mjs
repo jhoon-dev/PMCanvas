@@ -10,8 +10,65 @@ import { RegistrationEmail } from '../server/registration.mjs';
 import { PasswordReset } from '../server/password-reset.mjs';
 import { MailSettings } from '../server/mail-settings.mjs';
 import { createMailer } from '../server/mailer.mjs';
+import { OperationAlerts } from '../server/operation-alerts.mjs';
 import { smtpFixture, resetLink, verificationLink, mailText } from './support/smtp-fixture.mjs';
 const networkTest = (name, fn) => test(name, { skip: process.env.RUN_HTTP_TESTS !== '1' }, fn);
+networkTest(
+  '운영 실패 알림은 실제 TLS SMTP로 수신자별 전달하고 반복 tick에서 재발송하지 않음',
+  async (t) => {
+    const smtp = await smtpFixture();
+    t.after(() => smtp.close());
+    const mailer = createMailer({
+      from: 'sender@example.com',
+      transport: {
+        host: '127.0.0.1',
+        port: smtp.port,
+        secure: true,
+        auth: { user: 'fixture', pass: 'test-only-secret' },
+        tls: { ca: smtp.ca, servername: 'localhost' },
+        disableFileAccess: true,
+        disableUrlAccess: true,
+      },
+    });
+    t.after(() => mailer.close());
+    let delivered = false,
+      claims = 0;
+    const repo = {
+      claimOperationAlert: async () =>
+        claims++
+          ? null
+          : {
+              kind: 'restore',
+              occurrences: 2,
+              lease: 'fixture',
+              recipients: ['one@example.com', 'two@example.com'],
+            },
+      finishOperationAlert: async (job, ok) => {
+        delivered = ok;
+      },
+    };
+    const service = new OperationAlerts({
+      repo,
+      mailer: {
+        enabled: async () => true,
+        sendOperationAlert: (m) => mailer.sendOperationAlert(m),
+      },
+      origin: 'https://example.com',
+      basePath: '/pmcanvas',
+    });
+    await service.tick();
+    await service.tick();
+    assert.equal(delivered, true);
+    assert.equal(smtp.messages.length, 2);
+    const messages = smtp.messages.map(mailText);
+    for (const body of messages) {
+      assert.match(body, /Restore verification failed/);
+      assert.match(body, /#operation-alerts/);
+    }
+    assert.match(smtp.messages[0], /To: one@example.com/);
+    assert.doesNotMatch(smtp.messages[0], /two@example.com/);
+  },
+);
 const PASSWORD = 'a-test-password-12345',
   HASH = await hashPassword(PASSWORD);
 const ORIGIN = 'http://localhost:3000';
@@ -301,6 +358,11 @@ networkTest('하위 경로 /pmcanvas에서 화면과 API 실행, 임의 파일�
     'sharing-ui.js',
     'security-ui.js',
     'help-ui.js',
+    'i18n.js',
+    'locales/en.js',
+    'project-merge.js',
+    'conflict-ui.js',
+    'alerts-ui.js',
   ]) {
     const response = await fetch(origin + '/pmcanvas/' + file);
     assert.equal(response.status, 200);

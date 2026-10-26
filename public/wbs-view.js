@@ -1,3 +1,4 @@
+import { ui } from './i18n.js';
 import { WbsWorkspace } from './wbs-workspace.js';
 import { pageHead, dateToolbar } from './view-ui.js';
 
@@ -17,6 +18,7 @@ export class WbsView extends WbsWorkspace {
     onStatus,
     onRender,
     onDetails,
+    resolveConflict,
   }) {
     super({
       getDraftStore,
@@ -33,8 +35,16 @@ export class WbsView extends WbsWorkspace {
       onStatus,
       onRender,
       onDetails,
+      onConflict: resolveConflict
+        ? async (base, mine) => {
+            const { project: latest } = await request('projects/' + base.id);
+            const resolved = await resolveConflict(base, mine, latest);
+            if (resolved) acceptProject(latest);
+            return resolved;
+          }
+        : undefined,
       onSave: async (draft) => {
-        if (isSaving()) throw Error('저장이 진행 중입니다.');
+        if (isSaving()) throw Error(ui('저장이 진행 중입니다.'));
         onMutation();
         try {
           const { project: p } = await request('projects/' + draft.id, {
@@ -45,14 +55,14 @@ export class WbsView extends WbsWorkspace {
           onSaved();
           return p;
         } catch (error) {
-          if (error.status === 401) onAuth(error.message);
+          if (error.status === 401) onAuth(ui(error.message));
           throw error;
         } finally {
           onSettled();
         }
       },
       onReload: async (id) => {
-        if (isSaving()) throw Error('저장이 진행 중입니다.');
+        if (isSaving()) throw Error(ui('저장이 진행 중입니다.'));
         onMutation();
         try {
           const { project: p } = await request('projects/' + id);
@@ -66,7 +76,7 @@ export class WbsView extends WbsWorkspace {
   }
   render(project, asOf) {
     return (
-      pageHead('WORKSPACE', '업무와 일정', '업무를 입력하고, 일정을 조정하세요.', '') +
+      pageHead('WORKSPACE', ui('업무와 일정'), ui('업무를 입력하고, 일정을 조정하세요.'), '') +
       dateToolbar(asOf) +
       this.markup(project, asOf)
     );

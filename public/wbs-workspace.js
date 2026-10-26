@@ -1,7 +1,8 @@
+import { ui, rowLabel } from './i18n.js';
 import {
   hierarchy,
   ordered,
-  rollup,
+  rollups,
   setParent,
   captureBaseline,
   baselineDiff,
@@ -90,7 +91,7 @@ export class WbsWorkspace {
     try {
       this.recovery = this.options.getDraftStore?.()?.read(project.id);
     } catch {
-      this.localError = '이 브라우저의 복구 초안을 읽지 못했습니다.';
+      this.localError = ui('이 브라우저의 복구 초안을 읽지 못했습니다.');
     }
   }
   queueDraft() {
@@ -110,7 +111,7 @@ export class WbsWorkspace {
         this.localError = '';
       } else if (!this.recovery) store.remove(this.base.id);
     } catch {
-      this.localError = '브라우저 초안 보관에 실패했습니다. JSON 백업을 사용해 주세요.';
+      this.localError = ui('브라우저 초안 보관에 실패했습니다. JSON 백업을 사용해 주세요.');
     }
   }
   clearRecovery() {
@@ -118,7 +119,7 @@ export class WbsWorkspace {
       this.options.getDraftStore?.()?.remove(this.base.id);
       this.recovery = null;
     } catch {
-      this.localError = '복구 초안을 삭제하지 못했습니다.';
+      this.localError = ui('복구 초안을 삭제하지 못했습니다.');
     }
   }
   snapshot() {
@@ -126,10 +127,26 @@ export class WbsWorkspace {
     if (this.pending.size) p._wbsPendingCells = [...this.pending.values()];
     return p;
   }
+  context() {
+    if (this.frame?.project !== this.draft || this.frame?.at !== this.at) {
+      const tree = hierarchy(this.draft),
+        tasks = new Map(this.draft.tasks.map((t) => [t.id, t]));
+      this.frame = {
+        project: this.draft,
+        at: this.at,
+        tree,
+        tasks,
+        ordered: [...tree.keys()].map((id) => tasks.get(id)),
+        aggregates: rollups(this.draft, this.at, tree),
+        summary: summary(this.draft, this.at),
+      };
+    }
+    return this.frame;
+  }
   visible({ includeCollapsed = false } = {}) {
     const q = this.query.toLowerCase(),
-      h = hierarchy(this.draft);
-    return ordered(this.draft).filter(
+      h = this.context().tree;
+    return this.context().ordered.filter(
       (t) =>
         (!this.owner || t.owner === this.owner) &&
         (!q || [t.name, t.phase, t.memo].some((v) => (v || '').toLowerCase().includes(q))) &&
@@ -152,7 +169,7 @@ export class WbsWorkspace {
     return p;
   }
   changed(p, { paint = true, focus = null } = {}) {
-    if (this.readOnly || this.saving) throw Error('현재는 WBS를 편집할 수 없습니다.');
+    if (this.readOnly || this.saving) throw Error(ui('현재는 WBS를 편집할 수 없습니다.'));
     checkDraft(p);
     if (!equal(p, this.draft)) {
       this.undoStack.push(clone(this.draft));
@@ -192,7 +209,7 @@ export class WbsWorkspace {
       el.removeAttribute('aria-invalid');
       return true;
     } catch (error) {
-      this.error = error.message;
+      this.error = ui(error.message);
       el.setAttribute('aria-invalid', 'true');
       this.refresh();
       return false;
@@ -230,75 +247,89 @@ export class WbsWorkspace {
       action +
       '"' +
       (action === 'undo'
-        ? ' aria-label="실행 취소"'
+        ? ui(' aria-label="실행 취소"')
         : action === 'redo'
-          ? ' aria-label="다시 실행"'
+          ? ui(' aria-label="다시 실행"')
           : '') +
       '>' +
       label +
       '</button>';
     const file =
-      '<p class="menu-label">Excel · 파일</p><button class="button" data-action="export-excel">Excel 내려받기</button>' +
-      button('Excel 가져오기', 'import-excel') +
-      '<button class="button" data-action="export-wbs">CSV 내려받기</button>' +
-      button('표 복사', 'copy');
+      ui(
+        '<p class="menu-label">Excel · 파일</p><button class="button" data-action="export-excel">Excel 내려받기</button>',
+      ) +
+      button(ui('Excel 가져오기'), 'import-excel') +
+      ui('<button class="button" data-action="export-wbs">CSV 내려받기</button>') +
+      button(ui('표 복사'), 'copy');
     const options =
-      '<p class="menu-label">화면</p><label class="menu-check"><input id="wbsDetailed" type="checkbox" ' +
+      ui(
+        '<p class="menu-label">화면</p><label class="menu-check"><input id="wbsDetailed" type="checkbox" ',
+      ) +
       (this.detailed ? 'checked' : '') +
-      '>단계 · 선행 업무 · 메모 표시</label>' +
-      button('모두 펼치기', 'expand') +
-      button('모두 접기', 'collapse');
+      ui('>단계 · 선행 업무 · 메모 표시</label>') +
+      button(ui('모두 펼치기'), 'expand') +
+      button(ui('모두 접기'), 'collapse');
     const advanced = this.readOnly
       ? ''
-      : '<p class="menu-label">계획 · 관리</p>' +
-        button('현재 일정을 기준 계획으로 저장', 'baseline') +
-        (this.draft.baseline ? button('기준 계획 삭제', 'baseline-clear', 'danger') : '') +
-        '<button class="button" data-action="task">상세 양식으로 업무 추가</button>' +
-        button('변경 취소 · 서버에서 다시 읽기', 'discard');
+      : ui('<p class="menu-label">계획 · 관리</p>') +
+        button(ui('현재 일정을 기준 계획으로 저장'), 'baseline') +
+        (this.draft.baseline ? button(ui('기준 계획 삭제'), 'baseline-clear', 'danger') : '') +
+        ui('<button class="button" data-action="task">상세 양식으로 업무 추가</button>') +
+        button(ui('변경 취소 · 서버에서 다시 읽기'), 'discard');
     const recovery = this.recovery
-      ? '<div class="wbs-recovery" role="status"><span>저장하지 않은 초안이 있습니다.' +
-        (this.recovery.revision !== this.base._revision ? ' 서버 내용과 버전이 다릅니다.' : '') +
+      ? ui('<div class="wbs-recovery" role="status"><span>저장하지 않은 초안이 있습니다.') +
+        (this.recovery.revision !== this.base._revision
+          ? ui(' 서버 내용과 버전이 다릅니다.')
+          : '') +
         '</span>' +
-        button('복구하기', 'recover') +
-        button('삭제', 'forget', 'ghost') +
+        button(ui('복구하기'), 'recover') +
+        button(ui('삭제'), 'forget', 'ghost') +
         '</div>'
       : '';
     const selected = this.selected.size
-      ? '<div class="wbs-selection" role="group" aria-label="선택 업무 편집"><strong>' +
+      ? ui('<div class="wbs-selection" role="group" aria-label="선택 업무 편집"><strong>') +
         this.selected.size +
-        '개 선택</strong>' +
-        button('복제', 'duplicate') +
-        button('삭제', 'remove', 'danger') +
+        ui('개 선택</strong>') +
+        button(ui('복제'), 'duplicate') +
+        button(ui('삭제'), 'remove', 'danger') +
         this.panel(
           'structure',
-          '계층 · 순서',
+          ui('계층 · 순서'),
           '<div class="wbs-selection-tools">' +
-            button('하위 업무로', 'indent') +
-            button('한 단계 위로', 'outdent') +
-            button('위로 이동', 'up') +
-            button('아래로 이동', 'down') +
+            button(ui('하위 업무로'), 'indent') +
+            button(ui('한 단계 위로'), 'outdent') +
+            button(ui('위로 이동'), 'up') +
+            button(ui('아래로 이동'), 'down') +
             '</div>',
           'wbs-inline-tools',
         ) +
-        button('선택 해제', 'unselect', 'ghost') +
+        button(ui('선택 해제'), 'unselect', 'ghost') +
         '</div>'
       : '';
     return (
       recovery +
       '<div class="wbs-commandbar">' +
-      (!this.readOnly ? button('＋ 업무 추가', 'add') + button('저장', 'save', 'primary') : '') +
+      (!this.readOnly
+        ? button(ui('＋ 업무 추가'), 'add') + button(ui('저장'), 'save', 'primary')
+        : '') +
       '<span class="wbs-state" role="status"></span>' +
       '<div class="wbs-history" hidden>' +
       button('↶', 'undo', 'small') +
       button('↷', 'redo', 'small') +
       '</div>' +
-      '<details class="action-menu"><summary class="button" aria-label="WBS 더 보기">더 보기 <span aria-hidden="true">⌄</span></summary><div class="menu-popover">' +
+      ui(
+        '<details class="action-menu"><summary class="button" aria-label="WBS 더 보기">더 보기 <span aria-hidden="true">⌄</span></summary><div class="menu-popover">',
+      ) +
       file +
       options +
       advanced +
-      '</div></details></div><div class="wbs-filters"><label class="wbs-search"><span class="sr-only">업무 검색</span><input id="wbsQuery" type="search" value="' +
+      ui(
+        '</div></details></div><div class="wbs-filters"><label class="wbs-search"><span class="sr-only">업무 검색</span><input id="wbsQuery" type="search" value="',
+      ) +
       esc(this.query) +
-      '" placeholder="업무 검색" aria-label="업무 검색"></label><label><span class="sr-only">담당자</span><select id="wbsOwner" aria-label="담당자"><option value="">모든 담당자</option>' +
+      ui(
+        '" placeholder="업무 검색" aria-label="업무 검색"></label><label><span class="sr-only">담당자</span><select id="wbsOwner" aria-label="담당자"><option value="">모든 담당자</option>',
+      ) +
       this.draft.members
         .map(
           (m) =>
@@ -328,9 +359,7 @@ export class WbsWorkspace {
         '" data-index="' +
         index +
         '" aria-label="' +
-        row +
-        '행 ' +
-        this.layout()[index][1] +
+        rowLabel(row, this.layout()[index][1]) +
         '" ' +
         disabled;
     if (field === 'owner' || field === 'predecessor') {
@@ -340,7 +369,7 @@ export class WbsWorkspace {
         '<select' +
         common +
         '><option value="">' +
-        (field === 'owner' ? '미지정' : '없음') +
+        ui(field === 'owner' ? '미지정' : '없음') +
         '</option>' +
         rows
           .map(
@@ -374,35 +403,43 @@ export class WbsWorkspace {
         ? ' min="0.1" max="10000" step="0.1"'
         : ' maxlength="' + (field === 'name' ? 200 : 50) + '"') +
       (locked
-        ? ' readonly title="세부 작업이 여러 개이거나 완료 기록이 있습니다. 상세 편집에서 공수를 수정하세요."'
+        ? ui(
+            ' readonly title="세부 작업이 여러 개이거나 완료 기록이 있습니다. 상세 편집에서 공수를 수정하세요."',
+          )
         : '') +
       '>'
     );
   }
   grid() {
     const visible = this.visible(),
-      s = summary(this.draft, this.at),
-      tree = hierarchy(this.draft),
+      s = this.context().summary,
+      tree = this.context().tree,
       layout = this.layout();
     return (
-      '<section class="panel wbs-grid-panel"><div class="panel-head"><h2>업무 <span class="count">' +
+      ui(
+        '<section class="panel wbs-grid-panel"><div class="panel-head"><h2>업무 <span class="count">',
+      ) +
       visible.length +
       ' / ' +
       this.draft.tasks.length +
-      '</span></h2><span class="subtle">셀을 눌러 입력 · Excel에서 붙여넣기</span></div><div class="wbs-grid-scroll"><table class="wbs-grid ' +
+      ui(
+        '</span></h2><span class="subtle">셀을 눌러 입력 · Excel에서 붙여넣기</span></div><div class="wbs-grid-scroll"><table class="wbs-grid ',
+      ) +
       (this.detailed ? '' : 'wbs-grid-basic') +
-      '"><thead><tr><th><input type="checkbox" data-wbs-all aria-label="표시된 업무 모두 선택" ' +
+      ui(
+        '"><thead><tr><th><input type="checkbox" data-wbs-all aria-label="표시된 업무 모두 선택" ',
+      ) +
       (visible.length && visible.every((t) => this.selected.has(t.id)) ? 'checked' : '') +
-      '></th><th>번호</th>' +
-      layout.map((c) => '<th>' + c[1] + '</th>').join('') +
-      '<th>진척</th>' +
-      (this.detailed ? '<th>예상 완료일</th>' : '') +
+      ui('></th><th>번호</th>') +
+      layout.map((c) => '<th>' + ui(c[1]) + '</th>').join('') +
+      ui('<th>진척</th>') +
+      (this.detailed ? ui('<th>예상 완료일</th>') : '') +
       '<th></th></tr></thead><tbody>' +
       visible
         .map((t) => {
           const row = this.draft.tasks.indexOf(t) + 1,
             node = tree.get(t.id),
-            aggregate = rollup(this.draft, t.id, this.at);
+            aggregate = this.context().aggregates.get(t.id);
           return (
             '<tr data-grid-row="' +
             esc(t.id) +
@@ -412,11 +449,11 @@ export class WbsWorkspace {
             esc(t.id) +
             '" aria-label="' +
             row +
-            '행 선택" ' +
+            ui('행 선택" ') +
             (this.selected.has(t.id) ? 'checked' : '') +
             '></td><td class="wbs-number" title="' +
             (node.children.length
-              ? '하위 포함 ' +
+              ? ui('하위 포함 ') +
                 aggregate.hours.toFixed(1) +
                 'h · ' +
                 Math.round(aggregate.progress * 100) +
@@ -427,13 +464,13 @@ export class WbsWorkspace {
             (node.children.length
               ? '<button class="button small" data-wbs-fold="' +
                 esc(t.id) +
-                '" aria-label="하위 업무 접기 펼치기" aria-expanded="' +
+                ui('" aria-label="하위 업무 접기 펼치기" aria-expanded="') +
                 !this.collapsed.has(t.id) +
                 '">' +
                 (this.collapsed.has(t.id) ? '＋' : '−') +
                 '</button><small class="wbs-aggregate" data-rollup="' +
                 esc(t.id) +
-                '">합계 ' +
+                ui('">합계 ') +
                 aggregate.hours.toFixed(1) +
                 'h · ' +
                 Math.round(aggregate.progress * 100) +
@@ -454,12 +491,12 @@ export class WbsWorkspace {
               ? '<td data-row-forecast="' +
                 esc(t.id) +
                 '">' +
-                (s.forecast.tasks[t.id]?.end || '계산 대기') +
+                (s.forecast.tasks[t.id]?.end || ui('계산 대기')) +
                 '</td>'
               : '') +
             '<td><button class="button small" data-wbs-detail="' +
             esc(t.id) +
-            '">상세</button></td></tr>'
+            ui('">상세</button></td></tr>')
           );
         })
         .join('') +
@@ -467,20 +504,20 @@ export class WbsWorkspace {
       (!visible.length
         ? '<div class="calm-state">' +
           (this.draft.tasks.length
-            ? '검색 조건에 맞는 업무가 없습니다.'
-            : '업무 추가를 누르거나 아래 붙여넣기 영역에 엑셀 데이터를 붙여넣으세요.') +
+            ? ui('검색 조건에 맞는 업무가 없습니다.')
+            : ui('업무 추가를 누르거나 아래 붙여넣기 영역에 엑셀 데이터를 붙여넣으세요.')) +
           '</div>'
         : '') +
       this.panel(
         'paste',
-        '여러 업무 붙여넣기',
+        ui('여러 업무 붙여넣기'),
         '<textarea class="wbs-paste" ' +
           (this.readOnly ? 'disabled' : '') +
-          ' aria-label="새 업무 여러 행 붙여넣기" placeholder="' +
+          ui(' aria-label="새 업무 여러 행 붙여넣기" placeholder="') +
           this.layout()
-            .map((c) => c[1])
+            .map((c) => ui(c[1]))
             .join(' → ') +
-          ' (탭으로 구분)"></textarea>',
+          ui(' (탭으로 구분)"></textarea>'),
         'wbs-paste-panel',
       ) +
       '</section>'
@@ -489,10 +526,11 @@ export class WbsWorkspace {
   chart() {
     const p = this.draft,
       ts = this.visible();
-    if (!p.tasks.length) return '<div class="calm-state">업무를 입력하면 간트가 표시됩니다.</div>';
-    const cp = criticalPath(p),
+    if (!p.tasks.length)
+      return ui('<div class="calm-state">업무를 입력하면 간트가 표시됩니다.</div>');
+    const cp = this.analysis ? criticalPath(p) : { ids: new Set() },
       baseDates = (p.baseline?.tasks || []).flatMap((t) => [t.start, t.end]),
-      s = summary(p, this.at),
+      s = this.context().summary,
       from = addDays([s.start, ...baseDates].filter(Boolean).sort()[0], -3),
       to = addDays([s.end, s.forecast.end, this.at, ...baseDates].filter(Boolean).sort().at(-1), 5),
       span = daysBetween(from, to) + 1,
@@ -542,7 +580,9 @@ export class WbsWorkspace {
       day * 5 +
       'px;--week-offset:' +
       mondayOffset +
-      'px"><div class="wbs-gantt-head"><div class="wbs-gantt-name">업무 · 담당자</div><div class="wbs-time-scale" style="width:' +
+      ui(
+        'px"><div class="wbs-gantt-head"><div class="wbs-gantt-name">업무 · 담당자</div><div class="wbs-time-scale" style="width:',
+      ) +
       width +
       'px">' +
       ticks.join('') +
@@ -566,7 +606,7 @@ export class WbsWorkspace {
             '. ' +
             esc(t.name) +
             '</strong><small>' +
-            esc(p.members.find((m) => m.id === t.owner)?.name || '미지정') +
+            esc(p.members.find((m) => m.id === t.owner)?.name || ui('미지정')) +
             '</small></div><div class="wbs-time-track" style="width:' +
             width +
             'px">' +
@@ -576,7 +616,7 @@ export class WbsWorkspace {
                 left(f.start) +
                 'px;width:' +
                 (daysBetween(f.start, f.end) + 1) * day +
-                'px" title="예상 ' +
+                ui('px" title="예상 ') +
                 esc(f.start) +
                 ' ~ ' +
                 esc(f.end) +
@@ -586,9 +626,9 @@ export class WbsWorkspace {
             (this.readOnly ? '-1' : '0') +
             '" aria-label="' +
             esc(t.name) +
-            ' 계획 일정 ' +
+            ui(' 계획 일정 ') +
             t.start +
-            '부터 ' +
+            ui('부터 ') +
             t.end +
             '" aria-disabled="' +
             this.readOnly +
@@ -605,7 +645,7 @@ export class WbsWorkspace {
             (this.readOnly ? '-1' : '0') +
             '" aria-label="' +
             esc(t.name) +
-            ' 시작일 조절"></span><i style="width:' +
+            ui(' 시작일 조절"></span><i style="width:') +
             progress(t, this.at) * 100 +
             '%"></i><span class="wbs-bar-label">' +
             Math.round(progress(t, this.at) * 100) +
@@ -613,7 +653,7 @@ export class WbsWorkspace {
             (this.readOnly ? '-1' : '0') +
             '" aria-label="' +
             esc(t.name) +
-            ' 종료일 조절"></span></div>' +
+            ui(' 종료일 조절"></span></div>') +
             (this.at >= from
               ? '<div class="wbs-report-line" style="left:' + left(this.at) + 'px"></div>'
               : '') +
@@ -626,14 +666,14 @@ export class WbsWorkspace {
   }
   baselineBar(task, left, day) {
     if (!this.analysis) return '';
-    const h = hierarchy(this.draft),
-      a = h.get(task.id).children.length ? rollup(this.draft, task.id, this.at) : null;
+    const h = this.context().tree,
+      a = h.get(task.id).children.length ? this.context().aggregates.get(task.id) : null;
     const group = a
       ? '<div class="wbs-group-range" style="left:' +
         left(a.start) +
         'px;width:' +
         (daysBetween(a.start, a.end) + 1) * day +
-        'px" title="하위 업무 포함 일정"></div>'
+        ui('px" title="하위 업무 포함 일정"></div>')
       : '';
     const b = this.draft.baseline?.tasks.find((t) => t.id === task.id);
     return (
@@ -643,7 +683,7 @@ export class WbsWorkspace {
           left(b.start) +
           'px;width:' +
           (daysBetween(b.start, b.end) + 1) * day +
-          'px" title="기준 ' +
+          ui('px" title="기준 ') +
           b.start +
           ' ~ ' +
           b.end +
@@ -660,7 +700,7 @@ export class WbsWorkspace {
       ),
       count = warnings.dependencies.length + warnings.overloads.length;
     const issues =
-      warnings.dependencies.map((t) => '<p>선행 일정 확인: ' + esc(t.name) + '</p>').join('') +
+      warnings.dependencies.map((t) => ui('<p>선행 일정 확인: ') + esc(t.name) + '</p>').join('') +
       warnings.overloads
         .slice(0, 100)
         .map(
@@ -675,14 +715,14 @@ export class WbsWorkspace {
             w.load.toFixed(1) +
             ' / ' +
             w.capacity.toFixed(1) +
-            'h/일</p>',
+            ui('h/일</p>'),
         )
         .join('');
     const baseline = this.draft.baseline
       ? this.panel(
           'baseline-diff',
-          '기준 계획과 비교 · 변경 ' + changed.length + ' / 삭제 ' + diff.removed.length,
-          '<p>날짜 차이는 달력일이며 +는 지연입니다.</p>' +
+          ui('기준 계획과 비교 · 변경 ') + changed.length + ui(' / 삭제 ') + diff.removed.length,
+          ui('<p>날짜 차이는 달력일이며 +는 지연입니다.</p>') +
             changed
               .map(
                 (r) =>
@@ -690,36 +730,38 @@ export class WbsWorkspace {
                   esc(r.name) +
                   ' · ' +
                   (r.added
-                    ? '추가됨'
-                    : '시작 ' +
+                    ? ui('추가됨')
+                    : ui('시작 ') +
                       r.start +
-                      '일 / 종료 ' +
+                      ui('일 / 종료 ') +
                       r.end +
-                      '일 / 공수 ' +
+                      ui('일 / 공수 ') +
                       r.hours.toFixed(1) +
                       'h' +
-                      (r.renamed ? ' / 이름 변경' : '') +
-                      (r.reparented ? ' / 상위 변경' : '')) +
+                      (r.renamed ? ui(' / 이름 변경') : '') +
+                      (r.reparented ? ui(' / 상위 변경') : '')) +
                   '</p>',
               )
               .join('') +
-            diff.removed.map((t) => '<p>삭제: ' + esc(t.name) + '</p>').join(''),
+            diff.removed.map((t) => ui('<p>삭제: ') + esc(t.name) + '</p>').join(''),
         )
       : '';
     return this.panel(
       'review',
-      '<span>일정 점검</span><span class="wbs-check-badge ' +
+      ui('<span>일정 점검</span><span class="wbs-check-badge ') +
         (count ? 'needs-attention' : '') +
         '">' +
-        (count ? '확인할 사항 ' + count + '건' : '특이사항 없음') +
+        (count ? ui('확인할 사항 ') + count + ui('건') : ui('특이사항 없음')) +
         '</span>',
       '<div class="wbs-review-content">' +
-        (issues || '<p>선행 일정 충돌이나 담당자 과부하가 없습니다.</p>') +
+        (issues || ui('<p>선행 일정 충돌이나 담당자 과부하가 없습니다.</p>')) +
         baseline +
         this.panel(
           'calculation',
-          '계산 기준 · 임계 업무 ' + cp.ids.size + '개',
-          '<p>계획 공수를 근무일에 균등 배분해 과부하를 확인합니다. 임계 업무는 현재 시작일·선행 관계·근무일 기준이며 인력 경쟁으로 인한 지연은 포함하지 않습니다.</p><p>' +
+          ui('계산 기준 · 임계 업무 ') + cp.ids.size + ui('개'),
+          ui(
+            '<p>계획 공수를 근무일에 균등 배분해 과부하를 확인합니다. 임계 업무는 현재 시작일·선행 관계·근무일 기준이며 인력 경쟁으로 인한 지연은 포함하지 않습니다.</p><p>',
+          ) +
             this.draft.tasks
               .filter((t) => cp.ids.has(t.id))
               .map((t) => esc(t.name))
@@ -734,27 +776,35 @@ export class WbsWorkspace {
     const scheduleTools =
       '<div class="wbs-schedule-options"><label class="wbs-cascade"><input type="checkbox" id="wbsAnalysis" ' +
       (this.analysis ? 'checked' : '') +
-      '>예상 일정과 분석 표시</label><label class="wbs-cascade"><input type="checkbox" id="wbsCascade" ' +
+      ui(
+        '>예상 일정과 분석 표시</label><label class="wbs-cascade"><input type="checkbox" id="wbsCascade" ',
+      ) +
       (this.cascade ? 'checked' : '') +
-      '>후속 업무도 함께 조정</label><div class="wbs-shift"><label>선택 일정 이동 <input type="number" id="wbsShift" min="-3652" max="3652" value="1" aria-label="선택 일정 이동 일수">일</label><button class="button small" data-wbs-action="shift">적용</button><button class="button small" data-wbs-action="align">선행 일정에 맞추기</button></div></div>';
+      ui(
+        '>후속 업무도 함께 조정</label><div class="wbs-shift"><label>선택 일정 이동 <input type="number" id="wbsShift" min="-3652" max="3652" value="1" aria-label="선택 일정 이동 일수">일</label><button class="button small" data-wbs-action="shift">적용</button><button class="button small" data-wbs-action="align">선행 일정에 맞추기</button></div></div>',
+      );
     return (
       this.controls() +
       this.grid() +
-      '<section class="panel wbs-chart-panel"><div class="panel-head"><div><h2>일정</h2><p>막대를 끌어 일정을 바꾸세요.</p></div><div class="wbs-chart-options"><label class="wbs-zoom"><span class="sr-only">일정 보기</span><select id="wbsZoom" aria-label="일정 보기"><option value="24" ' +
+      ui(
+        '<section class="panel wbs-chart-panel"><div class="panel-head"><div><h2>일정</h2><p>막대를 끌어 일정을 바꾸세요.</p></div><div class="wbs-chart-options"><label class="wbs-zoom"><span class="sr-only">일정 보기</span><select id="wbsZoom" aria-label="일정 보기"><option value="24" ',
+      ) +
       (this.zoom === 24 ? 'selected' : '') +
-      '>일</option><option value="10" ' +
+      ui('>일</option><option value="10" ') +
       (this.zoom === 10 ? 'selected' : '') +
-      '>주</option><option value="4" ' +
+      ui('>주</option><option value="4" ') +
       (this.zoom === 4 ? 'selected' : '') +
-      '>월</option></select></label>' +
-      this.panel('schedule-options', '일정 옵션', scheduleTools, 'wbs-inline-tools') +
+      ui('>월</option></select></label>') +
+      this.panel('schedule-options', ui('일정 옵션'), scheduleTools, 'wbs-inline-tools') +
       '</div></div><span class="wbs-drag-hint" role="status"></span><div class="wbs-chart-host">' +
       this.chart() +
       '</div>' +
       this.panel(
         'help',
-        '사용 팁 · 일정 표시 안내',
-        '<p>Tab: 다음 셀 · Enter: 다음 행 · Ctrl+S: 저장 · Ctrl+Z: 실행 취소. 전체 열을 보려면 더 보기에서 세부 항목을 켜세요.</p><p>상위 업무 합계는 자체 작업과 하위 작업을 포함합니다. 입력 칸은 자체 작업의 값입니다.</p><p>실선: 계획과 진척 · 점선: 예상 일정 · 회색: 기준 계획 · 빨간 테두리: 임계 업무 · 초록 선: 하위 포함 일정.</p>',
+        ui('사용 팁 · 일정 표시 안내'),
+        ui(
+          '<p>Tab: 다음 셀 · Enter: 다음 행 · Ctrl+S: 저장 · Ctrl+Z: 실행 취소. 전체 열을 보려면 더 보기에서 세부 항목을 켜세요.</p><p>상위 업무 합계는 자체 작업과 하위 작업을 포함합니다. 입력 칸은 자체 작업의 값입니다.</p><p>실선: 계획과 진척 · 점선: 예상 일정 · 회색: 기준 계획 · 빨간 테두리: 임계 업무 · 초록 선: 하위 포함 일정.</p>',
+        ),
         'wbs-help-panel',
       ) +
       '</section>' +
@@ -802,14 +852,14 @@ export class WbsWorkspace {
       history.hidden = !(this.undoStack.length || this.redoStack.length || this.pending.size);
     const status = this.root.querySelector('.wbs-state');
     status.textContent = this.readOnly
-      ? '읽기 전용'
+      ? ui('읽기 전용')
       : this.saving
-        ? '저장 중…'
+        ? ui('저장 중…')
         : this.dirty
-          ? '저장하지 않은 변경'
-          : '저장됨';
+          ? ui('저장하지 않은 변경')
+          : ui('저장됨');
     this.root.querySelector('.wbs-error').textContent = this.error
-      ? this.error + (this.pending.size ? ' · 확인할 셀 ' + this.pending.size + '개' : '')
+      ? this.error + (this.pending.size ? ui(' · 확인할 셀 ') + this.pending.size + ui('개') : '')
       : '';
     const conflicts = this.draft.tasks.filter(
       (t) => t.predecessor && t.start <= this.draft.tasks.find((p) => p.id === t.predecessor)?.end,
@@ -817,9 +867,9 @@ export class WbsWorkspace {
     this.root.querySelector('.wbs-warning').textContent =
       this.localError ||
       (conflicts
-        ? '계획 일정의 선행 관계 충돌 ' +
+        ? ui('계획 일정의 선행 관계 충돌 ') +
           conflicts +
-          '건 · 예상 일정은 선행 업무 완료 후로 계산합니다.'
+          ui('건 · 예상 일정은 선행 업무 완료 후로 계산합니다.')
         : '');
     this.root.querySelectorAll('[data-wbs-action]').forEach((b) => {
       const a = b.dataset.wbsAction;
@@ -838,17 +888,18 @@ export class WbsWorkspace {
       host.innerHTML = this.chart();
       const c = host.querySelector('.wbs-gantt-scroll');
       if (c) c.scrollLeft = old;
-      const s = summary(this.draft, this.at);
+      const s = this.context().summary;
       this.root
         .querySelectorAll('[data-row-forecast]')
         .forEach(
-          (el) => (el.textContent = s.forecast.tasks[el.dataset.rowForecast]?.end || '계산 대기'),
+          (el) =>
+            (el.textContent = s.forecast.tasks[el.dataset.rowForecast]?.end || ui('계산 대기')),
         );
     }
     this.root.querySelectorAll('[data-rollup]').forEach((el) => {
-      const a = rollup(this.draft, el.dataset.rollup, this.at);
+      const a = this.context().aggregates.get(el.dataset.rollup);
       el.textContent =
-        '합계 ' +
+        ui('합계 ') +
         a.hours.toFixed(1) +
         'h · ' +
         Math.round(a.progress * 100) +
@@ -923,7 +974,7 @@ export class WbsWorkspace {
           this.root.querySelector('.action-menu>summary')?.focus();
         } catch (error) {
           el.checked = this.detailed;
-          this.error = error.message;
+          this.error = ui(error.message);
           this.refresh(false);
         }
         return;
@@ -982,9 +1033,9 @@ export class WbsWorkspace {
             field: layout[col][0],
           },
         });
-        this.options.toast('붙여넣었습니다. 일정을 확인한 뒤 저장을 눌러 주세요.');
+        this.options.toast(ui('붙여넣었습니다. 일정을 확인한 뒤 저장을 눌러 주세요.'));
       } catch (error) {
-        this.error = error.message;
+        this.error = ui(error.message);
         this.refresh(false);
       }
     });
@@ -1000,7 +1051,7 @@ export class WbsWorkspace {
       const detail = e.target.closest('[data-wbs-detail]');
       if (detail) {
         if (this.dirty)
-          this.options.toast('WBS 변경사항을 먼저 저장한 뒤 세부 작업을 열어 주세요.');
+          this.options.toast(ui('WBS 변경사항을 먼저 저장한 뒤 세부 작업을 열어 주세요.'));
         else this.options.onDetails(detail.dataset.wbsDetail);
         return;
       }
@@ -1033,7 +1084,7 @@ export class WbsWorkspace {
       }
       if (action === 'recover') {
         if (this.readOnly || !this.recovery) return;
-        if (this.dirty) throw Error('현재 초안을 먼저 저장하거나 취소해 주세요.');
+        if (this.dirty) throw Error(ui('현재 초안을 먼저 저장하거나 취소해 주세요.'));
         const saved = this.recovery,
           p = clone(saved.draft);
         p._role = this.base._role;
@@ -1065,7 +1116,9 @@ export class WbsWorkspace {
         if (this.dirty) {
           if (
             !confirm(
-              'WBS 변경사항을 버리고 서버의 최신 업무를 읽을까요? 필요한 내용은 먼저 백업하세요.',
+              ui(
+                'WBS 변경사항을 버리고 서버의 최신 업무를 읽을까요? 필요한 내용은 먼저 백업하세요.',
+              ),
             )
           )
             return;
@@ -1109,7 +1162,21 @@ export class WbsWorkspace {
           this.clearRecovery();
           this.reset(p);
           this.options.onRender();
-          this.options.toast('WBS와 일정을 서버에 저장했습니다.');
+          this.options.toast(ui('WBS와 일정을 서버에 저장했습니다.'));
+        } catch (error) {
+          if (error.status !== 409 || !this.options.onConflict) throw error;
+          const resolved = await this.options.onConflict(clone(this.base), clone(this.draft));
+          if (resolved) {
+            this.base = clone(resolved.latest);
+            this.draft = clone(resolved.project);
+            this.changedFlag = !equal(this.draft, this.base);
+            this.undoStack = [];
+            this.redoStack = [];
+            this.error = '';
+            this.persistDraft();
+            this.repaint();
+            this.options.toast(ui('선택한 변경을 초안에 반영했습니다. 확인 후 저장해 주세요.'));
+          }
         } finally {
           this.saving = false;
           this.refresh(false);
@@ -1122,7 +1189,7 @@ export class WbsWorkspace {
           : this.visible();
         const layout = this.layout(),
           rows = [
-            layout.map((c) => c[1]),
+            layout.map((c) => ui(c[1])),
             ...tasks.map((t) =>
               layout.map(([f]) =>
                 f === 'owner'
@@ -1134,7 +1201,7 @@ export class WbsWorkspace {
             ),
           ];
         await navigator.clipboard.writeText(tsvText(rows));
-        this.options.toast('표를 복사했습니다. 엑셀에 붙여넣을 수 있습니다.');
+        this.options.toast(ui('표를 복사했습니다. 엑셀에 붙여넣을 수 있습니다.'));
         return;
       }
       if (this.readOnly) return;
@@ -1143,7 +1210,8 @@ export class WbsWorkspace {
         return;
       }
       if (action === 'baseline') {
-        if (this.draft.baseline && !confirm('기존 기준 계획을 현재 초안으로 교체할까요?')) return;
+        if (this.draft.baseline && !confirm(ui('기존 기준 계획을 현재 초안으로 교체할까요?')))
+          return;
         const p = clone(this.draft);
         p.baseline = captureBaseline(p);
         this.changed(p);
@@ -1151,7 +1219,7 @@ export class WbsWorkspace {
       }
       if (action === 'baseline-clear') {
         if (!this.draft.baseline) return;
-        if (!confirm('기준 계획을 삭제할까요? 저장 전에는 실행 취소할 수 있습니다.')) return;
+        if (!confirm(ui('기준 계획을 삭제할까요? 저장 전에는 실행 취소할 수 있습니다.'))) return;
         const p = clone(this.draft);
         delete p.baseline;
         this.changed(p);
@@ -1167,14 +1235,16 @@ export class WbsWorkspace {
         return;
       }
       const ids = [...this.selected];
-      if (action !== 'align' && !ids.length) throw Error('먼저 업무 행을 선택해 주세요.');
+      if (action !== 'align' && !ids.length) throw Error(ui('먼저 업무 행을 선택해 주세요.'));
       if (action === 'indent' || action === 'outdent')
         this.changed(checkDraft(setParent(this.draft, ids, action === 'indent' ? 1 : -1)));
       if (action === 'duplicate') this.changed(duplicateTasks(this.draft, ids));
       if (action === 'remove') {
         if (
           !confirm(
-            '선택한 업무와 완료 기록을 삭제하고, 연결된 후속 업무의 선행 관계를 해제할까요? 저장 전에는 실행 취소할 수 있습니다.',
+            ui(
+              '선택한 업무와 완료 기록을 삭제하고, 연결된 후속 업무의 선행 관계를 해제할까요? 저장 전에는 실행 취소할 수 있습니다.',
+            ),
           )
         )
           return;
@@ -1192,8 +1262,10 @@ export class WbsWorkspace {
     } catch (error) {
       this.error =
         error.status === 409
-          ? '다른 사용자가 먼저 저장했습니다. 현재 내용을 JSON 백업한 뒤 변경 취소 · 새로 읽기를 선택해 주세요.'
-          : error.message;
+          ? ui(
+              '다른 사용자가 먼저 저장했습니다. 현재 내용을 JSON 백업한 뒤 변경 취소 · 새로 읽기를 선택해 주세요.',
+            )
+          : ui(error.message);
       this.refresh(false);
       this.options.toast(this.error);
     }
@@ -1236,7 +1308,7 @@ export class WbsWorkspace {
           { focus: { gantt: bar.dataset.ganttTask, mode } },
         );
       } catch (error) {
-        this.error = error.message;
+        this.error = ui(error.message);
         this.refresh(false);
       }
       return;
@@ -1283,7 +1355,7 @@ export class WbsWorkspace {
         tasks = this.visible();
         r = tasks.length - 1;
       } catch (error) {
-        this.error = error.message;
+        this.error = ui(error.message);
         this.refresh(false);
         return;
       }
@@ -1300,7 +1372,7 @@ export class WbsWorkspace {
     try {
       this.commitAll();
     } catch (error) {
-      this.error = error.message;
+      this.error = ui(error.message);
       this.refresh(false);
       return;
     }
@@ -1348,7 +1420,7 @@ export class WbsWorkspace {
       addDays(d.task.end, d.mode === 'start' ? 0 : delta) +
       ' · ' +
       d.ids.length +
-      '개 업무';
+      ui('개 업무');
   }
   endDrag(e) {
     const d = this.drag;
@@ -1364,7 +1436,7 @@ export class WbsWorkspace {
         );
       else this.repaint(focus);
     } catch (error) {
-      this.error = error.message;
+      this.error = ui(error.message);
       this.repaint();
     }
   }

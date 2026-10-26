@@ -1,4 +1,5 @@
 import { progress, planned, taskHours, workdays, addDays, validDate } from './engine.js';
+import { ui } from './i18n.js';
 
 // Quote every value and force formula-like user text to plain text in Excel.
 export function csvText(rows) {
@@ -48,7 +49,7 @@ export function wbsRows(project, at, forecast, tasks = project.tasks) {
     unavailable: '계산 대기',
   };
   return [
-    header,
+    header.map((label) => ui(label)),
     ...tasks.map((task) => {
       const member = project.members.find((m) => m.id === task.owner);
       const f = forecast.tasks[task.id];
@@ -60,7 +61,7 @@ export function wbsRows(project, at, forecast, tasks = project.tasks) {
         String(project.tasks.indexOf(task) + 1).padStart(2, '0'),
         task.phase || '',
         task.name,
-        member?.name || '미지정',
+        member?.name || ui('미지정'),
         member?.grade || '',
         member?.allocation ?? '',
         task.start,
@@ -68,10 +69,10 @@ export function wbsRows(project, at, forecast, tasks = project.tasks) {
         total,
         total ? +((planned(task, at, project.holidays) / total) * 100).toFixed(1) : 0,
         +(actual * 100).toFixed(1),
-        actual === 1 ? '완료' : task.end < at ? '지연' : actual > 0 ? '진행 중' : '예정',
+        ui(actual === 1 ? '완료' : task.end < at ? '지연' : actual > 0 ? '진행 중' : '예정'),
         f?.end || '',
         f?.end ? Math.max(0, workdays(addDays(task.end, 1), f.end, project.holidays)) : '',
-        methods[f?.method] || '계산 대기',
+        ui(methods[f?.method] || '계산 대기'),
         project.tasks.find((t) => t.id === task.predecessor)?.name || '',
         task.memo || '',
       ];
@@ -93,7 +94,7 @@ export function completionRecords(project, { from, to, owner = '' }) {
           taskId: task.id,
           task: task.name,
           phase: task.phase || '',
-          owner: member?.name || '미지정',
+          owner: member?.name || ui('미지정'),
           grade: member?.grade || '',
           title: item.title,
           hours: item.hours,
@@ -109,7 +110,16 @@ export function completionRecords(project, { from, to, owner = '' }) {
 
 export function completionRows(project, records) {
   return [
-    ['프로젝트', '완료일', '담당자', '등급', '단계', '업무명', '완료한 세부 작업', '예상 공수 (h)'],
+    [
+      '프로젝트',
+      '완료일',
+      '담당자',
+      '등급',
+      '단계',
+      '업무명',
+      '완료한 세부 작업',
+      '예상 공수 (h)',
+    ].map((label) => ui(label)),
     ...records.map((r) => [
       project.name,
       r.date,

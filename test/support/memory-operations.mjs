@@ -1,7 +1,53 @@
 import { randomUUID } from 'node:crypto';
 import { fail } from '../../server/errors.mjs';
 import { deletedTaskBundle, restoreTaskBundle } from '../../server/workspace-model.mjs';
+import { alertConfig, alertKinds } from '../../server/operation-alerts.mjs';
 export class MemoryOperations {
+  async operationAlerts() {
+    this.alertSettings ??= { enabled: false, recipients: [], revision: 0 };
+    this.operationFailures ??= new Map();
+    return {
+      settings: structuredClone(this.alertSettings),
+      alerts: structuredClone([...this.operationFailures.values()]),
+    };
+  }
+  async recordOperationFailure(kind) {
+    if (!alertKinds.includes(kind)) throw Error('Invalid operation alert kind.');
+    await this.operationAlerts();
+    const now = new Date().toISOString(),
+      old = this.operationFailures.get(kind);
+    this.operationFailures.set(
+      kind,
+      old
+        ? { ...old, occurrences: old.occurrences + 1, lastAt: now }
+        : {
+            kind,
+            occurrences: 1,
+            acknowledged: 0,
+            notified: 0,
+            attempts: 0,
+            firstAt: now,
+            lastAt: now,
+          },
+    );
+  }
+  async saveAlertSettings(actor, body) {
+    this.admin(actor);
+    await this.operationAlerts();
+    const b = alertConfig(body);
+    if (b.revision !== this.alertSettings.revision) fail(409, 'ALERT_CONFLICT', '알림 설정 충돌');
+    this.alertSettings = { ...b, revision: b.revision + 1 };
+    return this.operationAlerts();
+  }
+  async acknowledgeAlert(actor, kind, count) {
+    this.admin(actor);
+    await this.operationAlerts();
+    if (!alertKinds.includes(kind) || !Number.isSafeInteger(count) || count < 1)
+      fail(400, 'INVALID_ALERT', '잘못된 알림');
+    const row = this.operationFailures.get(kind);
+    if (row) row.acknowledged = Math.max(row.acknowledged, Math.min(row.occurrences, count));
+    return this.operationAlerts();
+  }
   admin(id) {
     const u = this.users.get(id);
     if (!u?.is_admin || u.is_active === false) fail(403, 'FORBIDDEN', '관리자 필요');

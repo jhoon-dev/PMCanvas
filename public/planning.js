@@ -37,8 +37,31 @@ export function hierarchy(project) {
   return info;
 }
 export function ordered(project) {
-  const h = hierarchy(project);
-  return [...h.keys()].map((id) => project.tasks.find((t) => t.id === id));
+  const h = hierarchy(project),
+    tasks = new Map(project.tasks.map((t) => [t.id, t]));
+  return [...h.keys()].map((id) => tasks.get(id));
+}
+export function rollups(project, at = today(), tree = hierarchy(project)) {
+  const result = new Map(
+    project.tasks.map((t) => [
+      t.id,
+      { hours: taskHours(t), done: earned(t, at), start: t.start, end: t.end, count: 1 },
+    ]),
+  );
+  for (const id of [...tree.keys()].reverse()) {
+    const node = tree.get(id),
+      value = result.get(id);
+    value.progress = value.hours ? value.done / value.hours : 0;
+    const parent = result.get(node.ancestors.at(-1));
+    if (parent) {
+      parent.hours += value.hours;
+      parent.done += value.done;
+      parent.count += value.count;
+      if (value.start < parent.start) parent.start = value.start;
+      if (value.end > parent.end) parent.end = value.end;
+    }
+  }
+  return result;
 }
 export function rollup(project, id, at = today()) {
   const h = hierarchy(project),

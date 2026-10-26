@@ -1,3 +1,4 @@
+import { ui, locale } from './i18n.js';
 import { escapeHtml as esc } from './html.js';
 import { today, progress } from './engine.js';
 const TODAY = today();
@@ -22,9 +23,9 @@ const icon = (s, cls = '') =>
   (icons[s] || icons.layers) +
   '"/></svg>';
 const pct = (x) => Math.round(x * 100) + '%',
-  num = (x) => Number(x.toFixed(1)).toLocaleString('ko-KR'),
+  num = (x) => Number(x.toFixed(1)).toLocaleString(locale()),
   short = (d) => (d ? d.slice(5).replace('-', '.') : '—'),
-  full = (d) => (d ? d.replaceAll('-', '. ') : '계산 대기');
+  full = (d) => (d ? d.replaceAll('-', '. ') : ui('계산 대기'));
 const btn = (txt, action, cls = '') =>
   '<button class="button ' + cls + '" data-action="' + action + '">' + txt + '</button>';
 function avatar(p, m, size = '') {
@@ -44,7 +45,7 @@ function person(p, id) {
   const m = p.members.find((m) => m.id === id);
   return m
     ? '<span class="person">' + avatar(p, m, 'tiny') + esc(m.name) + '</span>'
-    : '<span class="muted">미지정</span>';
+    : ui('<span class="muted">미지정</span>');
 }
 function meter(value, cls = '') {
   return (
@@ -57,10 +58,10 @@ function meter(value, cls = '') {
 }
 function badge(t, asOf) {
   const v = progress(t, asOf);
-  if (v === 1) return '<span class="badge green">완료</span>';
-  if (t.end < asOf) return '<span class="badge red">지연</span>';
-  if (v > 0) return '<span class="badge blue">진행 중</span>';
-  return '<span class="badge neutral">예정</span>';
+  if (v === 1) return ui('<span class="badge green">완료</span>');
+  if (t.end < asOf) return ui('<span class="badge red">지연</span>');
+  if (v > 0) return ui('<span class="badge blue">진행 중</span>');
+  return ui('<span class="badge neutral">예정</span>');
 }
 function pageHead(eyebrow, title, subtitle, buttons) {
   return (
@@ -79,18 +80,18 @@ function dateToolbar(asOf, extra = '') {
   return (
     '<div class="view-toolbar"><div class="date-control">' +
     icon('calendar') +
-    '<label for="reportDate">보고 기준일</label><input id="reportDate" type="date" value="' +
+    ui('<label for="reportDate">보고 기준일</label><input id="reportDate" type="date" value="') +
     asOf +
     '" max="' +
     TODAY +
-    '" aria-label="보고 기준일"><span class="date-tag">' +
-    (asOf === TODAY ? '오늘' : '과거 조회') +
+    ui('" aria-label="보고 기준일"><span class="date-tag">') +
+    (asOf === TODAY ? ui('오늘') : ui('과거 조회')) +
     '</span></div>' +
     extra +
     '</div>'
   );
 }
-function empty(title, body, action = 'task', label = '첫 업무 등록') {
+function empty(title, body, action = 'task', label = ui('첫 업무 등록')) {
   return (
     '<div class="empty-state">' +
     icon('layers') +

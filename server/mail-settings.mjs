@@ -194,7 +194,12 @@ export class MailSettings {
       else if (method === 'sendVerification') await mailer.sendVerification(argument);
       else if (method === 'sendApproval') await mailer.sendApproval(argument);
       else if (method === 'sendReviewRequest') await mailer.sendReviewRequest(argument);
+      else if (method === 'sendOperationAlert') await mailer.sendOperationAlert(argument);
       else await mailer.sendTest(argument);
+    } catch (error) {
+      if (mailer && method !== 'sendOperationAlert')
+        await this.repo.recordOperationFailure?.('mail').catch(() => {});
+      throw error;
     } finally {
       mailer?.close();
       this.sending--;
@@ -211,6 +216,9 @@ export class MailSettings {
   }
   sendReviewRequest(message) {
     return this.#send('sendReviewRequest', message);
+  }
+  sendOperationAlert(message) {
+    return this.#send('sendOperationAlert', message);
   }
   async test(to) {
     to = mailAddress(to);

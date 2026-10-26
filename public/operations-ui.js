@@ -1,3 +1,4 @@
+import { ui } from './i18n.js';
 import { createBackupSettingsUi } from './backup-settings-ui.js';
 
 export function workspaceOperations({
@@ -25,25 +26,39 @@ export function workspaceOperations({
     screen = 0;
   const backup = createBackupSettingsUi({ api, field, openInfo, toast, dialog });
   const tabs = [
-    ['users', '사용자'],
-    ['mail', '메일'],
-    ['security', '인증·보안'],
-    ['backups', '백업'],
+    ['users', ui('사용자')],
+    ['mail', ui('메일')],
+    ['security', ui('인증·보안')],
+    ['backups', ui('백업')],
   ];
   const nav = () =>
-    `<nav class="admin-tabs" aria-label="관리자 설정">${tabs.map(([id, label]) => `<button class="button small ${adminTab === id ? 'primary' : ''}" data-admin-tab="${id}" aria-current="${adminTab === id ? 'page' : 'false'}">${label}</button>`).join('')}</nav>`;
+    ui('<nav class="admin-tabs" aria-label="관리자 설정">') +
+    String(
+      tabs
+        .map(
+          ([id, label]) =>
+            `<button class="button small ${adminTab === id ? 'primary' : ''}" data-admin-tab="${id}" aria-current="${adminTab === id ? 'page' : 'false'}">${label}</button>`,
+        )
+        .join(''),
+    ) +
+    ui('</nav>');
   function mountNav() {
     if (!body().querySelector('.admin-tabs')) body().insertAdjacentHTML('afterbegin', nav());
-    document.querySelector('#infoDialog .eyebrow').textContent = '관리자 설정';
+    document.querySelector('#infoDialog .eyebrow').textContent = ui('관리자 설정');
   }
   async function summary() {
     if (!user()?.isAdmin) return;
     try {
-      const s = await api('admin/summary');
+      const [s, operations] = await Promise.all([api('admin/summary'), api('admin/alerts')]);
       pendingCount = s.pending;
       const b = document.querySelector('#accountButton');
       b.dataset.pending = s.pending || '';
-      b.textContent = (user().name || '계정') + (s.pending ? ' · 승인 ' + s.pending : '');
+      const count = operations.alerts.filter((a) => a.occurrences > a.acknowledged).length;
+      b.dataset.alerts = count || '';
+      b.textContent =
+        (user().name || ui('계정')) +
+        (s.pending ? ui(' · 승인 ') + s.pending : '') +
+        (count ? ui(' · 운영 알림 ') + count : '');
     } catch {
       /* The account menu remains usable when the summary is unavailable. */
     }
@@ -65,17 +80,37 @@ export function workspaceOperations({
     }
     if (adminTab === 'security') {
       openInfo(
-        '관리자 설정',
+        ui('관리자 설정'),
         nav() +
-          '<h3>인증과 보안</h3><p class="subtle">관리자 로그인에는 인증 앱 MFA가 적용됩니다.</p><button class="button" data-admin-security="connections">회사 로그인 연결</button> <button class="button" data-admin-security="audit">보안 감사 로그</button>',
+          ui(
+            '<h3>인증과 보안</h3><p class="subtle">관리자 로그인에는 인증 앱 MFA가 적용됩니다.</p><button class="button" data-admin-security="connections">회사 로그인 연결</button> <button class="button" data-admin-security="audit">보안 감사 로그</button><details class="account-section"><summary>운영 상태</summary><p>백업·복원 점검·메일 발송 실패를 확인하고 이메일 알림을 설정합니다.</p><button class="button" data-action="operation-alerts">운영 실패 알림</button></details>',
+          ),
       );
       return;
     }
     search = '';
     openInfo(
-      '관리자 설정',
+      ui('관리자 설정'),
       nav() +
-        `<h3>사용자 관리</h3><p id="approvalCount" class="subtle"></p><div class="admin-filters"><input id="userSearch" type="search" placeholder="이름 또는 이메일" aria-label="사용자 검색"><select id="userStatus" aria-label="계정 상태"><option value="all">전체 계정</option><option value="pending">승인 대기</option><option value="unverified">이메일 인증 대기</option><option value="active">활성 계정</option><option value="inactive">비활성 계정</option><option value="rejected">가입 거절</option></select></div><div id="userList" aria-live="polite">불러오는 중…</div><details class="account-section"><summary>사용자 직접 추가</summary><form id="createUserForm" class="server-form">${field('이름', 'name', '', 'text', 'required maxlength="80"')}${field('이메일', 'email', '', 'email', 'required autocomplete="off"')}${field('초기 비밀번호', 'password', '', 'password', 'required minlength="12" maxlength="256" autocomplete="new-password"')}<button class="button primary">계정 만들기</button><p class="account-result" role="status"></p></form></details>`,
+        (ui(
+          '<h3>사용자 관리</h3><p id="approvalCount" class="subtle"></p><div class="admin-filters"><input id="userSearch" type="search" placeholder="이름 또는 이메일" aria-label="사용자 검색"><select id="userStatus" aria-label="계정 상태"><option value="all">전체 계정</option><option value="pending">승인 대기</option><option value="unverified">이메일 인증 대기</option><option value="active">활성 계정</option><option value="inactive">비활성 계정</option><option value="rejected">가입 거절</option></select></div><div id="userList" aria-live="polite">불러오는 중…</div><details class="account-section"><summary>사용자 직접 추가</summary><form id="createUserForm" class="server-form">',
+        ) +
+          String(field(ui('이름'), 'name', '', 'text', 'required maxlength="80"')) +
+          ui('') +
+          String(field(ui('이메일'), 'email', '', 'email', 'required autocomplete="off"')) +
+          ui('') +
+          String(
+            field(
+              ui('초기 비밀번호'),
+              'password',
+              '',
+              'password',
+              'required minlength="12" maxlength="256" autocomplete="new-password"',
+            ),
+          ) +
+          ui(
+            '<button class="button primary">계정 만들기</button><p class="account-result" role="status"></p></form></details>',
+          )),
     );
     body().querySelector('#userStatus').value = initialStatus;
     await refreshUsers();
@@ -87,7 +122,11 @@ export function workspaceOperations({
     const pending = data.filter((u) => u.registrationPending && u.emailVerified).length,
       unverified = data.filter((u) => u.registrationPending && !u.emailVerified).length;
     body().querySelector('#approvalCount').textContent =
-      `승인 대기 ${pending}명 · 이메일 인증 대기 ${unverified}명`;
+      ui('승인 대기 ') +
+      String(pending) +
+      ui('명 · 이메일 인증 대기 ') +
+      String(unverified) +
+      ui('명');
     return data.filter(
       (u) =>
         (!search || (u.name + ' ' + u.email).toLowerCase().includes(search)) &&
@@ -108,11 +147,54 @@ export function workspaceOperations({
     ++screen;
     const owned = projects().filter((p) => p._role === 'owner');
     openInfo(
-      '가입 신청 검토',
-      `<p><strong>${esc(u.name)}</strong><br>${esc(u.email)}</p><form id="registrationDecision" data-user-id="${esc(id)}">
-      ${u.emailVerified ? `<p class="subtle">이메일 인증을 완료했습니다. 소속을 확인한 뒤 승인해 주세요.</p><details class="account-section"><summary>프로젝트에 바로 초대하기 <span class="optional">선택</span></summary>${owned.map((p) => `<div class="approval-project"><label><input type="checkbox" name="grant" value="${esc(p.id)}">${esc(p.name)}</label><select data-grant-role="${esc(p.id)}" aria-label="${esc(p.name)} 권한" disabled><option value="editor">편집자</option><option value="viewer">조회자</option></select></div>`).join('') || '<p class="subtle">내가 소유한 프로젝트가 없습니다. 승인 후 소유자에게 공유를 요청하세요.</p>'}</details>` : '<p class="notice">이메일 인증 대기 중입니다. 인증을 마치면 승인할 수 있습니다.</p>'}
-      <p class="account-result" role="alert"></p><div class="dialog-actions"><button type="button" class="button" data-admin-tab="pending">목록으로</button><span class="spacer"></span><button class="button primary" name="decision" value="approve" ${u.emailVerified ? '' : 'disabled'}>가입 승인</button></div>
-      <details class="account-section"><summary>가입 거절</summary><label class="field">거절 사유 <span class="optional">관리자 기록용</span><textarea name="reason" maxlength="500" rows="2"></textarea></label><button class="button danger ghost" name="decision" value="reject">거절 확정</button></details></form>`,
+      ui('가입 신청 검토'),
+      ui('<p><strong>') +
+        String(esc(u.name)) +
+        ui('</strong><br>') +
+        String(esc(u.email)) +
+        ui('</p><form id="registrationDecision" data-user-id="') +
+        String(esc(id)) +
+        ui('">\n      ') +
+        String(
+          u.emailVerified
+            ? ui(
+                '<p class="subtle">이메일 인증을 완료했습니다. 소속을 확인한 뒤 승인해 주세요.</p><details class="account-section"><summary>프로젝트에 바로 초대하기 <span class="optional">선택</span></summary>',
+              ) +
+                String(
+                  owned
+                    .map(
+                      (p) =>
+                        ui(
+                          '<div class="approval-project"><label><input type="checkbox" name="grant" value="',
+                        ) +
+                        String(esc(p.id)) +
+                        ui('">') +
+                        String(esc(p.name)) +
+                        ui('</label><select data-grant-role="') +
+                        String(esc(p.id)) +
+                        ui('" aria-label="') +
+                        String(esc(p.name)) +
+                        ui(
+                          ' 권한" disabled><option value="editor">편집자</option><option value="viewer">조회자</option></select></div>',
+                        ),
+                    )
+                    .join('') ||
+                    ui(
+                      '<p class="subtle">내가 소유한 프로젝트가 없습니다. 승인 후 소유자에게 공유를 요청하세요.</p>',
+                    ),
+                ) +
+                ui('</details>')
+            : ui(
+                '<p class="notice">이메일 인증 대기 중입니다. 인증을 마치면 승인할 수 있습니다.</p>',
+              ),
+        ) +
+        ui(
+          '\n      <p class="account-result" role="alert"></p><div class="dialog-actions"><button type="button" class="button" data-admin-tab="pending">목록으로</button><span class="spacer"></span><button class="button primary" name="decision" value="approve" ',
+        ) +
+        String(u.emailVerified ? '' : 'disabled') +
+        ui(
+          '>가입 승인</button></div>\n      <details class="account-section"><summary>가입 거절</summary><label class="field">거절 사유 <span class="optional">관리자 기록용</span><textarea name="reason" maxlength="500" rows="2"></textarea></label><button class="button danger ghost" name="decision" value="reject">거절 확정</button></details></form>',
+        ),
     );
     const form = body().querySelector('#registrationDecision');
     dialog.registerGuard({
@@ -126,40 +208,78 @@ export function workspaceOperations({
     if (!canChange() || !dialog.canLeave()) return;
     backup.stop();
     const generation = ++screen;
-    openInfo('휴지통', '<p>불러오는 중…</p>');
+    openInfo(ui('휴지통'), ui('<p>불러오는 중…</p>'));
     try {
       const { items } = await api('trash');
       if (generation !== screen) return;
       body().innerHTML =
-        '<p class="subtle">삭제한 항목은 30일 동안 복구할 수 있습니다.</p>' +
+        ui('<p class="subtle">삭제한 항목은 30일 동안 복구할 수 있습니다.</p>') +
         (items.length
           ? items
               .map(
                 (i) =>
-                  `<article class="account-user sharing-row"><span><strong>${esc(i.name)}</strong><small>${i.type === 'project' ? '프로젝트' : '업무 ' + Number(i.count) + '개'} · ${esc(new Date(i.deletedAt).toLocaleDateString('ko-KR'))} 삭제</small><small>${esc(new Date(i.expiresAt).toLocaleDateString('ko-KR'))}까지 복구 가능</small></span><button class="button small" data-restore-type="${esc(i.type)}" data-restore-id="${esc(i.id)}">복구</button></article>`,
+                  ui('<article class="account-user sharing-row"><span><strong>') +
+                  String(esc(i.name)) +
+                  ui('</strong><small>') +
+                  String(
+                    i.type === 'project'
+                      ? ui('프로젝트')
+                      : ui('업무 ') + Number(i.count) + ui('개'),
+                  ) +
+                  ui(' · ') +
+                  String(esc(new Date(i.deletedAt).toLocaleDateString('ko-KR'))) +
+                  ui(' 삭제</small><small>') +
+                  String(esc(new Date(i.expiresAt).toLocaleDateString('ko-KR'))) +
+                  ui(
+                    '까지 복구 가능</small></span><button class="button small" data-restore-type="',
+                  ) +
+                  String(esc(i.type)) +
+                  ui('" data-restore-id="') +
+                  String(esc(i.id)) +
+                  ui('">복구</button></article>'),
               )
               .join('')
-          : '<div class="calm-state">복구할 항목이 없습니다.</div>');
+          : ui('<div class="calm-state">복구할 항목이 없습니다.</div>'));
     } catch (error) {
-      if (generation === screen) body().textContent = error.message;
+      if (generation === screen) body().textContent = ui(error.message);
     }
   }
   async function mappings(p, access) {
     const { links } = await api('projects/' + p.id + '/member-accounts');
-    return `<details class="account-section"><summary>내 업무에 담당 계정 연결 <small>${links.length}/${p.members.length}명 연결</small></summary><p class="subtle">연결한 계정의 ‘내 업무’에 담당 업무가 표시됩니다. 계정은 인력 한 명에만 연결할 수 있습니다.</p>${
-      p.members
-        .map(
-          (m) =>
-            `<label class="field">${esc(m.name)}<select data-member-account="${esc(m.id)}" data-member-project="${esc(p.id)}"><option value="">연결 안 함</option>${access
-              .map((a) => {
-                const linked = links.find((l) => l.userId === a.id),
-                  used = linked && linked.memberId !== m.id;
-                return `<option value="${esc(a.id)}" ${linked?.memberId === m.id ? 'selected' : ''} ${used ? 'disabled' : ''}>${esc(a.name)} · ${esc(a.email)}${used ? ' (다른 인력에 연결됨)' : ''}</option>`;
-              })
-              .join('')}</select></label>`,
-        )
-        .join('') || '<p>먼저 참여인력을 추가해 주세요.</p>'
-    }</details>`;
+    return (
+      ui('<details class="account-section"><summary>내 업무에 담당 계정 연결 <small>') +
+      String(links.length) +
+      ui('/') +
+      String(p.members.length) +
+      ui(
+        '명 연결</small></summary><p class="subtle">연결한 계정의 ‘내 업무’에 담당 업무가 표시됩니다. 계정은 인력 한 명에만 연결할 수 있습니다.</p>',
+      ) +
+      String(
+        p.members
+          .map(
+            (m) =>
+              ui('<label class="field">') +
+              String(esc(m.name)) +
+              ui('<select data-member-account="') +
+              String(esc(m.id)) +
+              ui('" data-member-project="') +
+              String(esc(p.id)) +
+              ui('"><option value="">연결 안 함</option>') +
+              String(
+                access
+                  .map((a) => {
+                    const linked = links.find((l) => l.userId === a.id),
+                      used = linked && linked.memberId !== m.id;
+                    return `<option value="${esc(a.id)}" ${linked?.memberId === m.id ? 'selected' : ''} ${used ? 'disabled' : ''}>${esc(a.name)} · ${esc(a.email)}${used ? ui(' (다른 인력에 연결됨)') : ''}</option>`;
+                  })
+                  .join(''),
+              ) +
+              ui('</select></label>'),
+          )
+          .join('') || ui('<p>먼저 참여인력을 추가해 주세요.</p>'),
+      ) +
+      ui('</details>')
+    );
   }
   document.addEventListener('click', async (event) => {
     const tab = event.target.closest('[data-admin-tab]');
@@ -191,10 +311,12 @@ export function workspaceOperations({
         await reload(r.projectId);
         await trash();
         toast(
-          r.adjustments?.length ? '복구했습니다. ' + r.adjustments.join(', ') : '복구했습니다.',
+          r.adjustments?.length
+            ? ui('복구했습니다. ') + r.adjustments.join(', ')
+            : ui('복구했습니다.'),
         );
       } catch (error) {
-        toast(error.message);
+        toast(ui(error.message));
         restore.disabled = false;
       }
       return;
@@ -232,9 +354,9 @@ export function workspaceOperations({
       panel.outerHTML = await mappings(p, access);
       const replacement = body().querySelector('[data-member-account]')?.closest('details');
       if (replacement) replacement.open = true;
-      toast('내 업무 연결을 저장했습니다.');
+      toast(ui('내 업무 연결을 저장했습니다.'));
     } catch (error) {
-      toast(error.message);
+      toast(ui(error.message));
     } finally {
       select.disabled = false;
     }
@@ -269,12 +391,12 @@ export function workspaceOperations({
       toast(
         decision === 'approve'
           ? grants.length
-            ? '승인하고 프로젝트에 초대했습니다.'
-            : '가입을 승인했습니다.'
-          : '가입 신청을 거절했습니다.',
+            ? ui('승인하고 프로젝트에 초대했습니다.')
+            : ui('가입을 승인했습니다.')
+          : ui('가입 신청을 거절했습니다.'),
       );
     } catch (error) {
-      form.querySelector('.account-result').textContent = error.message;
+      form.querySelector('.account-result').textContent = ui(error.message);
     } finally {
       form.dataset.submitting = 'false';
       buttons.forEach((b) => (b.disabled = false));
