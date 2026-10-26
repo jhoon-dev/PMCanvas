@@ -16,7 +16,6 @@ export function setLanguage(value) {
   if (!supportedLanguages.includes(value)) throw Error('Unsupported language.');
   language = value;
 }
-const cache = new Map();
 const pattern = new RegExp(
   Object.keys(english)
     .sort((a, b) => b.length - a.length)
@@ -28,7 +27,6 @@ const pattern = new RegExp(
 export function ui(value, selectedLanguage = language) {
   const text = String(value ?? '');
   if (selectedLanguage === 'ko' || !/[가-힣]/.test(text)) return text;
-  if (cache.has(text)) return cache.get(text);
   const protectedValues = [];
   const safe = text.replace(/\b(value|data-[\w-]+)=(["'])(.*?)\2/g, (all) => {
     const token = '\u0001' + protectedValues.length + '\u0002';
@@ -38,8 +36,6 @@ export function ui(value, selectedLanguage = language) {
   const result = safe
     .replace(pattern, (key) => english[key])
     .replace(/\u0001(\d+)\u0002/g, (_, i) => protectedValues[Number(i)]);
-  if (cache.size >= 4096) cache.clear();
-  cache.set(text, result);
   return result;
 }
 export function localizeStatic(root) {

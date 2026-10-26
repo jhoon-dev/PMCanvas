@@ -135,6 +135,8 @@ test('한·영 UI는 입력 데이터와 option의 저장 값을 번역하지 �
   try {
     setLanguage('en');
     assert.equal(ui('프로젝트 한눈에'), 'Project overview');
+    ui('<img src=x onerror=alert(1)>알 수 없는 오류');
+    assert.equal(ui('<button>저장</button>'), '<button>Save</button>');
     assert.equal(rowLabel(1, '업무명'), 'Row 1 Task name');
     assert.equal(
       ui('<option value="개발">개발</option>'),
