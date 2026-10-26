@@ -11,7 +11,7 @@ const icons={dashboard:'M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z',l
 const icon=(s,cls='')=>'<svg class="icon '+cls+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="'+(icons[s]||icons.layers)+'"/></svg>';
 const pct=x=>Math.round(x*100)+'%',num=x=>Number(x.toFixed(1)).toLocaleString('ko-KR'),short=d=>d?d.slice(5).replace('-','.'):'—',full=d=>d?d.replaceAll('-','. '):'계산 대기';
 const btn=(txt,action,cls='')=>'<button class="button '+cls+'" data-action="'+action+'">'+txt+'</button>';
-let state={version:1,projects:[],activeId:null},storageError='',view=location.hash.slice(1)||'overview',asOf=TODAY,ownerFilter='',statusFilter='',query='',onlyPending=false,editor=null,chartTooltip='';
+let state={version:1,projects:[],activeId:null},storageError='',view=normalizeView(location.hash.slice(1)),asOf=TODAY,ownerFilter='',statusFilter='',query='',onlyPending=false,editor=null,chartTooltip='';
 const project=()=>state.projects.find(p=>p.id===state.activeId),member=id=>project().members.find(m=>m.id===id);
 const wbs=new WbsWorkspace({
  getDraftStore:()=>currentUser?new DraftStore(currentUser.id):null,
@@ -59,7 +59,8 @@ if(!state.projects.length){
  document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===view));
  $('#projectList').innerHTML=state.projects.map(x=>'<button class="project-switch '+(x.id===p.id?'selected':'')+'" data-project="'+esc(x.id)+'"><span class="project-bullet"></span>'+esc(x.name)+(x.demo?'<small>예시</small>':'')+'</button>').join('');
  const notices=(storageError?'<div class="notice error-notice" role="alert">'+esc(storageError)+' '+btn('다시 저장','retry-save','small')+' '+btn('서버 다시 읽기','reload-server','small')+'</div>':'')+(p.demo?'<div class="demo-notice"><span><span class="demo-pill">SAMPLE</span> 예시 데이터로 먼저 둘러보세요. 실제 업무는 새 프로젝트에서 시작할 수 있어요.</span>'+btn('새 프로젝트 만들기 ↗','project','link')+'</div>':'');
- $('#main').innerHTML=notices+({overview:()=>overview(p,s),tasks:()=>tasksView(p,s),daily:()=>dailyView(p,s),people:()=>peopleView(p,s)})[view]();
+ let content;switch(view){case 'tasks':content=tasksView(p,s);break;case 'daily':content=dailyView(p,s);break;case 'people':content=peopleView(p,s);break;default:content=overview(p,s);}
+ $('#main').innerHTML=notices+content;
  hydrateIcons();updateAccessUi();if(view==='tasks')wbs.attach();
 }
 function hydrateIcons(){document.querySelectorAll('[data-icon]').forEach(e=>{e.innerHTML=icon(e.dataset.icon);});}
@@ -164,7 +165,8 @@ $('#deleteButton').addEventListener('click',async()=>{
  if(editor.type==='member')p.members=p.members.filter(m=>m.id!==editor.id);else p.tasks=p.tasks.filter(t=>t.id!==editor.id);const saved=await persist();$('#editorDialog').close();render();toast(saved?'삭제했습니다.':'서버에 저장하지 못했습니다. 현재 내용을 백업해 주세요.');
 });
 $('#dialogBody').addEventListener('click',e=>{if(e.target.closest('#addItem')){$('#itemEditors').insertAdjacentHTML('beforeend',itemEditor());$('#itemEditors').lastElementChild.querySelector('input').focus();}if(e.target.closest('.remove-item')){const row=e.target.closest('.item-editor');if(row.dataset.doneDate&&!confirm('완료 기록이 있는 세부 작업을 삭제할까요?'))return;row.remove();}});
-function navigate(v){if(wbs.dirty&&v!=='tasks'){toast('WBS 변경사항을 먼저 저장하거나 취소해 주세요.');return;}view=v;ownerFilter='';statusFilter='';query='';location.hash=v;render();}
+function normalizeView(value){return ['overview','tasks','daily','people'].includes(value)?value:'overview';}
+function navigate(v){v=normalizeView(v);if(wbs.dirty&&v!=='tasks'){toast('WBS 변경사항을 먼저 저장하거나 취소해 주세요.');return;}view=v;ownerFilter='';statusFilter='';query='';location.hash=v;render();}
 document.addEventListener('click',e=>{
  const nav=e.target.closest('[data-view]');if(nav){navigate(nav.dataset.view);return;}
  const sw=e.target.closest('[data-project]');if(sw){if(storageError||wbs.dirty){toast('현재 변경사항을 먼저 저장하거나 백업한 뒤 취소해 주세요.');return;}state.activeId=sw.dataset.project;ownerFilter='';statusFilter='';query='';render();return;}
@@ -184,7 +186,7 @@ $('#main').addEventListener('change',async e=>{
  }
 });
 $('#main').addEventListener('input',e=>{if(e.target.id==='taskSearch'){const pos=e.target.selectionStart;query=e.target.value;render();$('#taskSearch').focus();$('#taskSearch').setSelectionRange(pos,pos);}});
-window.addEventListener('hashchange',()=>{const next=location.hash.slice(1)||'overview';if(wbs.dirty&&next!=='tasks'){history.replaceState(null,'','#tasks');toast('WBS 변경사항을 먼저 저장하거나 취소해 주세요.');return;}view=next;render();});
+window.addEventListener('hashchange',()=>{const next=normalizeView(location.hash.slice(1));if(wbs.dirty&&next!=='tasks'){history.replaceState(null,'','#tasks');toast('WBS 변경사항을 먼저 저장하거나 취소해 주세요.');return;}view=next;render();});
 $('#projectSelect').onchange=e=>{if(storageError||wbs.dirty){toast('WBS 변경사항을 먼저 저장하거나 취소해 주세요.');render();return;}state.activeId=e.target.value;ownerFilter='';statusFilter='';query='';render();};$('#mobileNewProject').onclick=()=>openEditor('project');
 $('#closeDialog').onclick=$('#cancelDialog').onclick=()=>$('#editorDialog').close();$('#closeInfo').onclick=()=>$('#infoDialog').close();$('#helpButton').onclick=help;$('#methodFooter').onclick=method;$('#newProjectSide').onclick=()=>openEditor('project');
 $('#backupButton').onclick=()=>{
@@ -218,8 +220,8 @@ function openHistory(){
 function renderHistory(){
  const p=project(),rows=completionRecords(p,historyQuery),hours=rows.reduce((s,r)=>s+r.hours,0);
  const body='<div class="report-filters">'+
- '<label class="field">시작일<input id="historyFrom" type="date" value="'+historyQuery.from+'" max="'+asOf+'" required></label>'+
- '<label class="field">종료일<input id="historyTo" type="date" value="'+historyQuery.to+'" max="'+asOf+'" required></label>'+
+ '<label class="field">시작일<input id="historyFrom" type="date" value="'+esc(historyQuery.from)+'" max="'+esc(asOf)+'" required></label>'+
+ '<label class="field">종료일<input id="historyTo" type="date" value="'+esc(historyQuery.to)+'" max="'+asOf+'" required></label>'+
  '<label class="field">담당자<select id="historyOwner"><option value="">전체 담당자</option>'+p.members.map(m=>'<option value="'+esc(m.id)+'" '+(m.id===historyQuery.owner?'selected':'')+'>'+esc(m.name)+'</option>').join('')+'</select></label></div>'+
  '<div class="report-summary"><strong>'+rows.length+'개 완료 · '+num(hours)+'h 예상 공수</strong><button class="button small" data-action="export-history" '+(!rows.length?'disabled':'')+'>CSV 출력</button></div>'+
  '<p class="subtle">완료한 항목에 배정된 예상 공수입니다. 실제 근무시간 합계는 아닙니다.</p>'+
