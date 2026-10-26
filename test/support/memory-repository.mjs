@@ -5,7 +5,8 @@ import {digest} from '../../server/security.mjs';
 import {projectChanges} from '../../server/project.mjs';
 import {publicUser} from '../../server/postgres.mjs';
 import {reviewRecipients} from '../../server/mail-settings.mjs';
-export class MemoryRepository{
+import {MemoryOperations} from './memory-operations.mjs';
+export class MemoryRepository extends MemoryOperations{
  async reserveAttempt(key,limit,windowMs){this.attempts??=new Map();const old=this.attempts.get(key);const value=old&&old.until>Date.now()?old:{count:0,until:Date.now()+windowMs};if(value.count>=limit)fail(429,'RATE_LIMIT','로그인 시도가 많습니다.');value.count++;this.attempts.set(key,value);}
  async clearAttempt(key){this.attempts?.delete(key);}
  async upgradeHash(id,oldHash,newHash){const user=this.users.get(id);if(!user||user.password_hash!==oldHash)fail(401,'LOGIN_FAILED','계정 변경');user.password_hash=newHash;}
@@ -19,7 +20,7 @@ export class MemoryRepository{
   else{if(!state?.recovery_hashes.includes(recoveryHash))fail(401,'MFA_REPLAY','복구 코드 재사용');state.recovery_hashes=state.recovery_hashes.filter(h=>h!==recoveryHash);}
   this.transients.delete(key);
  }
- constructor(users=[]){this.users=new Map(users.map(u=>[u.id,u]));this.sessions=new Map();this.projects=new Map();this.events=new Map();this.transients=new Map();this.identities=new Map();this.resets=new Map();this.verifications=new Map();this.notices=new Map();this.reviewNotices=new Map();}
+ constructor(users=[]){super();this.users=new Map(users.map(u=>[u.id,u]));this.sessions=new Map();this.projects=new Map();this.events=new Map();this.transients=new Map();this.identities=new Map();this.resets=new Map();this.verifications=new Map();this.notices=new Map();this.reviewNotices=new Map();}
  async health(){}
  async findUserByEmail(email){return [...this.users.values()].find(u=>u.email===email);}
  syncReviewNotifications(fallback=[]){
@@ -65,23 +66,24 @@ export class MemoryRepository{
   if(!actor?.is_admin||actor.is_active===false)fail(403,'FORBIDDEN','권한이 없습니다.');
   if(!target)fail(404,'USER_NOT_FOUND','계정이 없습니다.');
   if(target.is_admin||actorId===targetId)fail(403,'ADMIN_PROTECTED','관리자 계정은 보호됩니다.');
+  if(isActive===true&&target.registration_rejected)fail(409,'REGISTRATION_REJECTED','가입 거절');
   if(isActive===true&&target.registration_pending&&!target.email_verified_at)fail(409,'EMAIL_UNVERIFIED','이메일 인증이 필요합니다.');
   if(isActive===true&&target.registration_pending&&!this.notices.has(targetId))this.notices.set(targetId,{state:'pending',attempts:0,available:0});
   if(isActive!==undefined)target.is_active=isActive;if(isActive===true)target.registration_pending=false;
   if(passwordHash!==undefined)target.password_hash=passwordHash;if(passwordHash||isActive===false)this.resets.delete(targetId);
   this.revokeSessions(targetId);return publicUser({...target,approval_mail_status:this.notices.get(targetId)?.state});
  }
- access(userId,id,minimum='viewer'){const p=this.projects.get(id),role=p?.roles[userId];if(!role)fail(404,'NOT_FOUND','프로젝트를 찾을 수 없습니다.');if(minimum==='owner'&&role!=='owner'||minimum==='editor'&&role==='viewer')fail(403,'FORBIDDEN','권한이 없습니다.');return p;}
+ access(userId,id,minimum='viewer'){const p=this.projects.get(id),role=p?.roles[userId];if(!role||p.deletedAt)fail(404,'NOT_FOUND','프로젝트를 찾을 수 없습니다.');if(minimum==='owner'&&role!=='owner'||minimum==='editor'&&role==='viewer')fail(403,'FORBIDDEN','권한이 없습니다.');return p;}
  document(p,userId){return {...structuredClone(p.data),id:p.id,_revision:p.revision,_role:p.roles[userId]};}
  async createProject(userId,id,p){
   const old=this.projects.get(id);if(old){this.access(userId,id,'owner');if(JSON.stringify(old.data)!==JSON.stringify(p))fail(409,'CREATE_CONFLICT','내용이 다릅니다.');return this.document(old,userId);}
   const entry={id,data:structuredClone(p),revision:1,roles:{[userId]:'owner'}};this.projects.set(id,entry);this.events.set(id,[{id:'1',revision:1,type:'project.created',changes:projectChanges(null,p),at:new Date(),actor:'테스트'}]);return this.document(entry,userId);
  }
  async getProject(userId,id){return this.document(this.access(userId,id),userId);}
- async listProjects(userId){return [...this.projects.values()].filter(p=>p.roles[userId]).map(p=>this.document(p,userId));}
+ async listProjects(userId){return [...this.projects.values()].filter(p=>p.roles[userId]&&!p.deletedAt).map(p=>this.document(p,userId));}
  async updateProject(userId,id,p,revision){
   const entry=this.access(userId,id,'editor');if(entry.revision!==revision)fail(409,'REVISION_CONFLICT','다른 사용자가 먼저 수정했습니다.');
-  const changes=projectChanges(entry.data,p);entry.data=structuredClone(p);if(changes.length){entry.revision++;this.events.get(id).unshift({id:String(entry.revision),revision:entry.revision,type:'project.updated',changes,at:new Date(),actor:'테스트'});}return this.document(entry,userId);
+  const changes=projectChanges(entry.data,p);this.captureTasks(userId,entry,p);entry.data=structuredClone(p);if(this.links?.has(id))this.links.set(id,this.links.get(id).filter(l=>p.members.some(m=>m.id===l.memberId)));if(changes.length){entry.revision++;this.events.get(id).unshift({id:String(entry.revision),revision:entry.revision,type:'project.updated',changes,at:new Date(),actor:'테스트'});}return this.document(entry,userId);
  }
  async listAccess(userId,id){const p=this.access(userId,id,'owner');return Object.entries(p.roles).map(([id,role])=>{const u=this.users.get(id);return {id,role,name:u.name,email:u.email};});}
  async grantAccess(userId,id,email,role){const p=this.access(userId,id,'owner'),u=await this.findUserByEmail(email);if(!u)fail(404,'USER_NOT_FOUND','계정이 없습니다.');if(p.roles[u.id]==='owner')fail(409,'OWNER_IMMUTABLE','소유자 변경 불가');p.roles[u.id]=role;return {ok:true};}

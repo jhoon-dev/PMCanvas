@@ -1,4 +1,5 @@
 import {AdminMfa,totp} from '../server/admin-mfa.mjs';
+import {BackupWorker} from '../server/backup-worker.mjs';
 import {MailSettings} from '../server/mail-settings.mjs';
 import {captureBaseline,setParent} from '../public/planning.js';
 import test from 'node:test';
@@ -275,4 +276,59 @@ test('실제 PostgreSQL: 관리자 SMTP 암호화·재시작 복구·권한·동
   let restoredPassword;const restarted=new MailSettings({repo:new PgRepository(pool),key,makeMailer:config=>({sendTest:async()=>{restoredPassword=config.transport.auth.pass;},close(){}})});await restarted.test('recipient@example.com');assert.equal(restoredPassword,body.password);assert.equal((await restarted.public()).hasPassword,true);
   const attempts=await Promise.allSettled([service.save(admin.id,{...body,password:'',revision:1}),restarted.save(admin.id,{...body,password:'',revision:1})]);assert.equal(attempts.filter(r=>r.status==='fulfilled').length,1);assert.equal(attempts.find(r=>r.status==='rejected').reason.code,'MAIL_CONFLICT');assert.equal((await service.public()).revision,2);
  }finally{await pool.query('DELETE FROM pm_mail_settings WHERE id=true');for(const id of ids.reverse())await pool.query('DELETE FROM pm_users WHERE id=$1',[id]);await pool.end();}
+});
+
+test('실제 PostgreSQL: 가입 승인·프로젝트 일괄 권한의 원자성, 거절과 관리자 격리',{skip:process.env.RUN_POSTGRES_TESTS!=='1'},async()=>{
+ if(!/_test$/.test(process.env.PGDATABASE||''))throw Error('Dedicated _test database required');
+ const pool=await createPool(),repo=new PgRepository(pool),ids=[],projects=[],suffix=randomUUID();
+ const make=async(name,extra={})=>{const u=await repo.createUser({email:name+suffix+'@example.com',name,passwordHash:'unused',...extra});ids.push(u.id);return u;};
+ try{await migrate(pool);const admin=await make('admin',{isAdmin:true}),other=await make('other'),pending=await make('pending',{registrationPending:true}),rejected=await make('rejected',{registrationPending:true});
+ const a=randomUUID(),b=randomUUID();projects.push(a,b);await repo.createProject(admin.id,a,cleanProject({name:'own',members:[],tasks:[]}));await repo.createProject(other.id,b,cleanProject({name:'other',members:[],tasks:[]}));
+ const approve=grants=>repo.decideRegistration(admin.id,pending.id,{decision:'approve',reason:'',grants});
+ await assert.rejects(approve([]),e=>e.code==='EMAIL_UNVERIFIED');await pool.query('UPDATE pm_users SET email_verified_at=now() WHERE id=$1',[pending.id]);
+ await assert.rejects(approve([{projectId:a,role:'editor'},{projectId:b,role:'viewer'}]),e=>e.status===404);
+ assert.equal((await repo.findUserByEmail(pending.email)).registration_pending,true);assert.equal((await pool.query('SELECT count(*) AS n FROM pm_project_access WHERE user_id=$1',[pending.id])).rows[0].n,'0');
+ await assert.rejects(repo.decideRegistration(other.id,pending.id,{decision:'approve',reason:'',grants:[]}),e=>e.status===403);
+ const outcomes=await Promise.allSettled([approve([{projectId:a,role:'editor'}]),approve([])]);assert.equal(outcomes.filter(r=>r.status==='fulfilled').length,1);assert.equal((await repo.getProject(pending.id,a))._role,'editor');
+ assert.equal((await pool.query('SELECT count(*) AS n FROM pm_approval_notifications WHERE user_id=$1 AND kind=$2',[pending.id,'approval'])).rows[0].n,'1');
+ await repo.decideRegistration(admin.id,rejected.id,{decision:'reject',reason:'중복 신청',grants:[]});const u=await repo.findUserByEmail(rejected.email);assert.equal(u.registration_rejected,true);assert.equal(u.is_active,false);await assert.rejects(repo.manageUser(admin.id,u.id,{isActive:true}),e=>e.code==='REGISTRATION_REJECTED');
+ }finally{for(const id of projects)await pool.query('DELETE FROM pm_projects WHERE id=$1',[id]);for(const id of ids)await pool.query('DELETE FROM pm_users WHERE id=$1',[id]);await pool.end();}
+});
+
+test('실제 PostgreSQL: 내 업무 매핑은 명시적·프로젝트별 격리, 전체 저장 보존과 공유 해제 정리',{skip:process.env.RUN_POSTGRES_TESTS!=='1'},async()=>{
+ if(!/_test$/.test(process.env.PGDATABASE||''))throw Error('Dedicated _test database required');
+ const pool=await createPool(),repo=new PgRepository(pool),ids=[],projectId=randomUUID();
+ try{await migrate(pool);for(const name of ['owner','member','outsider'])ids.push((await repo.createUser({email:randomUUID()+'@example.com',name,passwordHash:'unused'})).id);
+ const [owner,member,outsider]=ids;let p=await repo.createProject(owner,projectId,cleanProject({name:'명시적 연결',members:[{id:'m',name:'담당',role:'개발',grade:'중급',hours:8,allocation:100}],tasks:[{id:'t',name:'내 업무',owner:'m',start:'2026-10-19',end:'2026-10-23',items:[{id:'i',title:'완료',hours:8,doneDate:'2026-10-23'}]}]}));
+ await repo.grantAccess(owner,projectId,(await pool.query('SELECT email FROM pm_users WHERE id=$1',[member])).rows[0].email,'editor');assert.deepEqual(await repo.myWork(member),[]);
+ await assert.rejects(repo.setMemberAccount(member,projectId,{memberId:'m',userId:member}),e=>e.status===403);await assert.rejects(repo.setMemberAccount(owner,projectId,{memberId:'m',userId:outsider}),e=>e.status===400);
+ await repo.setMemberAccount(owner,projectId,{memberId:'m',userId:member});assert.equal((await repo.myWork(member))[0].tasks[0].id,'t');assert.deepEqual(await repo.myWork(outsider),[]);
+ p.name='다른 변경';p=await repo.updateProject(owner,projectId,cleanProject(p),p._revision);assert.equal((await repo.memberAccounts(owner,projectId)).length,1);
+ await repo.revokeAccess(owner,projectId,member);assert.deepEqual(await repo.myWork(member),[]);assert.deepEqual(await repo.memberAccounts(owner,projectId),[]);
+ }finally{await pool.query('DELETE FROM pm_projects WHERE id=$1',[projectId]);for(const id of ids)await pool.query('DELETE FROM pm_users WHERE id=$1',[id]);await pool.end();}
+});
+
+test('실제 PostgreSQL: 업무·프로젝트 휴지통의 권한·완료 기록·충돌·30일 만료',{skip:process.env.RUN_POSTGRES_TESTS!=='1'},async()=>{
+ if(!/_test$/.test(process.env.PGDATABASE||''))throw Error('Dedicated _test database required');
+ const pool=await createPool(),repo=new PgRepository(pool),ids=[],projectId=randomUUID();
+ try{await migrate(pool);for(const name of ['owner','editor','viewer'])ids.push((await repo.createUser({email:randomUUID()+'@example.com',name,passwordHash:'unused'})).id);const [owner,editor,viewer]=ids;
+ let p=await repo.createProject(owner,projectId,cleanProject({name:'휴지통',members:[],tasks:[{id:'t',name:'기록',owner:'',predecessor:'',start:'2026-10-19',end:'2026-10-23',items:[{id:'i',title:'완료 기록',hours:8,doneDate:'2026-10-23'}]}]}));
+ for(const [user,role]of [[editor,'editor'],[viewer,'viewer']])await repo.grantAccess(owner,projectId,(await pool.query('SELECT email FROM pm_users WHERE id=$1',[user])).rows[0].email,role);
+ p.tasks=[];p=await repo.updateProject(editor,projectId,cleanProject(p),p._revision);let trash=await repo.listTrash(editor);assert.equal(trash.length,1);assert.deepEqual(await repo.listTrash(viewer),[]);await assert.rejects(repo.restoreTrash(viewer,'tasks',trash[0].id),e=>e.status===403);
+ await repo.restoreTrash(editor,'tasks',trash[0].id);p=await repo.getProject(owner,projectId);assert.equal(p.tasks[0].items[0].doneDate,'2026-10-23');assert.equal(p._revision,3);await assert.rejects(repo.restoreTrash(editor,'tasks',trash[0].id),e=>e.status===404);
+ await assert.rejects(repo.trashProject(editor,projectId,p._revision),e=>e.status===403);await assert.rejects(repo.trashProject(owner,projectId,1),e=>e.code==='REVISION_CONFLICT');await repo.trashProject(owner,projectId,p._revision);assert.deepEqual(await repo.listProjects(editor),[]);await assert.rejects(repo.getProject(owner,projectId),e=>e.status===404);assert.deepEqual(await repo.listTrash(editor),[]);
+ await repo.restoreTrash(owner,'project',projectId);assert.equal((await repo.getProject(viewer,projectId)).tasks[0].id,'t');p=await repo.getProject(owner,projectId);await repo.trashProject(owner,projectId,p._revision);await pool.query("UPDATE pm_projects SET deleted_at=now()-interval '31 days' WHERE id=$1",[projectId]);assert.deepEqual(await repo.listTrash(owner),[]);assert.equal((await pool.query('SELECT id FROM pm_projects WHERE id=$1',[projectId])).rowCount,0);
+ }finally{await pool.query('DELETE FROM pm_projects WHERE id=$1',[projectId]);for(const id of ids)await pool.query('DELETE FROM pm_users WHERE id=$1',[id]);await pool.end();}
+});
+
+test('실제 PostgreSQL: 관리자 백업 설정 충돌·실행 중복 방지·작업 lease',{skip:process.env.RUN_POSTGRES_TESTS!=='1'},async()=>{
+ if(!/_test$/.test(process.env.PGDATABASE||''))throw Error('Dedicated _test database required');
+ const pool=await createPool(),repo=new PgRepository(pool),ids=[];
+ try{await migrate(pool);for(const isAdmin of [true,false])ids.push((await repo.createUser({email:randomUUID()+'@example.com',name:'백업',passwordHash:'unused',isAdmin})).id);const [admin,other]=ids,s=(await repo.backupStatus()).settings,b={enabled:true,hour:4,retentionDays:7,verifyRestore:true,revision:s.revision};
+ await assert.rejects(repo.saveBackupSettings(other,b),e=>e.status===403);await repo.saveBackupSettings(admin,b);await assert.rejects(repo.saveBackupSettings(admin,b),e=>e.code==='BACKUP_CONFLICT');await repo.requestBackup(admin);await assert.rejects(repo.requestBackup(admin),e=>e.code==='BACKUP_RUNNING');
+ await pool.query("UPDATE pm_backup_settings SET requested=false,lease_until=now()+interval '5 minutes' WHERE id=true");await assert.rejects(repo.requestBackup(admin),e=>e.code==='BACKUP_RUNNING');
+ await pool.query('UPDATE pm_backup_settings SET requested=true,lease_until=NULL WHERE id=true');
+ const worker=new BackupWorker({pool}),claims=await Promise.all([worker.claim(),worker.claim()]);assert.equal(claims.filter(Boolean).length,1);const first=claims.find(Boolean);
+ await pool.query("UPDATE pm_backup_settings SET requested=true,lease_until=now()-interval '1 minute' WHERE id=true");const second=await worker.claim();assert.ok(second);assert.notEqual(second.id,first.id);assert.equal((await pool.query('SELECT state FROM pm_backup_runs WHERE id=$1',[first.id])).rows[0].state,'failed');await pool.query('DELETE FROM pm_backup_runs WHERE id=ANY($1::uuid[])',[[first.id,second.id]]);
+ }finally{await pool.query('UPDATE pm_backup_settings SET requested=false,lease_until=NULL,updated_by=NULL WHERE id=true');for(const id of ids)await pool.query('DELETE FROM pm_users WHERE id=$1',[id]);await pool.end();}
 });

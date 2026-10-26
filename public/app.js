@@ -1,7 +1,8 @@
 import {DraftStore} from './draft-store.js';
 import {api} from './api-client.js';
+import {workspaceOperations,myWorkView} from './operations-ui.js';
 import {WbsWorkspace} from './wbs-workspace.js';
-let currentUser=null,saveInFlight=false,mutationSequence=0,fetchSequence=0;
+let currentUser=null,saveInFlight=false,mutationSequence=0,fetchSequence=0,myProjects=[],dailyMode='mine';
 const resetLanding=location.hash.startsWith('#reset-password'),verificationLanding=location.hash.startsWith('#verify-email');
 let emailVerificationToken=location.hash.match(/^#verify-email=([A-Za-z0-9_-]{43})$/)?.[1]||'';
 let passwordResetToken=location.hash.match(/^#reset-password=([A-Za-z0-9_-]{43})$/)?.[1]||'';
@@ -24,7 +25,7 @@ const wbs=new WbsWorkspace({
  toast,onStatus:updateAccessUi,onRender:render,onDetails:id=>openEditor('task',id),
  onSave:async draft=>{
   if(saveInFlight)throw Error('저장이 진행 중입니다.');mutationSequence++;setBusy(true);
-  try{const {project:p}=await api('projects/'+draft.id,{method:'PUT',body:{project:draft,revision:draft._revision}});state.projects[state.projects.findIndex(x=>x.id===p.id)]=p;storageError='';return p;}
+  try{const {project:p}=await api('projects/'+draft.id,{method:'PUT',body:{project:draft,revision:draft._revision}});state.projects[state.projects.findIndex(x=>x.id===p.id)]=p;storageError='';refreshMyWork();return p;}
   catch(error){if(error.status===401)showAuth(error.message);throw error;}finally{setBusy(false);}
  },
  onReload:async id=>{
@@ -37,7 +38,7 @@ async function persist(){
  try{
   const result=await api('projects'+(p._revision?'/'+p.id:''),{method:p._revision?'PUT':'POST',body:{project:p,...(p._revision?{revision:p._revision}:{})}});
   state.projects[state.projects.findIndex(x=>x.id===p.id)]=result.project;
-  storageError='';$('#saveStatus').textContent='서버에 저장됨';$('#saveStatus').classList.remove('error');return true;
+  storageError='';$('#saveStatus').textContent='서버에 저장됨';$('#saveStatus').classList.remove('error');refreshMyWork();return true;
  }catch(error){
   storageError=error.message;$('#saveStatus').textContent='저장 실패 · 백업 필요';$('#saveStatus').classList.add('error');
   toast(error.message);if(error.status===401)showAuth(error.message);return false;
@@ -56,7 +57,7 @@ function render(){
  document.body.dataset.appView=view;
 if(!state.projects.length){
  $('#breadcrumbProject').textContent='프로젝트 시작하기';$('#projectSelect').innerHTML='';$('#projectList').innerHTML='';$('#taskNavCount').textContent='';
- $('#main').innerHTML=pageHead('PROJECT WORKSPACE','팀의 프로젝트를 시작하세요','프로젝트를 만들고 팀원과 함께 업무를 관리하세요.',btn('새 프로젝트','project','primary'))+empty('아직 접근할 수 있는 프로젝트가 없습니다','새 프로젝트를 만들거나 소유자에게 공유 권한을 요청하세요.','project','새 프로젝트');
+ $('#main').innerHTML=view==='daily'?myWorkView({projects:myProjects,esc,progress,today:TODAY,projectMode:''}):pageHead('PROJECT WORKSPACE','팀의 프로젝트를 시작하세요','프로젝트를 만들고 팀원과 함께 업무를 관리하세요.',btn('새 프로젝트','project','primary'))+empty('아직 접근할 수 있는 프로젝트가 없습니다','새 프로젝트를 만들거나 소유자에게 공유 권한을 요청하세요.','project','새 프로젝트');
  updateAccessUi();hydrateIcons();return;
 }
  if(!['overview','tasks','daily','people'].includes(view))view='overview';
@@ -113,8 +114,10 @@ function filterControls(){return '<div class="filter-controls"><input type="sear
 function filteredTasks(p){return p.tasks.filter(t=>(!ownerFilter||t.owner===ownerFilter)&&(!query||t.name.toLowerCase().includes(query.toLowerCase()))&&(!statusFilter||(statusFilter==='done'?progress(t,asOf)===1:statusFilter==='late'?t.end<asOf&&progress(t,asOf)<1:progress(t,asOf)>0&&progress(t,asOf)<1)));}
 function tasksView(p,s){return pageHead('WORKSPACE','업무와 일정','업무를 입력하고, 일정을 조정하세요.','')+dateToolbar()+wbs.markup(p,asOf);}
 function dailyView(p,s){
+ const toggle='<div class="daily-mode"><button class="button small '+(dailyMode==='mine'?'primary':'')+'" data-daily-mode="mine">내 업무 모아보기</button><button class="button small '+(dailyMode==='project'?'primary':'')+'" data-daily-mode="project">이 프로젝트 완료 체크</button></div>';
+ if(dailyMode==='mine')return myWorkView({projects:myProjects,esc,progress,today:TODAY,projectMode:toggle});
  const ts=filteredTasks(p),items=ts.flatMap(t=>t.items.map(i=>({t,i}))),done=items.filter(x=>x.i.doneDate===asOf).length;
- return pageHead('DAILY CHECK-IN','매일 작업 체크','담당자를 선택하고, 실제로 완료한 작업만 체크해 주세요.',btn('완료 내역','history')+btn('＋ 업무 추가','task','primary'))+dateToolbar(filterControls())+'<div class="daily-summary"><div class="daily-summary-icon">'+icon('check')+'</div><div><strong>'+full(asOf)+'의 완료 기록</strong><p>체크하면 완료일이 기록되고 진척률과 예상 완료일이 다시 계산됩니다.</p></div><span class="daily-count">'+done+'<small>개 완료</small></span></div><div class="section-toolbar"><span>'+items.length+'개 체크 항목 · 예상 공수 기준으로 반영</span><label class="toggle-label"><input type="checkbox" id="onlyPending" '+(onlyPending?'checked':'')+'>미완료만 보기</label></div>'+
+ return pageHead('DAILY CHECK-IN','매일 작업 체크','담당자를 선택하고, 실제로 완료한 작업만 체크해 주세요.',btn('완료 내역','history')+btn('＋ 업무 추가','task','primary'))+toggle+dateToolbar(filterControls())+'<div class="daily-summary"><div class="daily-summary-icon">'+icon('check')+'</div><div><strong>'+full(asOf)+'의 완료 기록</strong><p>체크하면 완료일이 기록되고 진척률과 예상 완료일을 다시 계산합니다.</p></div><span class="daily-count">'+done+'<small>개 완료</small></span></div><div class="section-toolbar"><span>'+items.length+'개 체크 항목 · 예상 공수 기준으로 반영</span><label class="toggle-label"><input type="checkbox" id="onlyPending" '+(onlyPending?'checked':'')+'>미완료만 보기</label></div>'+
  (ts.length?ts.map(t=>{const visible=t.items.filter(i=>!onlyPending||!i.doneDate||i.doneDate>asOf);if(!visible.length)return '';return '<article class="panel check-panel"><div class="check-task-head"><div><span class="eyebrow">'+esc(t.phase||'일반')+'</span><h2>'+esc(t.name)+'</h2><div class="task-meta">'+person(t.owner)+'<span>'+short(t.start)+' — '+short(t.end)+'</span>'+badge(t)+'</div></div><div class="check-task-progress"><strong>'+pct(progress(t,asOf))+'</strong>'+meter(progress(t,asOf))+'</div></div><div class="check-items">'+visible.map(i=>{const checked=i.doneDate&&i.doneDate<=asOf,future=i.doneDate&&i.doneDate>asOf;return '<label class="check-item '+(checked?'is-done':'')+'"><input type="checkbox" data-check-task="'+esc(t.id)+'" data-check-item="'+esc(i.id)+'" '+(checked?'checked':'')+' '+(future?'disabled':'')+'><span class="check-box">'+icon('check')+'</span><span class="grow"><strong>'+esc(i.title)+'</strong><small>'+(future?short(i.doneDate)+'에 완료된 작업':checked?short(i.doneDate)+' 완료':'아직 완료하지 않은 작업')+'</small></span><span class="effort-chip">'+num(i.hours)+'h</span></label>';}).join('')+'</div></article>';}).join(''):empty('체크할 업무가 없습니다','업무를 추가하거나 담당자·상태 필터를 변경해 주세요.'))+
  '<p class="view-note">완료 체크는 선택한 보고 기준일로 기록됩니다. 주말에도 실제로 완료한 작업을 기록할 수 있습니다.</p>';
 }
@@ -130,7 +133,7 @@ function openEditor(type,id=''){
  if(wbs.dirty){toast('WBS 변경사항을 먼저 저장하거나 취소해 주세요.');return;}
  if(type==='project'&&storageError){toast('현재 변경사항을 먼저 백업하거나 저장해 주세요.');return;}
  if(type!=='project'&&project()?._role==='viewer'){toast('조회자는 프로젝트를 수정할 수 없습니다.');return;}
- editor={type,id};$('#formError').textContent='';$('#deleteButton').hidden=!id||type==='settings';$('#submitButton').textContent=type==='project'?'프로젝트 만들기':'저장하기';
+ editor={type,id};$('#formError').textContent='';$('#deleteButton').hidden=type==='settings'?project()?._role!=='owner':!id;$('#deleteButton').textContent=type==='settings'?'프로젝트 삭제':'삭제';$('#submitButton').textContent=type==='project'?'프로젝트 만들기':'저장하기';
  const p=project();let body='';
  if(type==='project'||type==='settings'){
  $('#dialogTitle').textContent=type==='project'?'새 프로젝트':'프로젝트 설정';
@@ -164,16 +167,19 @@ $('#editorForm').addEventListener('submit',async e=>{
  }catch(error){$('#formError').textContent=error.message;}
 });
 $('#deleteButton').addEventListener('click',async()=>{
+ if(editor.type==='settings'){const p=project();if(!opsCanChange())return;if(!confirm('프로젝트를 휴지통으로 이동할까요? 30일 동안 소유자가 복구할 수 있습니다.'))return;try{await api('projects/'+p.id,{method:'DELETE',body:{revision:p._revision}});$('#editorDialog').close();await loadProjects({force:true});toast('휴지통으로 이동했습니다. 파일 메뉴에서 복구할 수 있습니다.');}catch(error){$('#formError').textContent=error.message;}return;}
  const p=project();if(editor.type==='member'&&p.tasks.some(t=>t.owner===editor.id)){$('#formError').textContent='담당 업무가 있는 인력입니다. 먼저 업무 담당자를 변경해 주세요.';return;}
  if(editor.type==='task'&&p.tasks.some(t=>t.predecessor===editor.id)){$('#formError').textContent='후속 업무가 연결되어 있습니다. 먼저 선행 업무 연결을 해제해 주세요.';return;}
  if(editor.type==='task'&&p.tasks.some(t=>t.parentId===editor.id)){$('#formError').textContent='하위 업무가 있습니다. 먼저 WBS에서 내어쓰기하거나 하위 업무를 정리해 주세요.';return;}
- if(!confirm('이 항목을 삭제할까요? 업무의 완료 기록도 함께 삭제됩니다.'))return;
+ if(!confirm(editor.type==='task'?'업무를 휴지통으로 이동할까요? 완료 기록을 포함해 30일 동안 복구할 수 있습니다.':'이 참여인력을 삭제할까요?'))return;
  if(editor.type==='member')p.members=p.members.filter(m=>m.id!==editor.id);else p.tasks=p.tasks.filter(t=>t.id!==editor.id);const saved=await persist();$('#editorDialog').close();render();toast(saved?'삭제했습니다.':'서버에 저장하지 못했습니다. 현재 내용을 백업해 주세요.');
 });
 $('#dialogBody').addEventListener('click',e=>{if(e.target.closest('#addItem')){$('#itemEditors').insertAdjacentHTML('beforeend',itemEditor());$('#itemEditors').lastElementChild.querySelector('input').focus();}if(e.target.closest('.remove-item')){const row=e.target.closest('.item-editor');if(row.dataset.doneDate&&!confirm('완료 기록이 있는 세부 작업을 삭제할까요?'))return;row.remove();}});
 function normalizeView(value){return ['overview','tasks','daily','people'].includes(value)?value:'overview';}
 function navigate(v){v=normalizeView(v);if(wbs.dirty&&v!=='tasks'){toast('WBS 변경사항을 먼저 저장하거나 취소해 주세요.');return;}view=v;ownerFilter='';statusFilter='';query='';location.hash=v;render();}
 document.addEventListener('click',e=>{
+ const daily=e.target.closest('[data-daily-mode]');if(daily){dailyMode=daily.dataset.dailyMode;render();return;}
+ if(e.target.closest('[data-action="admin"]')){ops.admin().catch(e=>toast(e.message));return;}
  const nav=e.target.closest('[data-view]');if(nav){navigate(nav.dataset.view);return;}
  const sw=e.target.closest('[data-project]');if(sw){if(storageError||wbs.dirty){toast('현재 변경사항을 먼저 저장하거나 백업한 뒤 취소해 주세요.');return;}state.activeId=sw.dataset.project;ownerFilter='';statusFilter='';query='';render();return;}
  const task=e.target.closest('[data-edit-task]');if(task){openEditor('task',task.dataset.editTask);return;}
@@ -255,7 +261,7 @@ function updateAccessUi(){
  const p=project(),readOnly=p?._role==='viewer';
  document.querySelectorAll('[data-edit-task],[data-edit-member],[data-check-item]').forEach(el=>{if(readOnly)el.disabled=true;});
  document.querySelectorAll('[data-action="task"],[data-action="quick-task"],[data-action="member"],[data-action="settings"]').forEach(el=>{el.disabled=readOnly;});
- const account=$('#accountButton');if(account)account.textContent=currentUser?.name||'계정';
+ const account=$('#accountButton');if(account)account.textContent=(currentUser?.name||'계정')+(account.dataset.pending?' · 승인 '+account.dataset.pending:'');
  $('#saveStatus').textContent=saveInFlight?'서버 저장 중…':storageError?'저장 실패 · 백업 필요':wbs.dirty?'WBS 미저장 변경사항':readOnly?'조회 권한 · 서버 저장':'서버에 저장됨';
  $('#saveStatus').classList.toggle('error',!!storageError);
  document.querySelector('.side-bottom small').textContent=readOnly?'조회자 · 공동 프로젝트':'팀과 함께하는 프로젝트';
@@ -282,11 +288,11 @@ async function initializeAuthentication(){
 async function loadProjects({force=false}={}){
  if(wbs.dirty||wbs.interacting)return false;
  const checkpoint=mutationSequence,request=++fetchSequence;
- const data=await api('projects');
+ const [data,mine]=await Promise.all([api('projects'),api('my-work')]);
  if(wbs.dirty||wbs.interacting||request!==fetchSequence||checkpoint!==mutationSequence||(!force&&(saveInFlight||storageError||$('#editorDialog').open)))return false;
  const previous=state.activeId;
  state={version:1,projects:data.projects,activeId:data.projects.some(p=>p.id===previous)?previous:data.projects[0]?.id||null};
- storageError='';render();return true;
+ myProjects=mine.projects;storageError='';render();ops.summary();return true;
 }
 async function boot(){
  try{const session=await api('auth/me');if(currentUser?.id!==session.user.id){wbs.persistDraft();wbs.draft=null;wbs.base=null;wbs.pending.clear();wbs.recovery=null;}currentUser=session.user;await loadProjects();$('#authGate').hidden=true;await showApprovalInbox();}
@@ -298,25 +304,23 @@ async function reloadServer(){
 }
 async function openAccount(){
  if(!currentUser)return showAuth();
- openInfo('계정 관리','<p><strong>'+esc(currentUser.name)+'</strong><br>'+esc(currentUser.email)+'</p><button class="button" data-action="logout">로그아웃</button><section class="account-section"><label><input type="checkbox" id="draftPersist" '+(DraftStore.persistent(currentUser.id)?'checked':'')+'>브라우저를 닫은 후에도 초안 보관 (최대 8시간)</label><p>기본값은 현재 탭에서만 보관입니다. 보관 초안은 암호화되지 않으며 로그아웃 시 삭제됩니다.</p></section>'+ (currentUser.isAdmin?'<div class="admin-account-actions"><button class="button" data-action="mail-settings">이메일 발송 설정</button><button class="button" data-action="security-audit">보안 감사 로그</button></div><p>관리자 인증 앱 MFA가 적용됩니다. 복구 코드는 한 번만 사용할 수 있습니다.</p>':'')+
- (currentUser.localLogin===false?'<section class="account-section"><p>외부 인증 계정입니다. 비밀번호는 회사 인증 서버에서 변경해 주세요.</p></section>':'<section class="account-section"><h3>내 비밀번호 변경</h3><p class="subtle">변경하면 모든 기기에서 로그아웃됩니다. 새 비밀번호로 다시 로그인하세요.</p><form id="changePasswordForm" class="server-form">'+field('현재 비밀번호','currentPassword','','password','required maxlength="256" autocomplete="current-password"')+field('새 비밀번호','newPassword','','password','required minlength="12" maxlength="256" autocomplete="new-password"')+field('새 비밀번호 확인','confirmPassword','','password','required minlength="12" maxlength="256" autocomplete="new-password"')+'<button class="button primary">비밀번호 변경</button><p class="account-result" role="status"></p></form></section>')+
- (currentUser.isAdmin?'<section class="account-section">'+btn('SSO 연결과 계정 매핑','connections')+'<h3>사용자 계정</h3><p class="subtle">비활성화하면 로그인과 기존 세션이 차단됩니다. 프로젝트와 공유 권한은 보존하며 다시 활성화할 수 있습니다.</p><div id="userList" aria-live="polite">불러오는 중…</div><h3>사용자 계정 추가</h3><p class="subtle">계정을 만든 뒤 프로젝트 공유에서 편집자 또는 조회자로 추가하세요.</p><form id="createUserForm" class="server-form">'+field('이름','name','','text','required maxlength="80"')+field('이메일','email','','email','required autocomplete="off"')+field('초기 비밀번호','password','','password','required minlength="12" maxlength="256" autocomplete="new-password"')+'<button class="button primary">계정 만들기</button><p class="account-result" role="status"></p></form></section>':''));
- if(currentUser.isAdmin)await refreshUsers();
+ openInfo('계정 관리','<p><strong>'+esc(currentUser.name)+'</strong><br>'+esc(currentUser.email)+'</p><button class="button" data-action="logout">로그아웃</button><section class="account-section"><label><input type="checkbox" id="draftPersist" '+(DraftStore.persistent(currentUser.id)?'checked':'')+'>브라우저를 닫은 후에도 초안 보관 (최대 8시간)</label><p>기본값은 현재 탭에서만 보관입니다. 보관 초안은 암호화되지 않으며 로그아웃 시 삭제됩니다.</p></section>'+(currentUser.isAdmin?'<div class="admin-account-actions"><button class="button primary" data-action="admin">관리자 설정</button></div><p>관리자 인증 앱 MFA가 적용됩니다. 복구 코드는 한 번만 사용할 수 있습니다.</p>':'')+
+ (currentUser.localLogin===false?'<section class="account-section"><p>외부 인증 계정입니다. 비밀번호는 회사 인증 서버에서 변경해 주세요.</p></section>':'<section class="account-section"><details><summary>내 비밀번호 변경</summary><p class="subtle">변경하면 모든 기기에서 로그아웃됩니다.</p><form id="changePasswordForm" class="server-form">'+field('현재 비밀번호','currentPassword','','password','required maxlength="256" autocomplete="current-password"')+field('새 비밀번호','newPassword','','password','required minlength="12" maxlength="256" autocomplete="new-password"')+field('새 비밀번호 확인','confirmPassword','','password','required minlength="12" maxlength="256" autocomplete="new-password"')+'<button class="button primary">비밀번호 변경</button><p class="account-result" role="status"></p></form></details></section>'));
 }
 async function refreshUsers(){
  const list=$('#userList');if(!list)return;
  try{
   const {users}=await api('users');if(!list.isConnected)return;
   users.sort((a,b)=>Number(b.registrationPending)-Number(a.registrationPending));
-  const pending=users.filter(u=>u.registrationPending).length;
-  list.innerHTML=(pending?'<p class="notice">가입 신청 '+pending+'명 · 이메일 인증 완료 후 승인할 수 있습니다.</p>':'')+users.map(u=>{
+  const visible=ops.filterUsers(users),pending=users.filter(u=>u.registrationPending).length;
+  list.innerHTML=(!$('#userTools')&&pending?'<p class="notice">가입 신청 '+pending+'명 · 이메일 인증 완료 후 승인할 수 있습니다.</p>':'')+visible.map(u=>{
    const label=u.registrationPending?'가입 승인':u.isActive?'비활성화':'활성화';
-   return '<article class="account-user"><div class="sharing-row"><span><strong>'+esc(u.name)+'</strong><small>'+esc(u.email)+' · '+(u.isAdmin?'관리자':u.registrationPending?(u.emailVerified?'이메일 인증 완료 · 승인 대기':'이메일 인증 대기'):u.isActive?'활성':'비활성')+'</small></span>'+
-    (u.isAdmin?'<span class="badge neutral">관리자</span>':u.registrationPending&&!u.emailVerified?'<span class="badge neutral">인증 대기</span>':'<button class="button small '+(u.registrationPending?'primary':'')+'" data-user-status="'+esc(u.id)+'" data-registration-pending="'+!!u.registrationPending+'" data-next-active="'+!u.isActive+'" aria-label="'+esc(u.name)+' '+label+'">'+label+'</button>')+'</div>'+
+   return '<article class="account-user"><div class="sharing-row"><span><strong>'+esc(u.name)+'</strong><small>'+esc(u.email)+' · '+(u.isAdmin?'관리자':u.registrationPending?(u.emailVerified?'이메일 인증 완료 · 승인 대기':'이메일 인증 대기'):u.registrationRejected?'가입 거절':u.isActive?'활성':'비활성')+'</small></span>'+
+    (u.isAdmin?'<span class="badge neutral">관리자</span>':u.registrationPending?'<button class="button small primary" data-registration-review="'+esc(u.id)+'">신청 검토</button>':u.registrationRejected?'<span class="badge neutral">가입 거절</span>':'<button class="button small" data-user-status="'+esc(u.id)+'" data-registration-pending="false" data-next-active="'+!u.isActive+'" aria-label="'+esc(u.name)+' '+label+'">'+label+'</button>')+'</div>'+(u.registrationRejected?'<p class="subtle">거절 사유: '+esc(u.rejectionReason||'미입력')+'</p>':'')+
     (u.registrationPending&&u.reviewMailStatus?'<p class="subtle">관리자 승인 요청 · '+({pending:'발송 대기 · 실패 시 자동 재시도',sending:'발송 중',sent:'SMTP 전달 완료',failed:'일부 또는 전체 발송 실패'})[u.reviewMailStatus]+(u.reviewMailStatus==='failed'?' <button class="auth-link" data-retry-review="'+esc(u.id)+'">실패한 메일 다시 보내기</button>':'')+'</p>':'')+
     (u.approvalMailStatus?'<p class="subtle">승인 안내 메일 · '+({pending:'발송 대기 · 실패 시 자동 재시도',sending:'발송 중',sent:'SMTP 전달 완료',failed:'발송 실패'})[u.approvalMailStatus]+(u.approvalMailStatus==='failed'&&u.isActive?' <button class="auth-link" data-retry-notice="'+esc(u.id)+'">다시 보내기</button>':'')+'</p>':'')+
     (u.isAdmin||u.registrationPending?'':u.localLogin===false?'<p class="subtle">외부 인증 전용 계정</p>':'<details><summary>비밀번호 재설정 · '+esc(u.name)+'</summary><p class="subtle">새 비밀번호는 사용자에게 직접 전달하세요. 모든 기존 세션이 종료됩니다.</p><form class="server-form" data-reset-user="'+esc(u.id)+'">'+field('새 임시 비밀번호','password','','password','required minlength="12" maxlength="256" autocomplete="new-password"')+'<button class="button">비밀번호 재설정</button><p class="account-result" role="status"></p></form></details>')+'</article>';
-  }).join('');
+  }).join('')||'<p class="subtle">해당하는 계정이 없습니다.</p>';
  }catch(error){if(list.isConnected)list.textContent=error.message;}
 }
 async function openSharing(){
@@ -327,7 +331,7 @@ async function openSharing(){
   $('#infoBody').innerHTML='<p class="subtle">참여인력 정보와 로그인 계정은 별도로 관리합니다. 등록된 계정의 이메일로 접근 권한을 부여하세요.</p>'+
    '<div class="sharing-list">'+access.map(a=>'<div class="sharing-row"><span><strong>'+esc(a.name)+'</strong><small>'+esc(a.email)+' · '+({owner:'소유자',editor:'편집자',viewer:'조회자'})[a.role]+'</small></span>'+
    (a.role==='owner'?'':'<button class="button small" data-revoke-user="'+esc(a.id)+'">접근 해제</button>')+'</div>').join('')+'</div>'+
-   '<form id="shareForm" class="server-form">'+field('사용자 이메일','email','','email','required')+'<label class="field">권한<select name="role"><option value="editor">편집자 · 업무와 완료 체크 수정</option><option value="viewer">조회자 · 조회와 출력</option></select></label><button class="button primary">공유 권한 저장</button><p id="shareResult" role="status"></p></form>';
+   '<form id="shareForm" class="server-form">'+field('사용자 이메일','email','','email','required')+'<label class="field">권한<select name="role"><option value="editor">편집자 · 업무와 완료 체크 수정</option><option value="viewer">조회자 · 조회와 출력</option></select></label><button class="button primary">공유 권한 저장</button><p id="shareResult" role="status"></p></form>'+await ops.mappings(p,access);
  }catch(error){$('#infoBody').textContent=error.message;}
 }
 async function openConnections(){
@@ -340,6 +344,7 @@ async function openConnections(){
    '<h3>연결된 외부 계정</h3>'+identities.map(i=>{const p=providers.find(p=>p.key===i.providerKey);return '<article class="connection-card"><strong>'+esc(i.name)+' · '+esc(i.email)+'</strong><p>'+esc(p?.label||'이전 설정의 연결')+'</p><code>'+esc(i.subject)+'</code>'+(p?'<div class="identity-actions"><button class="button small" data-unlink-provider="'+esc(p.id)+'" data-unlink-subject="'+esc(i.subject)+'">연결 해제</button></div>':'')+'</article>';}).join('')+
    (providers.length?'<form id="linkIdentityForm" class="server-form"><h3>기존 계정에 외부 ID 연결</h3><p class="subtle">이메일만 일치한다고 자동 연결하지 않습니다. 인증 서버에서 확인한 불변 고유 ID를 입력하세요. OIDC는 sub, SAML은 영구 NameID, AD는 objectGUID의 base64:값입니다. 비상 복구용 관리자 계정에는 연결할 수 없습니다.</p><label class="field">인증 연결<select name="provider">'+providers.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.label)+'</option>').join('')+'</select></label>'+field('기존 사용자 이메일','email','','email','required')+field('외부 고유 ID','subject','','text','required maxlength="1024" autocomplete="off"')+'<button class="button primary">외부 계정 연결</button><p class="account-result" role="status"></p></form>':'');
  }catch(error){$('#infoBody').textContent=error.message;}
+ ops.securityNav();
 }
 async function openAudit(){
  const p=project();if(!p)return;
@@ -441,7 +446,7 @@ async function showApprovalInbox(){
  if(storageError||wbs.dirty||saveInFlight){toast('현재 변경사항을 저장한 뒤 승인 요청 링크를 다시 열어 주세요.');return;}
  reviewLanding=false;if(location.hash==='#registration-approvals')history.replaceState(null,'',location.pathname+location.search);
  if(!currentUser.isAdmin){toast('가입 승인 목록은 관리자만 확인할 수 있습니다.');return;}
- await openAccount();$('#userList')?.scrollIntoView({block:'start'});
+ await ops.admin('pending');
 }
 async function completeBrowserLogin(session){
  if(currentUser?.id!==session.user.id){wbs.persistDraft();if(currentUser)DraftStore.clearUser(currentUser.id);wbs.draft=null;wbs.base=null;wbs.pending.clear();wbs.recovery=null;}
@@ -556,3 +561,11 @@ async function openMailSettings(){
   populate();e.host.focus();
  }catch(error){if(host.isConnected)host.textContent=error.message;}
 }
+
+function opsCanChange(){if(wbs.dirty||storageError||saveInFlight){toast('현재 변경사항을 먼저 저장하거나 취소해 주세요.');return false;}return true;}
+async function refreshMyWork(){try{const r=await api('my-work');myProjects=r.projects;if(view==='daily'&&dailyMode==='mine')render();}catch{/* A successful project save is independent of this read. */}}
+const ops=workspaceOperations({api,esc,field,openInfo,toast,user:()=>currentUser,projects:()=>state.projects,refreshUsers,openMail:openMailSettings,openConnections,openAudit:openSecurityAudit,canChange:opsCanChange,
+ reload:async id=>{await loadProjects({force:true});if(id&&state.projects.some(p=>p.id===id)){state.activeId=id;render();}},
+ openTask:(projectId,taskId)=>{if(!opsCanChange())return;state.activeId=projectId;dailyMode='project';navigate('daily');const task=[...document.querySelectorAll('[data-check-task]')].find(el=>el.dataset.checkTask===taskId);task?.closest('.check-panel')?.scrollIntoView({block:'center'});}
+});
+const trashButton=document.createElement('button');trashButton.className='button ghost small';trashButton.textContent='휴지통';trashButton.id='trashButton';trashButton.onclick=()=>{trashButton.closest('details').open=false;ops.trash();};document.querySelector('.top-file-menu .menu-popover').append(trashButton);

@@ -9,6 +9,7 @@ import {HttpError,fail} from './errors.mjs';
 import {token,digest,safeEqual,hashPassword,verifyPassword,emailAddress,cookieValue,sessionCookie} from './security.mjs';
 import {cleanProject,uuid} from './project.mjs';
 import {Federation} from './federation.mjs';
+import {registrationDecision,backupSettings} from './workspace-model.mjs';
 import {registrationConfig} from './registration.mjs';
 import {mailAddress} from './mailer.mjs';
 
@@ -32,7 +33,7 @@ export function createHandler({repo,origin='http://localhost:3000',basePath='',l
   const user=await repo.externalSession({...identity,hash:digest(value),csrf,expires:new Date(Date.now()+seconds*1000)});
   return {user,csrf,cookie:sessionCookie(value,{...cookieConfig,maxAge:seconds})};
  };
- const staticFiles=new Map([['/','index.html'],['/index.html','index.html'],...['app.js','api-client.js','styles.css','engine.js','reports.js','wbs-model.js','wbs-workspace.js','wbs.css','planning.js','draft-store.js','wbs-import.js'].map(f=>['/'+f,f])]);
+ const staticFiles=new Map([['/','index.html'],['/index.html','index.html'],...['app.js','api-client.js','styles.css','engine.js','reports.js','wbs-model.js','wbs-workspace.js','wbs.css','planning.js','draft-store.js','wbs-import.js','operations-ui.js'].map(f=>['/'+f,f])]);
  const dummyHash=hashPassword('constant-timing-placeholder-password');
  const json=(res,status,body,headers={})=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store',...headers});res.end(JSON.stringify(body));};
  const readJson=async(req,maxBytes=8*1024*1024)=>{
@@ -163,6 +164,7 @@ export function createHandler({repo,origin='http://localhost:3000',basePath='',l
     const body=await readJson(req,16384),email=emailAddress(body.email);
     req.loginHash=digest(email);await reserve('local:'+email);if(req.clientIp)await reserve('login-ip:'+req.clientIp,40);
     const user=await repo.findUserByEmail(email),valid=await verifyPassword(body.password,user?.password_hash||await dummyHash);
+    if(user&&valid&&user.registration_rejected)fail(403,'REGISTRATION_REJECTED','가입 신청이 거절되었습니다. 관리자에게 문의해 주세요.');
     if(user&&valid&&user.registration_pending&&!user.email_verified_at)fail(403,'EMAIL_UNVERIFIED','이메일 인증이 필요합니다. 받은 인증 메일을 확인하거나 인증 메일을 다시 요청해 주세요.');
     if(user&&valid&&user.registration_pending)fail(403,'APPROVAL_PENDING','가입 승인 대기 중입니다. 관리자에게 승인 여부를 확인해 주세요.');
     if(!user||!valid||user.is_active===false||user.local_login===false)fail(401,'LOGIN_FAILED','이메일 또는 비밀번호를 확인해 주세요.');
@@ -227,6 +229,21 @@ export function createHandler({repo,origin='http://localhost:3000',basePath='',l
     const kind=noticeMatch[2];await repo.retryApprovalNotification(user.id,noticeMatch[1],kind);await audit(req,kind==='review'?'account.review_notice.retried':'account.approval_notice.retried',{targetId:noticeMatch[1]});registrationEmail.notify();
     return json(res,202,{ok:true});
    }
+   if(path==='/api/admin/summary'&&method==='GET'){if(!user.isAdmin)fail(403,'FORBIDDEN','관리자 권한이 필요합니다.');return json(res,200,await repo.adminSummary());}
+   if(path==='/api/admin/backups'||path==='/api/admin/backups/run'){
+    if(!user.isAdmin)fail(403,'FORBIDDEN','관리자 권한이 필요합니다.');
+    if(path.endsWith('/run')&&method==='POST'){await reserve('backup-run:'+user.id,2,600000);await repo.requestBackup(user.id);await audit(req,'backup.requested');return json(res,202,{ok:true});}
+    if(method==='GET')return json(res,200,await repo.backupStatus());
+    if(method==='PUT'){await repo.saveBackupSettings(user.id,backupSettings(await readJson(req,16384)));await audit(req,'backup.settings.updated');return json(res,200,await repo.backupStatus());}
+   }
+   const decisionMatch=path.match(/^\/api\/users\/([^/]+)\/registration$/);
+   if(decisionMatch&&method==='POST'){if(!user.isAdmin)fail(403,'FORBIDDEN','관리자 권한이 필요합니다.');if(!uuid(decisionMatch[1]))fail(404,'USER_NOT_FOUND','계정을 찾을 수 없습니다.');const input=registrationDecision(await readJson(req,16384));await repo.decideRegistration(user.id,decisionMatch[1],input);await audit(req,'account.registration.'+(input.decision==='approve'?'approved':'rejected'),{targetId:decisionMatch[1],projects:input.grants.length});registrationEmail?.notify();return json(res,200,{ok:true});}
+   if(path==='/api/my-work'&&method==='GET')return json(res,200,{projects:await repo.myWork(user.id)});
+   if(path==='/api/trash'&&method==='GET')return json(res,200,{items:await repo.listTrash(user.id)});
+   const restoreMatch=path.match(/^\/api\/trash\/(project|tasks)\/([^/]+)\/restore$/);
+   if(restoreMatch&&method==='POST'){if(!uuid(restoreMatch[2]))fail(404,'TRASH_NOT_FOUND','항목을 찾을 수 없습니다.');return json(res,200,await repo.restoreTrash(user.id,restoreMatch[1],restoreMatch[2]));}
+   const memberMatch=path.match(/^\/api\/projects\/([^/]+)\/member-accounts$/);
+   if(memberMatch){if(!uuid(memberMatch[1]))fail(404,'NOT_FOUND','프로젝트를 찾을 수 없습니다.');if(method==='GET')return json(res,200,{links:await repo.memberAccounts(user.id,memberMatch[1])});if(method==='PUT'){const b=await readJson(req,16384);if(typeof b.memberId!=='string'||!/^[a-zA-Z0-9_-]{1,80}$/.test(b.memberId)||b.userId!==null&&!uuid(b.userId))fail(400,'MEMBER_ACCOUNT','참여인력과 로그인 계정을 확인해 주세요.');return json(res,200,await repo.setMemberAccount(user.id,memberMatch[1],b));}}
    const userMatch=path.match(/^\/api\/users\/([^/]+)$/);
    if(userMatch&&method==='PATCH'){
     if(!user.isAdmin)fail(403,'FORBIDDEN','관리자만 계정을 관리할 수 있습니다.');
@@ -277,6 +294,7 @@ export function createHandler({repo,origin='http://localhost:3000',basePath='',l
     const [,id,resource,target]=match;if(!uuid(id))fail(404,'NOT_FOUND','프로젝트를 찾을 수 없습니다.');
     if(!resource){
      if(method==='GET')return json(res,200,{project:await repo.getProject(user.id,id)});
+     if(method==='DELETE'){const b=await readJson(req,16384);if(!Number.isSafeInteger(b.revision)||b.revision<1)fail(400,'REVISION_REQUIRED','프로젝트 버전이 필요합니다.');return json(res,200,await repo.trashProject(user.id,id,b.revision));}
      if(method==='PUT'){
       const body=await readJson(req);
       if(!Number.isSafeInteger(body.revision)||body.revision<1)fail(400,'REVISION_REQUIRED','프로젝트 버전이 필요합니다.');

@@ -39,3 +39,10 @@ jobs:
         env:
           RUN_POSTGRES_TESTS: '1'
       - run: npm audit --audit-level=moderate
+      - name: Build backup sidecar and verify an actual isolated restore
+        run: |
+          docker build -f Dockerfile.backup -t pmcanvas-backup:ci .
+          node -e "require('node:fs').writeFileSync(process.env.RUNNER_TEMP+'/pmcanvas-backup-key',Buffer.alloc(32,7),{mode:0o644})"
+          node --input-type=module -e "import {createPool} from './server/pg-pool.mjs';const p=await createPool();await p.query('UPDATE pm_backup_settings SET enabled=true,next_run_at=now(),verify_restore=true,requested=false,lease_until=NULL');await p.end();"
+          docker run --rm --network host --read-only --tmpfs /tmp -v "$RUNNER_TEMP/pmcanvas-backup-key:/run/secrets/mfa.key:ro" -e PGHOST -e PGUSER -e PGPASSWORD -e PGDATABASE -e BACKUP_DIR=/tmp/backups -e BACKUP_RESTORE_OWNER=pmcanvas pmcanvas-backup:ci node server/backup-worker.mjs --once
+          node scripts/check-backup.mjs

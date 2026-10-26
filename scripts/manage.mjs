@@ -43,7 +43,7 @@ async function main(){
  const env=parseEnv(fs.readFileSync(envPath,'utf8'));
  const database=env.APP_DATABASE||'pmcanvas';
  if(!/^[a-z][a-z0-9_]{0,62}$/.test(database))throw Error('Invalid APP_DATABASE.');
- if(command==='up'){ensureMfaKey();compose(['up','-d','--build','--wait','--wait-timeout','180']);return;}
+ if(command==='up'){ensureMfaKey();fs.mkdirSync(path.join(root,'backups'),{recursive:true,mode:0o700});compose(['up','-d','--build','--wait','--wait-timeout','180']);return;}
  if(command==='status'){compose(['ps']);return;}
  if(command==='stop'){compose(['stop']);return;}
  if(command==='logs'){compose(['logs','--tail','100','app']);return;}
@@ -62,7 +62,7 @@ async function main(){
    compose(['cp',source,'db:'+remote]);
    compose(['exec','-T','db','createdb','-U','postgres','-O','pmcanvas',target]);
    compose(['exec','-T','db','pg_restore','-U','postgres','--role=pmcanvas','--no-owner','--no-acl','--exit-on-error','--single-transaction','-d',target,remote]);
-   compose(['exec','-T','db','psql','-U','postgres','-d',target,'-v','ON_ERROR_STOP=1','-c',"DO $restore$ DECLARE t text; BEGIN FOREACH t IN ARRAY ARRAY['pm_sessions','pm_auth_transient','pm_auth_attempts','pm_password_resets'] LOOP IF to_regclass(t) IS NOT NULL THEN EXECUTE format('TRUNCATE %I',t); END IF; END LOOP; IF to_regclass('pm_admin_mfa') IS NOT NULL THEN EXECUTE 'UPDATE pm_admin_mfa SET recovery_hashes=ARRAY[]::text[]'; END IF; END $restore$;"]);
+   compose(['exec','-T','db','psql','-U','postgres','-d',target,'-v','ON_ERROR_STOP=1','-c',"DO $restore$ DECLARE t text; BEGIN FOREACH t IN ARRAY ARRAY['pm_sessions','pm_auth_transient','pm_auth_attempts','pm_password_resets','pm_email_verifications'] LOOP IF to_regclass(t) IS NOT NULL THEN EXECUTE format('TRUNCATE %I',t); END IF; END LOOP; IF to_regclass('pm_admin_mfa') IS NOT NULL THEN EXECUTE 'UPDATE pm_admin_mfa SET recovery_hashes=ARRAY[]::text[]'; END IF; END $restore$;"]);
    console.log('Restored to '+target+'. To activate, set APP_DATABASE='+target+' in .env and run npm run service:up.');
   }finally{compose(['exec','-T','db','rm','-f',remote],{capture:true});}return;
  }

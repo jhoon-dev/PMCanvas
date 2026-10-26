@@ -26,3 +26,5 @@ v0.7.0: Added WBS grid, transactional draft editing, clipboard TSV and interacti
 0.16.0: registration verification atomically queues per-administrator review requests; shared durable notification worker with independent retry, active-role checks, safe inbox links and preserved MFA recovery display. No new dependencies.
 
 0.17.0: administrator-configured review email recipients with normalization and bounded lists; atomic routing changes for pending registration notices, per-address deduplication and default administrator fallback. No new dependencies.
+
+0.18.0: consolidated administrator tabs, transactional registration decision/project grants, explicit member-account mapping and cross-project My Work, 30-day task/project trash, isolated automatic DB backup/restore-check sidecar. No new npm dependencies. Runtime secrets and backup archives excluded.

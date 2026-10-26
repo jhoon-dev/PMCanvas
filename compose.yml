@@ -53,5 +53,31 @@ services:
       ADMIN_EMAIL: ${ADMIN_EMAIL:?Set ADMIN_EMAIL in .env}
       ADMIN_NAME: ${ADMIN_NAME:-관리자}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env}
+  backup:
+    build:
+      context: .
+      dockerfile: Dockerfile.backup
+    restart: unless-stopped
+    init: true
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 512m
+    pids_limit: 64
+    tmpfs: [/tmp]
+    depends_on:
+      app:
+        condition: service_healthy
+    volumes:
+      - ./backups:/backups
+      - ./config/secrets/mfa.key:/run/secrets/mfa.key:ro
+    environment:
+      PGHOST: db
+      PGPORT: 5432
+      PGDATABASE: ${APP_DATABASE:-pmcanvas}
+      PGUSER: postgres
+      PGPASSWORD: ${DB_ADMIN_PASSWORD:?Set DB_ADMIN_PASSWORD}
+      PGSSLMODE: disable
+      BACKUP_RESTORE_OWNER: pmcanvas
 volumes:
   pgdata:

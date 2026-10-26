@@ -347,3 +347,19 @@ test('SMTP 관리자 API: 관리자·CSRF·Origin·비밀 미노출·즉시 적�
  for(let i=0;i<3;i++)assert.equal((await f.call(admin,'admin/mail-settings/test',{method:'POST',body:{to:'test@example.com'}})).status,200);
  assert.equal((await f.call(admin,'admin/mail-settings/test',{method:'POST',body:{to:'test@example.com'}})).status,429);assert.equal(sent.length,4);assert.ok(f.repo.security.some(e=>e.kind==='mail.settings.updated'));assert.ok(f.repo.security.some(e=>e.kind==='mail.test.sent'));assert.equal(JSON.stringify(f.repo.security).includes(smtpInput.password),false);
 });
+
+test('운영 API: 가입 승인 권한·프로젝트 연결·거절·CSRF, 내 업무와 휴지통',async t=>{
+ const f=await fixture(t),admin=await f.login('owner@example.com'),other=await f.login('other@example.com'),p=project();await f.call(admin,'projects',{method:'POST',body:{project:p}});
+ const applicant=await f.repo.createUser({email:'apply@example.com',name:'신청',passwordHash:HASH,registrationPending:true});f.repo.users.get(applicant.id).email_verified_at=new Date();
+ const decision={decision:'approve',grants:[{projectId:p.id,role:'editor'}]};
+ assert.equal((await f.call(other,'users/'+applicant.id+'/registration',{method:'POST',body:decision})).status,403);assert.equal((await f.call(admin,'users/'+applicant.id+'/registration',{method:'POST',body:decision,headers:{'X-CSRF-Token':'wrong'}})).status,403);
+ assert.equal((await f.call(admin,'users/'+applicant.id+'/registration',{method:'POST',body:decision})).status,200);const member=await f.login(applicant.email);assert.equal((await f.call(member,'projects/'+p.id)).data.project._role,'editor');
+ assert.equal((await f.call(admin,'projects/'+p.id+'/member-accounts',{method:'PUT',body:{memberId:'m1',userId:applicant.id}})).status,200);assert.equal((await f.call(member,'my-work')).data.projects[0].tasks[0].id,'t1');assert.equal((await f.call(other,'my-work')).data.projects.length,0);
+ assert.equal((await f.call(member,'projects/'+p.id,{method:'DELETE',body:{revision:1}})).status,403);assert.equal((await f.call(admin,'projects/'+p.id,{method:'DELETE',body:{revision:1}})).status,200);assert.equal((await f.call(member,'projects/'+p.id)).status,404);
+ assert.equal((await f.call(member,'trash')).data.items.length,0);assert.equal((await f.call(admin,'trash/project/'+p.id+'/restore',{method:'POST',body:{}})).status,200);
+ const rejected=await f.repo.createUser({email:'reject@example.com',name:'거절',passwordHash:HASH,registrationPending:true});assert.equal((await f.call(admin,'users/'+rejected.id+'/registration',{method:'POST',body:{decision:'reject',reason:'중복'}})).status,200);assert.equal((await f.call(f.client(),'auth/login',{method:'POST',body:{email:rejected.email,password:PASSWORD}})).data.error.code,'REGISTRATION_REJECTED');
+});
+test('운영 API: 백업 설정은 관리자·입력·revision·CSRF·중복 요청을 검증',async t=>{
+ const f=await fixture(t),admin=await f.login('owner@example.com'),other=await f.login('other@example.com');assert.equal((await f.call(other,'admin/backups')).status,403);assert.equal((await f.call(f.client(),'admin/backups')).status,401);
+ const b={enabled:true,hour:3,retentionDays:14,verifyRestore:true,revision:0};assert.equal((await f.call(admin,'admin/backups',{method:'PUT',body:{...b,hour:24}})).status,400);assert.equal((await f.call(admin,'admin/backups',{method:'PUT',body:b})).status,200);assert.equal((await f.call(admin,'admin/backups',{method:'PUT',body:b})).status,409);assert.equal((await f.call(admin,'admin/backups/run',{method:'POST',body:{},headers:{'X-CSRF-Token':'bad'}})).status,403);assert.equal((await f.call(admin,'admin/backups/run',{method:'POST',body:{}})).status,202);assert.equal((await f.call(admin,'admin/backups/run',{method:'POST',body:{}})).status,409);
+});

@@ -1,0 +1,13 @@
+FROM node:24-bookworm-slim AS runtime
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
+FROM postgres:18-bookworm
+COPY --from=runtime /usr/local/bin/node /usr/local/bin/node
+COPY --from=runtime /app/node_modules /app/node_modules
+COPY package.json /app/package.json
+COPY server /app/server
+RUN node --version
+WORKDIR /app
+USER 1000:1000
+CMD ["node","server/backup-worker.mjs"]

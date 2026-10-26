@@ -13,6 +13,12 @@ import {createApplication} from '../../server/http.mjs';
 import {hashPassword} from '../../server/security.mjs';
 const smtp=await smtpFixture(),key=Buffer.alloc(32,7),hash=await hashPassword('preview-admin-password'),repo=new MemoryRepository([{id:randomUUID(),email:'admin@example.com',name:'테스트 관리자',password_hash:hash,is_admin:true,is_active:true},{id:randomUUID(),email:'member@example.com',name:'테스트 일반 계정',password_hash:hash,is_admin:false,is_active:true}]);
 const makeMailer=config=>createMailer({...config,transport:{...config.transport,tls:{...config.transport.tls,ca:smtp.ca,servername:'localhost'}}});
+if(process.env.RUN_WORKSPACE_PREVIEW==='1'){
+ const admin=[...repo.users.values()].find(u=>u.is_admin),member=[...repo.users.values()].find(u=>!u.is_admin);
+ for(const [name,verified] of [['인증 완료 신청자',true],['인증 대기 신청자',false]]){const u=await repo.createUser({email:verified?'verified@example.com':'unverified@example.com',name,passwordHash:hash,registrationPending:true});if(verified)repo.users.get(u.id).email_verified_at=new Date();}
+ const p=await repo.createProject(admin.id,randomUUID(),{name:'운영 기능 검증 프로젝트',description:'일회용 테스트',holidays:[],members:[{id:'m1',name:'담당자',role:'개발',grade:'중급',hours:8,allocation:100}],tasks:[{id:'t1',name:'내 담당 업무',phase:'개발',owner:'m1',start:'2026-10-19',end:'2026-10-30',predecessor:'',memo:'',items:[{id:'i1',title:'완료 체크',hours:8,doneDate:null}]}]});
+ await repo.grantAccess(admin.id,p.id,member.email,'editor');await repo.setMemberAccount(admin.id,p.id,{memberId:'m1',userId:admin.id});
+}
 const mailSettings=new MailSettings({repo,key,makeMailer}),origin='http://localhost:4183',basePath='/pmcanvas',passwordReset=new PasswordReset({repo,mailer:mailSettings,origin,basePath});
 if(process.env.RUN_REGISTRATION_REVIEW_PREVIEW==='1')await mailSettings.save([...repo.users.values()].find(u=>u.is_admin).id,{revision:0,enabled:true,host:'127.0.0.1',port:smtp.port,secure:true,from:'sender@example.com',authEnabled:true,username:'fixture',password:'test-only-secret'});
 const registrationEmail=new RegistrationEmail({repo,mailer:mailSettings,origin,basePath});registrationEmail.start();
