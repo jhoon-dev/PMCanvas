@@ -6,7 +6,7 @@ import {hashPassword,emailAddress} from './security.mjs';
 import {loadAuthConfig} from './auth-config.mjs';
 import {Federation} from './federation.mjs';
 import {registrationConfig} from './registration.mjs';
-import {loadMailer} from './mailer.mjs';
+import {MailSettings,legacyMailSettings} from './mail-settings.mjs';
 import {PasswordReset} from './password-reset.mjs';
 const pool=await createPool(),repo=new PgRepository(pool);
 try{
@@ -22,9 +22,9 @@ try{
  const basePath=process.env.BASE_PATH||'',providers=loadAuthConfig();
  const federation=new Federation({repo,origin,basePath,providers});
  const keyFile=process.env.MFA_KEY_FILE||'config/secrets/mfa.key';const key=fs.readFileSync(keyFile);if(key.length!==32)throw Error('MFA_KEY_FILE must contain 32 random bytes. Run npm run setup or npm run service:up.');
- const mailer=loadMailer(),passwordReset=mailer?new PasswordReset({repo,mailer,origin,basePath}):null;
- const server=createApplication({repo,origin,basePath,federation,passwordReset,registration:registrationConfig(process.env),adminMfa:new AdminMfa(repo,key),trustProxies:process.env.TRUSTED_PROXIES||''});
- console.log('Password reset email:',mailer?'enabled':'not configured');
+ const mailer=new MailSettings({repo,key,legacy:(await repo.getMailSettings())?undefined:legacyMailSettings()}),passwordReset=new PasswordReset({repo,mailer,origin,basePath});
+ const server=createApplication({repo,origin,basePath,federation,passwordReset,mailSettings:mailer,registration:registrationConfig(process.env),adminMfa:new AdminMfa(repo,key),trustProxies:process.env.TRUSTED_PROXIES||''});
+ console.log('Password reset email:',await mailer.enabled()?'enabled':'not configured');
  console.log('Authentication connections:',providers.map(p=>p.id+' ('+p.type+')').join(', ')||'local only');
  const port=Number(process.env.PORT||3000),host=process.env.HOST||'0.0.0.0';
  server.listen(port,host,()=>console.log('PM Canvas API listening on port '+port));

@@ -7,14 +7,15 @@ import {createApplication} from '../server/http.mjs';
 import {hashPassword} from '../server/security.mjs';
 import {MemoryRepository} from './support/memory-repository.mjs';
 import {PasswordReset} from '../server/password-reset.mjs';
+import {MailSettings} from '../server/mail-settings.mjs';
 import {createMailer} from '../server/mailer.mjs';
 import {smtpFixture,resetLink} from './support/smtp-fixture.mjs';
 const networkTest=(name,fn)=>test(name,{skip:process.env.RUN_HTTP_TESTS!=='1'},fn);
 const PASSWORD='a-test-password-12345',HASH=await hashPassword(PASSWORD);
 const ORIGIN='http://localhost:3000';
-async function fixture(t,{basePath='',mailer=null}={}){
+async function fixture(t,{basePath='',mailer=null,mailSettingsFactory=null}={}){
  const users=[{id:randomUUID(),email:'owner@example.com',name:'소유자',password_hash:HASH,is_admin:true},{id:randomUUID(),email:'other@example.com',name:'팀원',password_hash:HASH,is_admin:false}];
- const repo=new MemoryRepository(users),reset=mailer?new PasswordReset({repo,mailer,origin:ORIGIN,basePath,logger:{error(){}}}):null,server=createApplication({repo,origin:ORIGIN,basePath,passwordReset:reset,logger:{error(){}}});
+ const repo=new MemoryRepository(users),mailSettings=mailSettingsFactory?mailSettingsFactory(repo):null,effectiveMailer=mailSettings||mailer,reset=effectiveMailer?new PasswordReset({repo,mailer:effectiveMailer,origin:ORIGIN,basePath,logger:{error(){}}}):null,server=createApplication({repo,origin:ORIGIN,basePath,passwordReset:reset,mailSettings,logger:{error(){}}});
  server.listen(0,'127.0.0.1');await once(server,'listening');
  t.after(()=>{server.closeAllConnections();return new Promise(resolve=>server.close(resolve));});
  const base='http://127.0.0.1:'+server.address().port+basePath+'/api/';
@@ -26,7 +27,7 @@ async function fixture(t,{basePath='',mailer=null}={}){
   return {status:response.status,data,headers:response.headers};
  }
  async function login(email){const c=client(),r=await call(c,'auth/login',{method:'POST',body:{email,password:PASSWORD}});assert.equal(r.status,200);return c;}
- return {repo,server,base,users,client,call,login,reset};
+ return {repo,server,base,users,client,call,login,reset,mailSettings};
 }
 const project=()=>({id:randomUUID(),name:'팀 프로젝트',description:'',holidays:[],members:[{id:'m1',name:'개발자',grade:'고급',role:'개발',hours:8,allocation:100}],tasks:[{id:'t1',name:'기능 개발',phase:'개발',owner:'m1',start:'2026-10-19',end:'2026-10-23',predecessor:'',memo:'',items:[{id:'i1',title:'기능 구현',hours:8,doneDate:null}]}]});
 networkTest('로그인·쿠키·세션 만료·로그아웃',async t=>{
@@ -127,4 +128,15 @@ networkTest('SMTP STARTTLS 거절 시 평문 인증으로 전환하지 않는다
  const commands=[],sockets=new Set(),server=netServer(socket=>{sockets.add(socket);socket.on('close',()=>sockets.delete(socket));socket.on('error',()=>{});socket.setEncoding('utf8');socket.write('220 localhost test\r\n');let buffer='';socket.on('data',chunk=>{buffer+=chunk;let end;while((end=buffer.indexOf('\r\n'))!==-1){const line=buffer.slice(0,end);buffer=buffer.slice(end+2);commands.push(line);socket.write(line.startsWith('EHLO')?'250-localhost\r\n250 AUTH PLAIN\r\n':'502 STARTTLS not available\r\n');}});});
  server.listen(0,'127.0.0.1');await once(server,'listening');t.after(()=>new Promise(resolve=>{for(const socket of sockets)socket.destroy();server.close(resolve);}));
  const mailer=createMailer({from:'sender@example.com',transport:{host:'127.0.0.1',port:server.address().port,secure:false,requireTLS:true,auth:{user:'fixture',pass:'test-only-secret'},connectionTimeout:2000,socketTimeout:2000}});t.after(()=>mailer.close());await assert.rejects(mailer.verify());assert.ok(commands.some(c=>c==='STARTTLS'));assert.equal(commands.some(c=>c.startsWith('AUTH')),false);
+});
+
+networkTest('관리자 SMTP 저장·테스트 메일 실제 TLS 수신·비밀번호 재설정에 즉시 사용',async t=>{
+ const smtp=await smtpFixture();t.after(()=>smtp.close());
+ const makeMailer=config=>createMailer({...config,transport:{...config.transport,tls:{...config.transport.tls,ca:smtp.ca,servername:'localhost'}}});
+ const f=await fixture(t,{basePath:'/pmcanvas',mailSettingsFactory:repo=>new MailSettings({repo,key:Buffer.alloc(32,5),makeMailer})}),admin=await f.login('owner@example.com');
+ const settings={revision:0,enabled:true,host:'127.0.0.1',port:smtp.port,secure:true,from:'sender@example.com',authEnabled:true,username:'fixture',password:'test-only-secret'};
+ assert.equal((await f.call(admin,'admin/mail-settings',{method:'PUT',body:settings})).status,200);
+ assert.equal((await f.call(admin,'admin/mail-settings/test',{method:'POST',body:{to:'receiver@example.com'}})).status,200);assert.equal(smtp.messages.length,1);assert.equal(resetLink(smtp.messages[0]),undefined);assert.match(smtp.messages[0],/To: receiver@example.com/);
+ const guest=f.client();assert.equal((await f.call(guest,'auth/forgot-password',{method:'POST',body:{email:'other@example.com'}})).status,202);await f.reset.idle();assert.equal(smtp.messages.length,2);assert.ok(resetLink(smtp.messages[1]));
+ const disabled=await f.call(admin,'admin/mail-settings',{method:'PUT',body:{...settings,password:'',enabled:false,revision:1}});assert.equal(disabled.status,200);assert.equal((await f.call(guest,'auth/providers')).data.passwordReset.enabled,false);
 });

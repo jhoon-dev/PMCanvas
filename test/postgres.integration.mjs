@@ -1,4 +1,5 @@
 import {AdminMfa,totp} from '../server/admin-mfa.mjs';
+import {MailSettings} from '../server/mail-settings.mjs';
 import {captureBaseline,setParent} from '../public/planning.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -185,4 +186,16 @@ test('실제 PostgreSQL: 재설정 링크 교체·동시 소비·세션 폐기·
   const disabled=digest(token());await issue(disabled);await repo.manageUser(admin.id,user.id,{isActive:false});await repo.manageUser(admin.id,user.id,{isActive:true});await assert.rejects(repo.consumePasswordReset(disabled,'new-hash'),e=>e.code==='RESET_INVALID');
   assert.equal(await repo.issuePasswordReset({userId:user.id,passwordHash:'wrong-snapshot',hash:digest(token()),expires:new Date(Date.now()+60000)}),false);
  }finally{for(const id of ids.reverse())await pool.query('DELETE FROM pm_users WHERE id=$1',[id]);await pool.end();}
+});
+
+test('실제 PostgreSQL: 관리자 SMTP 암호화·재시작 복구·권한·동시 설정 저장 충돌',{skip:process.env.RUN_POSTGRES_TESTS!=='1'},async()=>{
+ if(!/_test$/.test(process.env.PGDATABASE||''))throw Error('Use a dedicated _test database.');
+ const pool=await createPool(),repo=new PgRepository(pool),ids=[];
+ try{
+  await migrate(pool);await migrate(pool);const suffix=randomUUID(),admin=await repo.createUser({email:'smtp-admin-'+suffix+'@example.com',name:'관리자',passwordHash:'fixture',isAdmin:true}),user=await repo.createUser({email:'smtp-user-'+suffix+'@example.com',name:'일반 사용자',passwordHash:'fixture'});ids.push(admin.id,user.id);
+  const key=Buffer.alloc(32,23),service=new MailSettings({repo,key}),body={revision:0,enabled:true,host:'smtp.example.com',port:587,secure:false,from:'sender@example.com',authEnabled:true,username:'fixture',password:'test-only-smtp-secret'};
+  await assert.rejects(service.save(user.id,body),e=>e.status===403);await service.save(admin.id,body);const row=await repo.getMailSettings();assert.equal(row.revision,1);assert.equal(JSON.stringify(row).includes(body.password),false);
+  let restoredPassword;const restarted=new MailSettings({repo:new PgRepository(pool),key,makeMailer:config=>({sendTest:async()=>{restoredPassword=config.transport.auth.pass;},close(){}})});await restarted.test('recipient@example.com');assert.equal(restoredPassword,body.password);assert.equal((await restarted.public()).hasPassword,true);
+  const attempts=await Promise.allSettled([service.save(admin.id,{...body,password:'',revision:1}),restarted.save(admin.id,{...body,password:'',revision:1})]);assert.equal(attempts.filter(r=>r.status==='fulfilled').length,1);assert.equal(attempts.find(r=>r.status==='rejected').reason.code,'MAIL_CONFLICT');assert.equal((await service.public()).revision,2);
+ }finally{await pool.query('DELETE FROM pm_mail_settings WHERE id=true');for(const id of ids.reverse())await pool.query('DELETE FROM pm_users WHERE id=$1',[id]);await pool.end();}
 });

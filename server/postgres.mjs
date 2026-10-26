@@ -19,7 +19,7 @@ export async function migrate(pool){
  try{
   await client.query('BEGIN');await client.query('SELECT pg_advisory_xact_lock(726534001)');
   await client.query('CREATE TABLE IF NOT EXISTS pm_schema_migrations(version integer PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())');
-  for(const [version,file] of [[1,'001_initial.sql'],[2,'002_user_status.sql'],[3,'003_federated_auth.sql'],[4,'004_planning.sql'],[5,'005_security.sql'],[6,'006_registration.sql'],[7,'007_password_reset.sql']]){
+  for(const [version,file] of [[1,'001_initial.sql'],[2,'002_user_status.sql'],[3,'003_federated_auth.sql'],[4,'004_planning.sql'],[5,'005_security.sql'],[6,'006_registration.sql'],[7,'007_password_reset.sql'],[8,'008_mail_settings.sql']]){
    const {rows}=await client.query('SELECT version FROM pm_schema_migrations WHERE version=$1',[version]);
    if(!rows.length){await client.query(fs.readFileSync(new URL('../migrations/'+file,import.meta.url),'utf8'));await client.query('INSERT INTO pm_schema_migrations(version) VALUES ($1)',[version]);}
   }
@@ -98,6 +98,15 @@ export class PgRepository{
    await c.query('DELETE FROM pm_sessions WHERE user_id=$1',[targetId]);
    if(passwordHash||isActive===false)await c.query('DELETE FROM pm_password_resets WHERE user_id=$1',[targetId]);
    return publicUser(rows[0]);
+  });
+ }
+ async getMailSettings(){return (await this.pool.query('SELECT config,password_encrypted,revision FROM pm_mail_settings WHERE id=true')).rows[0]||null;}
+ async saveMailSettings(actorId,{config,passwordEncrypted,revision}){
+  return this.transaction(async c=>{
+   const actor=(await c.query('SELECT is_admin,is_active FROM pm_users WHERE id=$1 FOR UPDATE',[actorId])).rows[0];if(!actor?.is_admin||!actor.is_active)fail(403,'FORBIDDEN','관리자 권한이 필요합니다.');
+   await c.query('SELECT pg_advisory_xact_lock(726534008)');const old=(await c.query('SELECT revision FROM pm_mail_settings WHERE id=true FOR UPDATE')).rows[0];
+   if((old?.revision||0)!==revision)fail(409,'MAIL_CONFLICT','다른 관리자가 메일 설정을 변경했습니다. 최신 설정을 다시 확인해 주세요.');
+   await c.query('INSERT INTO pm_mail_settings(id,config,password_encrypted,revision,updated_by) VALUES (true,$1::jsonb,$2,$3,$4) ON CONFLICT(id) DO UPDATE SET config=$1::jsonb,password_encrypted=$2,revision=$3,updated_by=$4,updated_at=now()',[JSON.stringify(config),passwordEncrypted,revision+1,actorId]);
   });
  }
  async issuePasswordReset({userId,passwordHash,hash,expires}){

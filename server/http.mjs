@@ -11,7 +11,7 @@ import {cleanProject,uuid} from './project.mjs';
 import {Federation} from './federation.mjs';
 import {registrationConfig} from './registration.mjs';
 
-export function createHandler({repo,origin='http://localhost:3000',basePath='',logger=console,trustProxies='',adminMfa=null,passwordReset=null,registration=registrationConfig(),federation=new Federation({repo,origin,basePath})}){
+export function createHandler({repo,origin='http://localhost:3000',basePath='',logger=console,trustProxies='',adminMfa=null,passwordReset=null,mailSettings=null,registration=registrationConfig(),federation=new Federation({repo,origin,basePath})}){
  if(new URL(origin).origin!==origin)throw Error('PUBLIC_ORIGIN must contain only scheme and host, without a path or trailing slash.');
  if(basePath&&!/^\/[a-zA-Z0-9_-]+(?:\/[a-zA-Z0-9_-]+)*$/.test(basePath))throw Error('BASE_PATH must be empty or a path without a trailing slash.');
  const secure=new URL(origin).protocol==='https:',reserve=requestLimiter(repo),trusted=proxyList(trustProxies);
@@ -58,7 +58,7 @@ export function createHandler({repo,origin='http://localhost:3000',basePath='',l
    auditPath=path;const method=req.method;
    if(path==='/api/health'&&method==='GET'){try{await repo.health();return json(res,200,{ok:true});}catch{return json(res,503,{ok:false});}}
    req.clientIp=clientAddress(req,trusted);
-   if(path==='/api/auth/providers'&&method==='GET')return json(res,200,{providers:federation.list(),registration,passwordReset:{enabled:!!passwordReset}});
+   if(path==='/api/auth/providers'&&method==='GET')return json(res,200,{providers:federation.list(),registration,passwordReset:{enabled:!!passwordReset&&(!mailSettings||await mailSettings.enabled())}});
    const sso=path.match(/^\/api\/auth\/sso\/([a-z][a-z0-9_-]{0,39})\/(start|callback|metadata)$/);
    if(sso){
     const [,id,action]=sso,p=federation.provider(id);
@@ -114,7 +114,7 @@ export function createHandler({repo,origin='http://localhost:3000',basePath='',l
     }catch(error){if(error.status===403||error.code==='IDENTITY_UNLINKED')throw error;fail(401,'LOGIN_FAILED','디렉터리 인증에 실패했습니다. 계정 정보와 연결 설정을 확인해 주세요.');}
    }
    if((path==='/api/auth/forgot-password'||path==='/api/auth/reset-password')&&method==='POST'){
-    if(!passwordReset)fail(503,'RESET_UNAVAILABLE','현재 이메일 재설정을 사용할 수 없습니다. 관리자에게 문의해 주세요.');
+    if(!passwordReset||(path.endsWith('/forgot-password')&&mailSettings&&!await mailSettings.enabled()))fail(503,'RESET_UNAVAILABLE','현재 이메일 재설정을 사용할 수 없습니다. 관리자에게 문의해 주세요.');
     const request=path.endsWith('/forgot-password');
     await reserve(request?'reset-request-global':'reset-finish-global',request?100:200,request?3600000:900000);
     if(req.clientIp)await reserve((request?'reset-request-ip:':'reset-finish-ip:')+req.clientIp,request?10:20,900000);
@@ -158,6 +158,18 @@ export function createHandler({repo,origin='http://localhost:3000',basePath='',l
    }
    const session=await authenticate(req),user=session.user;req.actorId=user.id;
    if(mutation&&!safeEqual(req.headers['x-csrf-token'],session.csrf))fail(403,'CSRF_FAILED','보안 토큰을 갱신하려면 다시 로그인해 주세요.');
+   if(path==='/api/admin/mail-settings'||path==='/api/admin/mail-settings/test'){
+    if(!user.isAdmin)fail(403,'FORBIDDEN','관리자 권한이 필요합니다.');
+    if(!mailSettings)fail(503,'MAIL_ADMIN_UNAVAILABLE','메일 설정 관리 기능을 사용할 수 없습니다.');
+    if(path.endsWith('/test')&&method==='POST'){
+     await reserve('smtp-test:'+user.id,5,600000);await reserve('smtp-test-global',20,600000);const body=await readJson(req,16384);
+     try{await mailSettings.test(body.to);await audit(req,'mail.test.sent');return json(res,200,{ok:true,message:'SMTP 서버가 테스트 메일을 수락했습니다. 받은 편지함과 스팸함을 확인해 주세요.'});}
+     catch(error){await audit(req,'mail.test.failed',{code:error.code||'MAIL_ERROR'});throw error;}
+    }
+    if(path==='/api/admin/mail-settings'&&method==='GET')return json(res,200,{settings:await mailSettings.public()});
+    if(path==='/api/admin/mail-settings'&&method==='PUT'){await reserve('smtp-settings:'+user.id,20,600000);const settings=await mailSettings.save(user.id,await readJson(req,16384));await audit(req,'mail.settings.updated',{enabled:settings.enabled});return json(res,200,{settings});}
+    fail(405,'METHOD_NOT_ALLOWED','지원하지 않는 요청입니다.');
+   }
    if(path==='/api/auth/security-events'&&method==='GET'){if(!user.isAdmin)fail(403,'FORBIDDEN','관리자 권한이 필요합니다.');return json(res,200,{events:repo.securityEvents?await repo.securityEvents():[]});}
    if(path==='/api/auth/mfa/status'&&method==='GET'){if(!user.isAdmin)fail(403,'FORBIDDEN','관리자 권한이 필요합니다.');const state=adminMfa?await repo.getMfa(user.id):null;return json(res,200,{enabled:!!state,required:!!adminMfa,recoveryRemaining:state?.recovery_hashes.length||0});}
    if(path==='/api/auth/me'&&method==='GET')return json(res,200,{user,csrf:session.csrf});
@@ -253,10 +265,10 @@ export function createHandler({repo,origin='http://localhost:3000',basePath='',l
    }
    fail(404,'NOT_FOUND','API를 찾을 수 없습니다.');
   }catch(error){
-   if(auditPath.startsWith('/api/auth/')||auditPath.startsWith('/api/users'))try{await audit(req,'security.request.rejected',{path:auditPath,code:error.code||'INTERNAL_ERROR'});}catch{logger.error('Security audit write failed');}
+   if(auditPath.startsWith('/api/auth/')||auditPath.startsWith('/api/users')||auditPath.startsWith('/api/admin/'))try{await audit(req,'security.request.rejected',{path:auditPath,code:error.code||'INTERNAL_ERROR'});}catch{logger.error('Security audit write failed');}
    if(res.headersSent)return res.destroy();
    if(!(error instanceof HttpError))logger.error('API request failed:',error.code||error.name);
-   json(res,error.status||500,{error:{code:error.code&&error.status?error.code:'INTERNAL_ERROR',message:error.status?error.message:'서버 처리 중 오류가 발생했습니다.'}});
+   json(res,error.status||500,{error:{code:error.code&&error.status?error.code:'INTERNAL_ERROR',message:error.status?(error.status===429&&auditPath.startsWith('/api/admin/mail-settings')?'메일 설정 요청이 많습니다. 잠시 후 다시 시도해 주세요.':error.message):'서버 처리 중 오류가 발생했습니다.'}});
   }
  };
  return handler;

@@ -9,11 +9,12 @@ import {MemoryRepository} from './support/memory-repository.mjs';
 import {Federation} from '../server/federation.mjs';
 import {registrationConfig} from '../server/registration.mjs';
 import {PasswordReset} from '../server/password-reset.mjs';
+import {MailSettings} from '../server/mail-settings.mjs';
 const PASSWORD='a-test-password-12345',HASH=await hashPassword(PASSWORD);
 const ORIGIN='http://localhost:3000';
-async function fixture(t,{basePath='',providers=[],trustProxies='',mailer=null,registration=registrationConfig()}={}){
+async function fixture(t,{basePath='',providers=[],trustProxies='',mailer=null,mailSettingsFactory=null,registration=registrationConfig()}={}){
  const users=[{id:randomUUID(),email:'owner@example.com',name:'소유자',password_hash:HASH,is_admin:true},{id:randomUUID(),email:'other@example.com',name:'팀원',password_hash:HASH,is_admin:false}];
- const repo=new MemoryRepository(users),reset=mailer?new PasswordReset({repo,mailer,origin:ORIGIN,basePath,logger:{error(){}}}):null,handler=createHandler({repo,origin:ORIGIN,basePath,registration,trustProxies,passwordReset:reset,federation:new Federation({repo,origin:ORIGIN,basePath,providers}),logger:{error(){}}});
+ const repo=new MemoryRepository(users),mailSettings=mailSettingsFactory?mailSettingsFactory(repo):null,effectiveMailer=mailSettings||mailer,reset=effectiveMailer?new PasswordReset({repo,mailer:effectiveMailer,origin:ORIGIN,basePath,logger:{error(){}}}):null,handler=createHandler({repo,origin:ORIGIN,basePath,registration,trustProxies,passwordReset:reset,mailSettings,federation:new Federation({repo,origin:ORIGIN,basePath,providers}),logger:{error(){}}});
  async function inject(url,{method='GET',body,headers={}}={}){
   const req=Readable.from(body===undefined?[]:[Buffer.from(JSON.stringify(body))]);
   Object.assign(req,{url,method,headers,socket:{remoteAddress:'127.0.0.1'}});
@@ -36,7 +37,7 @@ async function fixture(t,{basePath='',providers=[],trustProxies='',mailer=null,r
   return {status:response.status,data,headers:response.headers};
  }
  async function login(email){const c=client(),r=await call(c,'auth/login',{method:'POST',body:{email,password:PASSWORD}});assert.equal(r.status,200);return c;}
- return {repo,users,client,call,login,inject,reset};
+ return {repo,users,client,call,login,inject,reset,mailSettings};
 }
 const project=()=>({id:randomUUID(),name:'팀 프로젝트',description:'',holidays:[],members:[{id:'m1',name:'개발자',grade:'고급',role:'개발',hours:8,allocation:100}],tasks:[{id:'t1',name:'기능 개발',phase:'개발',owner:'m1',start:'2026-10-19',end:'2026-10-23',predecessor:'',memo:'',items:[{id:'i1',title:'기능 구현',hours:8,doneDate:null}]}]});
 test('외부 계정 매핑은 관리자·CSRF 검증, 비밀 제외, 기존 사용자 ID 보존',async t=>{
@@ -282,4 +283,21 @@ test('이메일 재설정: 외부·비활성·가입 대기 계정 제외, 메�
  assert.equal((await f.call(guest,'auth/forgot-password',{method:'POST',body:{email:'other@example.com'}})).status,429);await f.reset.idle();
  const disabled=await fixture(t);assert.equal((await disabled.call(disabled.client(),'auth/forgot-password',{method:'POST',body:{email:'other@example.com'}})).status,503);
  const failed=await fixture(t,{mailer:{sendReset:async()=>{throw Error('smtp failure')}}});assert.equal((await failed.call(failed.client(),'auth/forgot-password',{method:'POST',body:{email:'other@example.com'}})).status,202);await failed.reset.idle();assert.equal(failed.repo.resets.size,0);assert.ok(failed.repo.security.some(e=>e.kind==='auth.password_reset.delivery_failed'));
+});
+
+const smtpInput={revision:0,enabled:true,host:'smtp.example.com',port:587,secure:false,from:'sender@example.com',authEnabled:true,username:'smtp-user',password:'smtp-test-secret'};
+test('SMTP 관리자 API: 관리자·CSRF·Origin·비밀 미노출·즉시 적용·테스트 수신자·요청 제한',async t=>{
+ const sent=[],f=await fixture(t,{mailSettingsFactory:repo=>new MailSettings({repo,key:Buffer.alloc(32,5),makeMailer:config=>({sendTest:async to=>sent.push(to),sendReset:async m=>sent.push(m),close(){}})})}),guest=f.client(),admin=await f.login('owner@example.com'),other=await f.login('other@example.com');
+ assert.equal((await f.call(guest,'admin/mail-settings')).status,401);assert.equal((await f.call(other,'admin/mail-settings')).status,403);
+ assert.equal((await f.call(admin,'admin/mail-settings',{method:'PUT',body:smtpInput,headers:{'X-CSRF-Token':'bad'}})).status,403);
+ assert.equal((await f.call(admin,'admin/mail-settings/test',{method:'POST',body:{to:'test@example.com'},headers:{Origin:'https://evil.example'}})).status,403);
+ assert.equal((await f.call(guest,'auth/providers')).data.passwordReset.enabled,false);
+ const saved=await f.call(admin,'admin/mail-settings',{method:'PUT',body:smtpInput});assert.equal(saved.status,200);assert.equal(saved.data.settings.hasPassword,true);assert.equal(JSON.stringify(saved.data).includes(smtpInput.password),false);
+ const read=await f.call(admin,'admin/mail-settings');assert.equal('password' in read.data.settings,false);assert.equal(JSON.stringify(f.repo.mailSettings).includes(smtpInput.password),false);
+ assert.equal((await f.call(guest,'auth/providers')).data.passwordReset.enabled,true);assert.equal((await f.call(admin,'admin/mail-settings',{method:'PUT',body:smtpInput})).status,409);
+ assert.equal((await f.call(other,'admin/mail-settings/test',{method:'POST',body:{to:'test@example.com'}})).status,403);
+ const first=await f.call(admin,'admin/mail-settings/test',{method:'POST',body:{to:'test@example.com'}});assert.equal(first.status,200);assert.deepEqual(sent,['test@example.com']);
+ assert.equal((await f.call(admin,'admin/mail-settings/test',{method:'POST',body:{to:'one,two@example.com'}})).status,400);
+ for(let i=0;i<3;i++)assert.equal((await f.call(admin,'admin/mail-settings/test',{method:'POST',body:{to:'test@example.com'}})).status,200);
+ assert.equal((await f.call(admin,'admin/mail-settings/test',{method:'POST',body:{to:'test@example.com'}})).status,429);assert.equal(sent.length,4);assert.ok(f.repo.security.some(e=>e.kind==='mail.settings.updated'));assert.ok(f.repo.security.some(e=>e.kind==='mail.test.sent'));assert.equal(JSON.stringify(f.repo.security).includes(smtpInput.password),false);
 });

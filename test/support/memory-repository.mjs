@@ -22,6 +22,8 @@ export class MemoryRepository{
  async health(){}
  async findUserByEmail(email){return [...this.users.values()].find(u=>u.email===email);}
  async listUsers(){return [...this.users.values()].map(publicUser);}
+ async getMailSettings(){return this.mailSettings?structuredClone(this.mailSettings):null;}
+ async saveMailSettings(actorId,{config,passwordEncrypted,revision}){const actor=this.users.get(actorId);if(!actor?.is_admin||actor.is_active===false)fail(403,'FORBIDDEN','관리자 권한이 필요합니다.');if((this.mailSettings?.revision||0)!==revision)fail(409,'MAIL_CONFLICT','다른 관리자가 설정을 변경했습니다.');this.mailSettings={config:structuredClone(config),password_encrypted:passwordEncrypted,revision:revision+1};}
  async issuePasswordReset({userId,passwordHash,hash,expires}){const u=this.users.get(userId);if(!u||u.is_active===false||u.local_login===false||u.registration_pending||u.password_hash!==passwordHash)return false;this.resets.set(userId,{userId,passwordHash,hash,expires});return true;}
  async revokePasswordReset(hash){for(const [id,r]of this.resets)if(r.hash===hash)this.resets.delete(id);}
  async consumePasswordReset(hash,passwordHash){const r=[...this.resets.values()].find(r=>r.hash===hash&&new Date(r.expires)>new Date()),u=r?this.users.get(r.userId):null;if(!u||u.is_active===false||u.local_login===false||u.registration_pending||u.password_hash!==r.passwordHash)fail(400,'RESET_INVALID','유효하지 않거나 만료된 링크입니다. 비밀번호 재설정을 다시 요청해 주세요.');this.resets.delete(u.id);u.password_hash=passwordHash;this.attempts?.delete(digest('local:'+u.email));this.revokeSessions(u.id);return {id:u.id};}
