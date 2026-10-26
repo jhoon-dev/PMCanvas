@@ -29,6 +29,14 @@ export function createMailer(config,{createTransport=nodemailer.createTransport}
    const info=await transport.sendMail({from:{name:'PM Canvas',address:config.from},to:{address:mailAddress(to)},subject:'[PM Canvas] 비밀번호 재설정',text:'비밀번호 재설정을 요청하셨습니다.\n\n아래 링크에서 새 비밀번호를 설정하세요. 링크는 15분 동안 한 번만 사용할 수 있습니다.\n\n'+url+'\n\n요청하지 않았다면 이 메일을 무시하세요. 비밀번호는 링크에서 변경을 완료하기 전까지 유지됩니다.'});
    if(!info.accepted?.length||info.rejected?.length)throw Object.assign(Error('SMTP recipient rejected'),{code:'MAIL_REJECTED'});
   },
+  async sendVerification({to,url}){
+   const info=await transport.sendMail({from:{name:'PM Canvas',address:config.from},to:{address:mailAddress(to)},subject:'[PM Canvas] 회원가입 이메일 인증',text:'PM Canvas 회원가입 이메일 인증을 요청하셨습니다.\n\n아래 링크에서 본인의 이름과 로그인 비밀번호를 설정해 이메일 인증을 완료하세요. 링크는 30분 동안 한 번만 사용할 수 있습니다. 인증 후 관리자 승인이 필요합니다.\n\n'+url+'\n\n직접 가입하지 않았다면 이 메일을 무시하세요. 링크를 열기만 해서는 계정이 인증되거나 활성화되지 않습니다.'});
+   if(!info.accepted?.length||info.rejected?.length)throw Object.assign(Error('SMTP recipient rejected'),{code:'MAIL_REJECTED'});
+  },
+  async sendApproval({to,url}){
+   const info=await transport.sendMail({from:{name:'PM Canvas',address:config.from},to:{address:mailAddress(to)},subject:'[PM Canvas] 회원가입이 승인되었습니다',text:'PM Canvas 회원가입이 승인되었습니다.\n\n이메일 인증 시 설정한 비밀번호로 로그인해 주세요.\n\n'+url+'\n\n이 메일에는 비밀번호가 포함되어 있지 않습니다. 비밀번호를 잊으셨다면 로그인 화면에서 비밀번호 찾기를 이용하세요.'});
+   if(!info.accepted?.length||info.rejected?.length)throw Object.assign(Error('SMTP recipient rejected'),{code:'MAIL_REJECTED'});
+  },
   async sendTest(to){
    const info=await transport.sendMail({from:{name:'PM Canvas',address:config.from},to:{address:mailAddress(to)},subject:'[PM Canvas] 테스트 메일',text:'PM Canvas 관리자 화면에서 요청한 테스트 메일입니다.\n\n이 메일이 도착했다면 현재 SMTP 설정으로 메일을 전달할 수 있습니다.'});
    if(!info.accepted?.length||info.rejected?.length)throw Object.assign(Error('SMTP recipient rejected'),{code:'MAIL_REJECTED'});

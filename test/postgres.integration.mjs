@@ -165,10 +165,37 @@ test('실제 PostgreSQL: 가입 신청 중복 원자성·대기 상태 제약·�
   const session={hash:digest(token()),userId:pending.id,csrf:token(),expires:new Date(Date.now()+60000),passwordHash:'test-hash'};
   await assert.rejects(repo.createSession(session),e=>e.status===401);
   await assert.rejects(repo.manageUser(pending.id,pending.id,{isActive:true}),e=>e.status===403);
+  await assert.rejects(repo.manageUser(admin.id,pending.id,{isActive:true}),e=>e.code==='EMAIL_UNVERIFIED');
+  const verification=digest(token());await repo.issueEmailVerification({userId:pending.id,passwordHash:'test-hash',hash:verification,expires:new Date(Date.now()+60000)});
+  await repo.consumeEmailVerification(verification,{name:'인증한 가입자',passwordHash:'test-hash'});
   const approved=await repo.manageUser(admin.id,pending.id,{isActive:true});assert.equal(approved.registrationPending,false);assert.equal(approved.isActive,true);
   await repo.createSession(session);assert.equal((await repo.findSession(session.hash)).user.id,pending.id);
   assert.deepEqual(await repo.listProjects(pending.id),[]);
   await repo.manageUser(admin.id,pending.id,{isActive:false});assert.equal(await repo.findSession(session.hash),null);assert.equal((await repo.findUserByEmail(email)).registration_pending,false);
+ }finally{for(const id of ids.reverse())await pool.query('DELETE FROM pm_users WHERE id=$1',[id]);await pool.end();}
+});
+
+test('실제 PostgreSQL: 이메일 인증 원자성·인증 전 활성화 제약·승인 알림 보관·작업 잠금·실패 복구',{skip:process.env.RUN_POSTGRES_TESTS!=='1'},async()=>{
+ if(!/_test$/.test(process.env.PGDATABASE||''))throw Error('Use a dedicated _test database.');
+ const pool=await createPool(),repo=new PgRepository(pool),other=new PgRepository(pool),ids=[];
+ try{
+  await migrate(pool);await migrate(pool);const suffix=randomUUID(),admin=await repo.createUser({email:'verify-admin-'+suffix+'@example.com',name:'관리자',passwordHash:'original',isAdmin:true}),u=await repo.createUser({email:'verify-'+suffix+'@example.com',name:'가입자',passwordHash:'original',registrationPending:true});ids.push(admin.id,u.id);
+  assert.equal((await repo.findUserByEmail(admin.email)).email_verification_required,false);assert.equal((await repo.findUserByEmail(u.email)).email_verification_required,true);
+  await assert.rejects(pool.query('UPDATE pm_users SET is_active=true,registration_pending=false WHERE id=$1',[u.id]),e=>e.code==='23514');
+  const first=digest(token()),current=digest(token()),input={userId:u.id,passwordHash:'original',expires:new Date(Date.now()+60000)};
+  assert.equal(await repo.issueEmailVerification({...input,hash:first}),true);assert.equal(await repo.issueEmailVerification({...input,hash:current}),true);
+  await assert.rejects(repo.consumeEmailVerification(first,{name:'본인',passwordHash:'verified-hash'}),e=>e.code==='VERIFICATION_INVALID');
+  const results=await Promise.allSettled([repo,other].map(r=>r.consumeEmailVerification(current,{name:'메일 소유자',passwordHash:'verified-hash'})));assert.equal(results.filter(r=>r.status==='fulfilled').length,1);assert.equal(results.find(r=>r.status==='rejected').reason.code,'VERIFICATION_INVALID');
+  const verified=await repo.findUserByEmail(u.email);assert.equal(verified.password_hash,'verified-hash');assert.ok(verified.email_verified_at);assert.equal(verified.is_active,false);
+  assert.equal(await repo.issueEmailVerification({...input,hash:digest(token()),passwordHash:'verified-hash'}),false);
+  const approved=await repo.manageUser(admin.id,u.id,{isActive:true});assert.equal(approved.approvalMailStatus,'pending');await repo.manageUser(admin.id,u.id,{isActive:true});assert.equal((await pool.query('SELECT count(*)::int AS n FROM pm_approval_notifications WHERE user_id=$1',[u.id])).rows[0].n,1);
+  const claims=await Promise.all([repo.claimApprovalNotification(),other.claimApprovalNotification()]);assert.equal(claims.filter(Boolean).length,1);const original=claims.find(Boolean);assert.equal(original.userId,u.id);
+  await pool.query("UPDATE pm_approval_notifications SET available_at=now()-interval '1 second' WHERE user_id=$1",[u.id]);const recovered=await other.claimApprovalNotification();assert.notEqual(recovered.lease,original.lease);
+  await repo.finishApprovalNotification(u.id,original.lease,true);assert.equal((await repo.listUsers()).find(x=>x.id===u.id).approvalMailStatus,'sending');
+  await repo.finishApprovalNotification(u.id,recovered.lease,false);await pool.query("UPDATE pm_approval_notifications SET available_at=now()-interval '1 second' WHERE user_id=$1",[u.id]);const third=await repo.claimApprovalNotification();await repo.finishApprovalNotification(u.id,third.lease,false);
+  assert.equal((await repo.listUsers()).find(x=>x.id===u.id).approvalMailStatus,'failed');assert.equal((await repo.findUserByEmail(u.email)).is_active,true);
+  await assert.rejects(repo.retryApprovalNotification(u.id,u.id),e=>e.status===403);await repo.retryApprovalNotification(admin.id,u.id);const retried=await repo.claimApprovalNotification();await repo.finishApprovalNotification(u.id,retried.lease,true);assert.equal((await repo.listUsers()).find(x=>x.id===u.id).approvalMailStatus,'sent');
+  await assert.rejects(repo.retryApprovalNotification(admin.id,u.id),e=>e.code==='NOTICE_UNAVAILABLE');
  }finally{for(const id of ids.reverse())await pool.query('DELETE FROM pm_users WHERE id=$1',[id]);await pool.end();}
 });
 

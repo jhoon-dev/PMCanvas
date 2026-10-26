@@ -8,13 +8,14 @@ import {hashPassword,digest} from '../server/security.mjs';
 import {MemoryRepository} from './support/memory-repository.mjs';
 import {Federation} from '../server/federation.mjs';
 import {registrationConfig} from '../server/registration.mjs';
+import {RegistrationEmail} from '../server/registration.mjs';
 import {PasswordReset} from '../server/password-reset.mjs';
 import {MailSettings} from '../server/mail-settings.mjs';
 const PASSWORD='a-test-password-12345',HASH=await hashPassword(PASSWORD);
 const ORIGIN='http://localhost:3000';
 async function fixture(t,{basePath='',providers=[],trustProxies='',mailer=null,mailSettingsFactory=null,registration=registrationConfig()}={}){
  const users=[{id:randomUUID(),email:'owner@example.com',name:'소유자',password_hash:HASH,is_admin:true},{id:randomUUID(),email:'other@example.com',name:'팀원',password_hash:HASH,is_admin:false}];
- const repo=new MemoryRepository(users),mailSettings=mailSettingsFactory?mailSettingsFactory(repo):null,effectiveMailer=mailSettings||mailer,reset=effectiveMailer?new PasswordReset({repo,mailer:effectiveMailer,origin:ORIGIN,basePath,logger:{error(){}}}):null,handler=createHandler({repo,origin:ORIGIN,basePath,registration,trustProxies,passwordReset:reset,mailSettings,federation:new Federation({repo,origin:ORIGIN,basePath,providers}),logger:{error(){}}});
+ const repo=new MemoryRepository(users),mailSettings=mailSettingsFactory?mailSettingsFactory(repo):null,effectiveMailer=mailSettings||mailer,reset=effectiveMailer?new PasswordReset({repo,mailer:effectiveMailer,origin:ORIGIN,basePath,logger:{error(){}}}):null,registrationEmail=new RegistrationEmail({repo,mailer:effectiveMailer||{async sendVerification(){},async sendApproval(){}},origin:ORIGIN,basePath,logger:{error(){}}}),handler=createHandler({repo,origin:ORIGIN,basePath,registration,trustProxies,passwordReset:reset,registrationEmail,mailSettings,federation:new Federation({repo,origin:ORIGIN,basePath,providers}),logger:{error(){}}});
  async function inject(url,{method='GET',body,headers={}}={}){
   const req=Readable.from(body===undefined?[]:[Buffer.from(JSON.stringify(body))]);
   Object.assign(req,{url,method,headers,socket:{remoteAddress:'127.0.0.1'}});
@@ -37,7 +38,7 @@ async function fixture(t,{basePath='',providers=[],trustProxies='',mailer=null,m
   return {status:response.status,data,headers:response.headers};
  }
  async function login(email){const c=client(),r=await call(c,'auth/login',{method:'POST',body:{email,password:PASSWORD}});assert.equal(r.status,200);return c;}
- return {repo,users,client,call,login,inject,reset,mailSettings};
+ return {repo,users,client,call,login,inject,reset,mailSettings,registrationEmail};
 }
 const project=()=>({id:randomUUID(),name:'팀 프로젝트',description:'',holidays:[],members:[{id:'m1',name:'개발자',grade:'고급',role:'개발',hours:8,allocation:100}],tasks:[{id:'t1',name:'기능 개발',phase:'개발',owner:'m1',start:'2026-10-19',end:'2026-10-23',predecessor:'',memo:'',items:[{id:'i1',title:'기능 구현',hours:8,doneDate:null}]}]});
 test('외부 계정 매핑은 관리자·CSRF 검증, 비밀 제외, 기존 사용자 ID 보존',async t=>{
@@ -206,22 +207,27 @@ test('Excel 가져오기 API는 인증·CSRF·편집 권한과 파일 형식을 
 
 const application={name:'신규 팀원',email:'new@example.com',password:PASSWORD,confirmPassword:PASSWORD};
 test('회원가입: 승인 전 접근 차단, 관리자·CSRF 승인, 권한 위조 거절과 프로젝트 격리',async t=>{
- const f=await fixture(t,{basePath:'/pmcanvas'}),guest=f.client();
+ const messages=[],f=await fixture(t,{basePath:'/pmcanvas',mailer:{async sendVerification(m){messages.push(m);},async sendApproval(m){messages.push(m);}}}),guest=f.client();
  const policy=await f.call(guest,'auth/providers');assert.equal(policy.data.registration.mode,'approval');
  const result=await f.call(guest,'auth/register',{method:'POST',body:{...application,isAdmin:true,isActive:true,registrationPending:false}});
  assert.equal(result.status,202);assert.equal(result.headers.get('set-cookie'),null);assert.equal('user' in result.data,false);
  const stored=await f.repo.findUserByEmail(application.email);assert.equal(stored.is_admin,false);assert.equal(stored.is_active,false);assert.equal(stored.registration_pending,true);assert.match(stored.password_hash,/^scrypt-v2:/);
  assert.equal((await f.call(guest,'projects')).status,401);
- const before=await f.call(guest,'auth/login',{method:'POST',body:application});assert.equal(before.status,403);assert.equal(before.data.error.code,'APPROVAL_PENDING');assert.equal(f.repo.sessions.size,0);
+ const before=await f.call(guest,'auth/login',{method:'POST',body:application});assert.equal(before.status,403);assert.equal(before.data.error.code,'EMAIL_UNVERIFIED');assert.equal(f.repo.sessions.size,0);
  assert.equal((await f.call(guest,'auth/login',{method:'POST',body:{...application,password:'wrong'}})).status,401);
  const admin=await f.login('owner@example.com'),other=await f.login('other@example.com');
  const users=await f.call(admin,'users');assert.equal(users.data.users.find(u=>u.email===application.email).registrationPending,true);assert.equal(JSON.stringify(users.data).includes('scrypt-v2'),false);
  const route='users/'+stored.id;
  assert.equal((await f.call(other,route,{method:'PATCH',body:{isActive:true}})).status,403);
  assert.equal((await f.call(admin,route,{method:'PATCH',body:{isActive:true},headers:{'X-CSRF-Token':'bad'}})).status,403);
+ assert.equal((await f.call(admin,route,{method:'PATCH',body:{isActive:true}})).data.error.code,'EMAIL_UNVERIFIED');
+ await f.registrationEmail.idle();const proof=new URL(messages[0].url).hash.slice('#verify-email='.length);
+ assert.equal((await f.call(guest,'auth/verify-email',{method:'POST',body:{token:proof,name:application.name,newPassword:PASSWORD,confirmPassword:PASSWORD}})).status,200);
+ assert.equal((await f.call(guest,'auth/login',{method:'POST',body:application})).data.error.code,'APPROVAL_PENDING');
  const approved=await f.call(admin,route,{method:'PATCH',body:{isActive:true}});assert.equal(approved.data.user.registrationPending,false);assert.equal(approved.data.user.isActive,true);
  const login=await f.call(guest,'auth/login',{method:'POST',body:application});assert.equal(login.status,200);assert.equal(login.data.user.isAdmin,false);
  assert.deepEqual((await f.call(guest,'projects')).data.projects,[]);
+ await f.registrationEmail.idle();assert.equal(messages.length,2);assert.equal(f.repo.notices.get(stored.id).state,'sent');
  assert.ok(f.repo.security.some(e=>e.kind==='account.registration.requested'));
 });
 test('회원가입: 중복·기존 관리자·외부 계정에 같은 응답, 기존 정보와 비밀번호 보존',async t=>{
@@ -257,6 +263,36 @@ test('회원가입: 신뢰 프록시의 IP별 가입 한도는 다른 사용자�
 });
 
 const resetBody=value=>({token:value,newPassword:'new-reset-password-12345',confirmPassword:'new-reset-password-12345'});
+test('가입 이메일 인증 API: 비밀번호 없는 신청·재발송·Origin·만료 링크·기존 계정 보호·입력 제한',async t=>{
+ const messages=[],f=await fixture(t,{mailer:{async sendVerification(m){messages.push(m);},async sendApproval(){}}}),guest=f.client();
+ assert.equal((await f.call(guest,'auth/register',{method:'POST',body:{name:'신청자',email:application.email}})).status,202);await f.registrationEmail.idle();
+ const first=new URL(messages[0].url).hash.slice('#verify-email='.length);
+ assert.equal((await f.inject('/api/auth/verify-email?token='+first)).status,401);assert.equal((await f.repo.findUserByEmail(application.email)).email_verified_at,null);
+ const resend=email=>f.call(guest,'auth/resend-verification',{method:'POST',body:{email}});
+ const response=await resend(application.email);assert.equal(response.status,202);await f.registrationEmail.idle();assert.equal(messages.length,2);
+ assert.deepEqual((await resend('owner@example.com')).data,response.data);assert.deepEqual((await resend('missing@example.com')).data,response.data);await f.registrationEmail.idle();assert.equal(messages.length,2);
+ const proof=new URL(messages[1].url).hash.slice('#verify-email='.length),body={token:proof,name:'메일 소유자',newPassword:PASSWORD,confirmPassword:PASSWORD};
+ assert.equal((await f.call(guest,'auth/verify-email',{method:'POST',body,headers:{Origin:'https://evil.example'}})).status,403);
+ assert.equal((await f.call(guest,'auth/verify-email',{method:'POST',body:{...body,token:first}})).data.error.code,'VERIFICATION_INVALID');
+ assert.equal((await f.call(guest,'auth/verify-email',{method:'POST',body:{...body,confirmPassword:'different'}})).data.error.code,'PASSWORD_MISMATCH');
+ assert.equal((await f.call(guest,'auth/verify-email',{method:'POST',body:{...body,name:' '}})).data.error.code,'INVALID_NAME');
+ assert.equal((await f.call(guest,'auth/verify-email',{method:'POST',body})).status,200);
+ assert.equal((await f.call(guest,'auth/verify-email',{method:'POST',body})).data.error.code,'VERIFICATION_INVALID');
+ assert.equal((await resend(application.email)).status,202);await f.registrationEmail.idle();assert.equal(messages.length,2);
+ assert.equal((await resend(application.email)).status,429);
+});
+test('SMTP 미설정 시 가입 접수 차단, 승인 메일 재시도는 관리자·CSRF·실패 상태 검사',async t=>{
+ const disabled=await fixture(t,{mailSettingsFactory:repo=>new MailSettings({repo,key:Buffer.alloc(32,17)})});
+ assert.equal((await disabled.call(disabled.client(),'auth/providers')).data.registration.emailEnabled,false);
+ assert.equal((await disabled.call(disabled.client(),'auth/register',{method:'POST',body:application})).status,503);assert.equal(disabled.repo.users.size,2);
+ const f=await fixture(t),admin=await f.login('owner@example.com'),other=await f.login('other@example.com'),id=f.users[1].id,route='users/'+id+'/approval-notice';
+ assert.equal((await f.call(f.client(),route,{method:'POST',body:{}})).status,401);
+ assert.equal((await f.call(other,route,{method:'POST',body:{}})).status,403);
+ assert.equal((await f.call(admin,route,{method:'POST',body:{},headers:{'X-CSRF-Token':'bad'}})).status,403);
+ assert.equal((await f.call(admin,route,{method:'POST',body:{}})).status,409);
+ Object.assign(f.users[1],{is_active:true,email_verified_at:new Date()});f.repo.notices.set(id,{state:'failed',attempts:3,available:0});
+ assert.equal((await f.call(admin,route,{method:'POST',body:{}})).status,202);await f.registrationEmail.idle();assert.equal(f.repo.notices.get(id).state,'sent');
+});
 const mailToken=mail=>new URL(mail.url).hash.slice('#reset-password='.length);
 test('이메일 재설정: 동일 접수 응답·Origin·확인값·세션 폐기·일회성 링크·자동 로그인 금지',async t=>{
  const mails=[],f=await fixture(t,{basePath:'/pmcanvas',mailer:{sendReset:async mail=>mails.push(mail)}}),a=await f.login('other@example.com'),b=await f.login('other@example.com'),guest=f.client();

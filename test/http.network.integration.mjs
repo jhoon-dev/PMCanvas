@@ -6,16 +6,17 @@ import {randomUUID} from 'node:crypto';
 import {createApplication} from '../server/http.mjs';
 import {hashPassword} from '../server/security.mjs';
 import {MemoryRepository} from './support/memory-repository.mjs';
+import {RegistrationEmail} from '../server/registration.mjs';
 import {PasswordReset} from '../server/password-reset.mjs';
 import {MailSettings} from '../server/mail-settings.mjs';
 import {createMailer} from '../server/mailer.mjs';
-import {smtpFixture,resetLink} from './support/smtp-fixture.mjs';
+import {smtpFixture,resetLink,verificationLink,mailText} from './support/smtp-fixture.mjs';
 const networkTest=(name,fn)=>test(name,{skip:process.env.RUN_HTTP_TESTS!=='1'},fn);
 const PASSWORD='a-test-password-12345',HASH=await hashPassword(PASSWORD);
 const ORIGIN='http://localhost:3000';
 async function fixture(t,{basePath='',mailer=null,mailSettingsFactory=null}={}){
  const users=[{id:randomUUID(),email:'owner@example.com',name:'소유자',password_hash:HASH,is_admin:true},{id:randomUUID(),email:'other@example.com',name:'팀원',password_hash:HASH,is_admin:false}];
- const repo=new MemoryRepository(users),mailSettings=mailSettingsFactory?mailSettingsFactory(repo):null,effectiveMailer=mailSettings||mailer,reset=effectiveMailer?new PasswordReset({repo,mailer:effectiveMailer,origin:ORIGIN,basePath,logger:{error(){}}}):null,server=createApplication({repo,origin:ORIGIN,basePath,passwordReset:reset,mailSettings,logger:{error(){}}});
+ const repo=new MemoryRepository(users),mailSettings=mailSettingsFactory?mailSettingsFactory(repo):null,effectiveMailer=mailSettings||mailer,reset=effectiveMailer?new PasswordReset({repo,mailer:effectiveMailer,origin:ORIGIN,basePath,logger:{error(){}}}):null,registrationEmail=new RegistrationEmail({repo,mailer:effectiveMailer||{async sendVerification(){},async sendApproval(){}},origin:ORIGIN,basePath,logger:{error(){}}}),server=createApplication({repo,origin:ORIGIN,basePath,passwordReset:reset,registrationEmail,mailSettings,logger:{error(){}}});
  server.listen(0,'127.0.0.1');await once(server,'listening');
  t.after(()=>{server.closeAllConnections();return new Promise(resolve=>server.close(resolve));});
  const base='http://127.0.0.1:'+server.address().port+basePath+'/api/';
@@ -27,7 +28,7 @@ async function fixture(t,{basePath='',mailer=null,mailSettingsFactory=null}={}){
   return {status:response.status,data,headers:response.headers};
  }
  async function login(email){const c=client(),r=await call(c,'auth/login',{method:'POST',body:{email,password:PASSWORD}});assert.equal(r.status,200);return c;}
- return {repo,server,base,users,client,call,login,reset,mailSettings};
+ return {repo,server,base,users,client,call,login,reset,mailSettings,registrationEmail};
 }
 const project=()=>({id:randomUUID(),name:'팀 프로젝트',description:'',holidays:[],members:[{id:'m1',name:'개발자',grade:'고급',role:'개발',hours:8,allocation:100}],tasks:[{id:'t1',name:'기능 개발',phase:'개발',owner:'m1',start:'2026-10-19',end:'2026-10-23',predecessor:'',memo:'',items:[{id:'i1',title:'기능 구현',hours:8,doneDate:null}]}]});
 networkTest('로그인·쿠키·세션 만료·로그아웃',async t=>{
@@ -104,12 +105,29 @@ networkTest('하위 경로 /pmcanvas에서 화면과 API 실행, 임의 파일�
 });
 
 networkTest('회원가입 HTTP: 세션 없는 접수·승인 전 로그인 차단·승인 후 로그인',async t=>{
- const f=await fixture(t,{basePath:'/pmcanvas'}),c=f.client(),body={name:'가입 통신 검증',email:'network@example.com',password:PASSWORD,confirmPassword:PASSWORD};
+ const messages=[],f=await fixture(t,{basePath:'/pmcanvas',mailer:{async sendVerification(m){messages.push(m);},async sendApproval(m){messages.push(m);}}}),c=f.client(),body={name:'가입 통신 검증',email:'network@example.com',password:PASSWORD,confirmPassword:PASSWORD};
  const applied=await f.call(c,'auth/register',{method:'POST',body});assert.equal(applied.status,202);assert.equal(applied.headers.get('set-cookie'),null);
+ assert.equal((await f.call(c,'auth/login',{method:'POST',body})).data.error.code,'EMAIL_UNVERIFIED');
+ await f.registrationEmail.idle();const proof=new URL(messages[0].url).hash.slice('#verify-email='.length);
+ assert.equal((await f.call(c,'auth/verify-email',{method:'POST',body:{token:proof,name:body.name,newPassword:PASSWORD,confirmPassword:PASSWORD}})).status,200);
  assert.equal((await f.call(c,'auth/login',{method:'POST',body})).data.error.code,'APPROVAL_PENDING');
  const admin=await f.login('owner@example.com'),user=await f.repo.findUserByEmail(body.email);
  assert.equal((await f.call(admin,'users/'+user.id,{method:'PATCH',body:{isActive:true}})).status,200);
  const logged=await f.call(c,'auth/login',{method:'POST',body});assert.equal(logged.status,200);assert.match(logged.headers.get('set-cookie'),/HttpOnly/);assert.equal((await f.call(c,'auth/me')).data.user.email,body.email);
+});
+
+networkTest('가입 이메일 HTTP·TLS SMTP: 인증 메일 수신·승인 전 차단·승인 알림 한 번 전달',async t=>{
+ const smtp=await smtpFixture();t.after(()=>smtp.close());
+ const f=await fixture(t,{basePath:'/pmcanvas',mailSettingsFactory:repo=>new MailSettings({repo,key:Buffer.alloc(32,19),makeMailer:config=>createMailer({...config,transport:{...config.transport,tls:{...config.transport.tls,ca:smtp.ca,servername:'localhost'}}})})}),admin=await f.login('owner@example.com'),guest=f.client();
+ await f.mailSettings.save(f.users[0].id,{revision:0,enabled:true,host:'127.0.0.1',port:smtp.port,secure:true,from:'sender@example.com',authEnabled:true,username:'fixture',password:'test-only-secret'});
+ const email='new-network@example.com';assert.equal((await f.call(guest,'auth/register',{method:'POST',body:{email,name:'가입자'}})).status,202);await f.registrationEmail.idle();assert.equal(smtp.messages.length,1);
+ const link=verificationLink(smtp.messages[0]);assert.equal(new URL(link).pathname,'/pmcanvas/');assert.equal(new URL(link).search,'');assert.ok(mailText(smtp.messages[0]).includes('30분'));
+ const u=await f.repo.findUserByEmail(email),route='users/'+u.id;assert.equal((await f.call(admin,route,{method:'PATCH',body:{isActive:true}})).data.error.code,'EMAIL_UNVERIFIED');
+ const proof={token:new URL(link).hash.slice('#verify-email='.length),name:'인증한 가입자',newPassword:PASSWORD,confirmPassword:PASSWORD};assert.equal((await f.call(guest,'auth/verify-email',{method:'POST',body:proof})).status,200);
+ assert.equal((await f.call(guest,'auth/login',{method:'POST',body:{email,password:PASSWORD}})).data.error.code,'APPROVAL_PENDING');
+ assert.equal((await f.call(admin,route,{method:'PATCH',body:{isActive:true}})).status,200);await f.registrationEmail.idle();assert.equal(smtp.messages.length,2);assert.ok(mailText(smtp.messages[1]).includes('회원가입이 승인되었습니다'));assert.equal(mailText(smtp.messages[1]).includes(PASSWORD),false);
+ assert.equal((await f.call(guest,'auth/login',{method:'POST',body:{email,password:PASSWORD}})).status,200);
+ await f.call(admin,route,{method:'PATCH',body:{isActive:true}});await f.registrationEmail.idle();assert.equal(smtp.messages.length,2);
 });
 
 networkTest('이메일 재설정 HTTP·TLS SMTP: 실제 메일 수신·링크 사용·새 비밀번호 로그인',async t=>{

@@ -5,7 +5,7 @@ import {createApplication} from './http.mjs';
 import {hashPassword,emailAddress} from './security.mjs';
 import {loadAuthConfig} from './auth-config.mjs';
 import {Federation} from './federation.mjs';
-import {registrationConfig} from './registration.mjs';
+import {registrationConfig,RegistrationEmail} from './registration.mjs';
 import {MailSettings,legacyMailSettings} from './mail-settings.mjs';
 import {PasswordReset} from './password-reset.mjs';
 const pool=await createPool(),repo=new PgRepository(pool);
@@ -23,11 +23,12 @@ try{
  const federation=new Federation({repo,origin,basePath,providers});
  const keyFile=process.env.MFA_KEY_FILE||'config/secrets/mfa.key';const key=fs.readFileSync(keyFile);if(key.length!==32)throw Error('MFA_KEY_FILE must contain 32 random bytes. Run npm run setup or npm run service:up.');
  const mailer=new MailSettings({repo,key,legacy:(await repo.getMailSettings())?undefined:legacyMailSettings()}),passwordReset=new PasswordReset({repo,mailer,origin,basePath});
- const server=createApplication({repo,origin,basePath,federation,passwordReset,mailSettings:mailer,registration:registrationConfig(process.env),adminMfa:new AdminMfa(repo,key),trustProxies:process.env.TRUSTED_PROXIES||''});
+ const registrationEmail=new RegistrationEmail({repo,mailer,origin,basePath});registrationEmail.start();
+ const server=createApplication({repo,origin,basePath,federation,passwordReset,registrationEmail,mailSettings:mailer,registration:registrationConfig(process.env),adminMfa:new AdminMfa(repo,key),trustProxies:process.env.TRUSTED_PROXIES||''});
  console.log('Password reset email:',await mailer.enabled()?'enabled':'not configured');
  console.log('Authentication connections:',providers.map(p=>p.id+' ('+p.type+')').join(', ')||'local only');
  const port=Number(process.env.PORT||3000),host=process.env.HOST||'0.0.0.0';
  server.listen(port,host,()=>console.log('PM Canvas API listening on port '+port));
- const stop=()=>{server.close(async()=>{await passwordReset?.idle();mailer?.close();await pool.end();process.exit(0);});setTimeout(()=>process.exit(1),10000).unref();};
+ const stop=()=>{server.close(async()=>{await registrationEmail.close();await passwordReset?.idle();mailer?.close();await pool.end();process.exit(0);});setTimeout(()=>process.exit(1),10000).unref();};
  process.once('SIGTERM',stop);process.once('SIGINT',stop);
 }catch(error){console.error('Startup failed:',error.message);await pool.end();process.exitCode=1;}

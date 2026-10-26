@@ -47,10 +47,15 @@ export class MailSettings{
   this.sending++;let mailer;
   try{const state=await this.current();if(!state.config.enabled)fail(400,'MAIL_DISABLED','이메일 발송을 사용하도록 설정을 저장해 주세요.');
    mailer=this.makeMailer(mailConfig({...state.config,username:state.config.authEnabled?state.config.username:''},{password:state.password}));
-   if(method==='sendReset')await mailer.sendReset(argument);else await mailer.sendTest(argument);
+   if(method==='sendReset')await mailer.sendReset(argument);
+   else if(method==='sendVerification')await mailer.sendVerification(argument);
+   else if(method==='sendApproval')await mailer.sendApproval(argument);
+   else await mailer.sendTest(argument);
   }finally{mailer?.close();this.sending--;}
  }
  sendReset(message){return this.#send('sendReset',message);}
+ sendVerification(message){return this.#send('sendVerification',message);}
+ sendApproval(message){return this.#send('sendApproval',message);}
  async test(to){
   to=mailAddress(to);
   try{await this.#send('sendTest',to);}catch(error){

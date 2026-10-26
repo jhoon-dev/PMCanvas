@@ -22,8 +22,11 @@ export async function smtpFixture(){
  server.listen(0,'127.0.0.1');await once(server,'listening');
  return {port:server.address().port,ca:cert.cert,messages,close:()=>new Promise(resolve=>{for(const socket of sockets)socket.destroy();server.close(resolve);})};
 }
-export function resetLink(message){
+export function mailText(message){
  const body=message.slice(message.indexOf('\r\n\r\n')+4);
  const decoded=/^Content-Transfer-Encoding: base64\r?$/mi.test(message)?Buffer.from(body,'base64').toString('utf8'):body.replace(/=\r?\n/g,'').replace(/=([0-9A-F]{2})/gi,(_,hex)=>String.fromCharCode(parseInt(hex,16)));
- return decoded.match(/https?:\/\/[^\s<>]+#reset-password=[A-Za-z0-9_-]{43}/)?.[0];
+ return decoded;
+}
+export function resetLink(message){return mailText(message).match(/https?:\/\/[^\s<>]+#reset-password=[A-Za-z0-9_-]{43}/)?.[0];}
+export function verificationLink(message){return mailText(message).match(/https?:\/\/[^\s<>]+#verify-email=[A-Za-z0-9_-]{43}/)?.[0];
 }

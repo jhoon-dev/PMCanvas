@@ -10,8 +10,9 @@ import {token,digest,safeEqual,hashPassword,verifyPassword,emailAddress,cookieVa
 import {cleanProject,uuid} from './project.mjs';
 import {Federation} from './federation.mjs';
 import {registrationConfig} from './registration.mjs';
+import {mailAddress} from './mailer.mjs';
 
-export function createHandler({repo,origin='http://localhost:3000',basePath='',logger=console,trustProxies='',adminMfa=null,passwordReset=null,mailSettings=null,registration=registrationConfig(),federation=new Federation({repo,origin,basePath})}){
+export function createHandler({repo,origin='http://localhost:3000',basePath='',logger=console,trustProxies='',adminMfa=null,passwordReset=null,registrationEmail=null,mailSettings=null,registration=registrationConfig(),federation=new Federation({repo,origin,basePath})}){
  if(new URL(origin).origin!==origin)throw Error('PUBLIC_ORIGIN must contain only scheme and host, without a path or trailing slash.');
  if(basePath&&!/^\/[a-zA-Z0-9_-]+(?:\/[a-zA-Z0-9_-]+)*$/.test(basePath))throw Error('BASE_PATH must be empty or a path without a trailing slash.');
  const secure=new URL(origin).protocol==='https:',reserve=requestLimiter(repo),trusted=proxyList(trustProxies);
@@ -58,7 +59,7 @@ export function createHandler({repo,origin='http://localhost:3000',basePath='',l
    auditPath=path;const method=req.method;
    if(path==='/api/health'&&method==='GET'){try{await repo.health();return json(res,200,{ok:true});}catch{return json(res,503,{ok:false});}}
    req.clientIp=clientAddress(req,trusted);
-   if(path==='/api/auth/providers'&&method==='GET')return json(res,200,{providers:federation.list(),registration,passwordReset:{enabled:!!passwordReset&&(!mailSettings||await mailSettings.enabled())}});
+   if(path==='/api/auth/providers'&&method==='GET')return json(res,200,{providers:federation.list(),registration:{...registration,emailVerification:true,emailEnabled:!!registrationEmail&&(!mailSettings||await mailSettings.enabled())},passwordReset:{enabled:!!passwordReset&&(!mailSettings||await mailSettings.enabled())}});
    const sso=path.match(/^\/api\/auth\/sso\/([a-z][a-z0-9_-]{0,39})\/(start|callback|metadata)$/);
    if(sso){
     const [,id,action]=sso,p=federation.provider(id);
@@ -124,25 +125,45 @@ export function createHandler({repo,origin='http://localhost:3000',basePath='',l
     const result=await passwordReset.finish(body.token,body.newPassword,body.confirmPassword);req.actorId=result.id;await audit(req,'auth.password_reset.completed');
     return json(res,200,{ok:true},{'Set-Cookie':sessionCookie('',{...cookieConfig,maxAge:0})});
    }
+   if((path==='/api/auth/verify-email'||path==='/api/auth/resend-verification')&&method==='POST'){
+    if(!registrationEmail)fail(503,'VERIFICATION_UNAVAILABLE','현재 이메일 인증을 사용할 수 없습니다. 관리자에게 문의해 주세요.');
+    const resend=path.endsWith('/resend-verification');
+    await reserve(resend?'verification-resend-global':'verification-finish-global',resend?100:200,resend?3600000:900000);
+    if(req.clientIp)await reserve((resend?'verification-resend-ip:':'verification-finish-ip:')+req.clientIp,resend?10:20,900000);
+    const body=await readJson(req,16384);
+    if(resend){
+     if(registration.mode!=='approval')fail(403,'REGISTRATION_DISABLED','현재 회원가입을 받지 않습니다.');
+     if(mailSettings&&!await mailSettings.enabled())fail(503,'VERIFICATION_UNAVAILABLE','현재 이메일 인증을 사용할 수 없습니다. 관리자에게 문의해 주세요.');
+     const email=mailAddress(body.email);req.loginHash=digest(email);await reserve('registration-email:'+email,3,3600000);
+     registrationEmail.request(email,req.clientIp?digest(req.clientIp):null);
+     return json(res,202,{ok:true,message:'이메일 인증이 필요한 가입 신청이라면 인증 메일을 보내드립니다. 받은 편지함과 스팸함을 확인해 주세요.'});
+    }
+    if(typeof body.token==='string'&&body.token.length<=128)await reserve('verification-token:'+body.token,5,900000);
+    const result=await registrationEmail.finish(body.token,body.name,body.newPassword,body.confirmPassword);req.actorId=result.id;await audit(req,'account.verification.completed');
+    return json(res,200,{ok:true,message:'이메일 인증을 완료했습니다. 관리자 승인 후 안내 메일을 보내드립니다.'});
+   }
    if(path==='/api/auth/register'&&method==='POST'){
     if(registration.mode!=='approval')fail(403,'REGISTRATION_DISABLED','현재 회원가입을 받지 않습니다. 관리자에게 문의해 주세요.');
+    if(!registrationEmail||(mailSettings&&!await mailSettings.enabled()))fail(503,'VERIFICATION_UNAVAILABLE','회원가입에는 이메일 인증이 필요합니다. 관리자에게 메일 설정을 요청해 주세요.');
     await reserve('registration-global',100,3600000);if(req.clientIp)await reserve('registration-ip:'+req.clientIp,10,900000);
-    const body=await readJson(req,16384),email=emailAddress(body.email);
+    const body=await readJson(req,16384),email=mailAddress(body.email);
     req.loginHash=digest(email);await reserve('registration-email:'+email,3,3600000);
     if(registration.domains.length&&!registration.domains.includes(email.split('@')[1]))fail(400,'REGISTRATION_DOMAIN','가입 가능한 회사 이메일을 입력해 주세요.');
     if(typeof body.name!=='string'||!body.name.trim()||body.name.length>80)fail(400,'INVALID_NAME','이름은 1~80자로 입력해 주세요.');
     if(body.password!==body.confirmPassword)fail(400,'PASSWORD_MISMATCH','비밀번호 확인이 일치하지 않습니다.');
-    const passwordHash=await hashPassword(body.password);
+    const passwordHash=await hashPassword(body.password===undefined&&body.confirmPassword===undefined?token():body.password);
     try{
      const created=await repo.createUser({email,name:body.name.trim(),passwordHash,isAdmin:false,registrationPending:true});
      await audit(req,'account.registration.requested',{targetId:created.id});
     }catch(error){if(error.code!=='EMAIL_EXISTS')throw error;}
-    return json(res,202,{ok:true,message:'가입 신청을 접수했습니다. 관리자 승인 후 로그인해 주세요.'});
+    registrationEmail.request(email,req.clientIp?digest(req.clientIp):null);
+    return json(res,202,{ok:true,message:'가입 신청을 접수했습니다. 인증 메일에서 이메일 인증을 완료해 주세요. 인증 후 관리자 승인이 필요합니다.'});
    }
    if(path==='/api/auth/login'&&method==='POST'){
     const body=await readJson(req,16384),email=emailAddress(body.email);
     req.loginHash=digest(email);await reserve('local:'+email);if(req.clientIp)await reserve('login-ip:'+req.clientIp,40);
     const user=await repo.findUserByEmail(email),valid=await verifyPassword(body.password,user?.password_hash||await dummyHash);
+    if(user&&valid&&user.registration_pending&&!user.email_verified_at)fail(403,'EMAIL_UNVERIFIED','이메일 인증이 필요합니다. 받은 인증 메일을 확인하거나 인증 메일을 다시 요청해 주세요.');
     if(user&&valid&&user.registration_pending)fail(403,'APPROVAL_PENDING','가입 승인 대기 중입니다. 관리자에게 승인 여부를 확인해 주세요.');
     if(!user||!valid||user.is_active===false||user.local_login===false)fail(401,'LOGIN_FAILED','이메일 또는 비밀번호를 확인해 주세요.');
     req.actorId=user.id;
@@ -197,6 +218,15 @@ export function createHandler({repo,origin='http://localhost:3000',basePath='',l
      const result=method==='POST'?await repo.linkIdentity(user.id,{providerKey:p.key,subject:body.subject,email:emailAddress(body.email)}):await repo.unlinkIdentity(user.id,p.key,body.subject);await audit(req,method==='POST'?'account.identity.linked':'account.identity.unlinked',{provider:p.id});return json(res,200,result);
     }
    }
+   const noticeMatch=path.match(/^\/api\/users\/([^/]+)\/approval-notice$/);
+   if(noticeMatch&&method==='POST'){
+    if(!user.isAdmin)fail(403,'FORBIDDEN','관리자 권한이 필요합니다.');
+    if(!uuid(noticeMatch[1]))fail(404,'USER_NOT_FOUND','계정을 찾을 수 없습니다.');
+    if(!registrationEmail)fail(503,'NOTICE_UNAVAILABLE','안내 메일 발송을 사용할 수 없습니다.');
+    await reserve('approval-notice:'+noticeMatch[1],3,3600000);await reserve('approval-notice-global',100,3600000);
+    await repo.retryApprovalNotification(user.id,noticeMatch[1]);await audit(req,'account.approval_notice.retried',{targetId:noticeMatch[1]});registrationEmail.notify();
+    return json(res,202,{ok:true});
+   }
    const userMatch=path.match(/^\/api\/users\/([^/]+)$/);
    if(userMatch&&method==='PATCH'){
     if(!user.isAdmin)fail(403,'FORBIDDEN','관리자만 계정을 관리할 수 있습니다.');
@@ -205,7 +235,7 @@ export function createHandler({repo,origin='http://localhost:3000',basePath='',l
     if(keys.length!==1||!['isActive','password'].includes(keys[0]))fail(400,'INVALID_UPDATE','계정 상태 또는 비밀번호 중 하나를 지정해 주세요.');
     if('isActive' in body&&typeof body.isActive!=='boolean')fail(400,'INVALID_STATUS','계정 상태가 올바르지 않습니다.');
     const update='password' in body?{passwordHash:await hashPassword(body.password)}:{isActive:body.isActive};
-    const managed=await repo.manageUser(user.id,userMatch[1],update);await audit(req,'account.user.updated',{targetId:userMatch[1],change:keys[0]});return json(res,200,{user:managed});
+    const managed=await repo.manageUser(user.id,userMatch[1],update);if(managed.approvalMailStatus==='pending')registrationEmail?.notify();await audit(req,'account.user.updated',{targetId:userMatch[1],change:keys[0]});return json(res,200,{user:managed});
    }
    if(path==='/api/users'){
     if(!user.isAdmin)fail(403,'FORBIDDEN','관리자만 계정을 관리할 수 있습니다.');

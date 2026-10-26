@@ -3,7 +3,7 @@ import {randomUUID} from 'node:crypto';
 import {fail} from './errors.mjs';
 import {digest} from './security.mjs';
 import {cleanProject,projectChanges} from './project.mjs';
-export const publicUser=u=>({id:u.id,email:u.email,name:u.name,isAdmin:!!u.is_admin,isActive:u.is_active!==false,localLogin:u.local_login!==false,registrationPending:!!u.registration_pending});
+export const publicUser=u=>({id:u.id,email:u.email,name:u.name,isAdmin:!!u.is_admin,isActive:u.is_active!==false,localLogin:u.local_login!==false,registrationPending:!!u.registration_pending,emailVerified:!!u.email_verified_at,approvalMailStatus:u.approval_mail_status||null});
 
 export async function createPool(env=process.env){
  const {Pool}=await import('pg');
@@ -19,7 +19,7 @@ export async function migrate(pool){
  try{
   await client.query('BEGIN');await client.query('SELECT pg_advisory_xact_lock(726534001)');
   await client.query('CREATE TABLE IF NOT EXISTS pm_schema_migrations(version integer PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())');
-  for(const [version,file] of [[1,'001_initial.sql'],[2,'002_user_status.sql'],[3,'003_federated_auth.sql'],[4,'004_planning.sql'],[5,'005_security.sql'],[6,'006_registration.sql'],[7,'007_password_reset.sql'],[8,'008_mail_settings.sql']]){
+  for(const [version,file] of [[1,'001_initial.sql'],[2,'002_user_status.sql'],[3,'003_federated_auth.sql'],[4,'004_planning.sql'],[5,'005_security.sql'],[6,'006_registration.sql'],[7,'007_password_reset.sql'],[8,'008_mail_settings.sql'],[9,'009_registration_email.sql']]){
    const {rows}=await client.query('SELECT version FROM pm_schema_migrations WHERE version=$1',[version]);
    if(!rows.length){await client.query(fs.readFileSync(new URL('../migrations/'+file,import.meta.url),'utf8'));await client.query('INSERT INTO pm_schema_migrations(version) VALUES ($1)',[version]);}
   }
@@ -60,10 +60,10 @@ export class PgRepository{
  async findUserByEmail(email){return (await this.pool.query('SELECT * FROM pm_users WHERE email=$1',[email])).rows[0]||null;}
  async countUsers(){return Number((await this.pool.query('SELECT count(*) AS n FROM pm_users')).rows[0].n);}
  async createUser({email,name,passwordHash,isAdmin=false,registrationPending=false}){
-  try{const {rows}=await this.pool.query('INSERT INTO pm_users(id,email,name,password_hash,is_admin,is_active,registration_pending) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *',[randomUUID(),email,name,passwordHash,isAdmin,!registrationPending,registrationPending]);return publicUser(rows[0]);}
+  try{const {rows}=await this.pool.query('INSERT INTO pm_users(id,email,name,password_hash,is_admin,is_active,registration_pending,email_verification_required) VALUES ($1,$2,$3,$4,$5,$6,$7,$7) RETURNING *',[randomUUID(),email,name,passwordHash,isAdmin,!registrationPending,registrationPending]);return publicUser(rows[0]);}
   catch(error){if(error.code==='23505')fail(409,'EMAIL_EXISTS','이미 등록된 이메일입니다.');throw error;}
  }
- async listUsers(){return (await this.pool.query('SELECT id,email,name,is_admin,is_active,local_login,registration_pending FROM pm_users ORDER BY registration_pending DESC,created_at')).rows.map(publicUser);}
+ async listUsers(){return (await this.pool.query('SELECT u.*,n.state AS approval_mail_status FROM pm_users u LEFT JOIN pm_approval_notifications n ON n.user_id=u.id ORDER BY u.registration_pending DESC,u.created_at')).rows.map(publicUser);}
  async createSession({hash,userId,csrf,expires,passwordHash}){
   return this.transaction(async c=>{
    const user=(await c.query('SELECT password_hash,is_active,local_login FROM pm_users WHERE id=$1 FOR UPDATE',[userId])).rows[0];
@@ -94,10 +94,54 @@ export class PgRepository{
    if(!target)fail(404,'USER_NOT_FOUND','계정을 찾을 수 없습니다.');
    if(target.is_admin||actorId===targetId)fail(403,'ADMIN_PROTECTED','관리자 계정은 본인의 비밀번호 변경만 가능합니다.');
    if(passwordHash&&!target.local_login)fail(400,'EXTERNAL_PASSWORD','외부 인증 계정의 비밀번호는 인증 서버에서 변경해 주세요.');
+   if(isActive===true&&target.registration_pending&&!target.email_verified_at)fail(409,'EMAIL_UNVERIFIED','이메일 인증을 완료한 계정만 승인할 수 있습니다.');
+   const approving=isActive===true&&target.registration_pending;
    const {rows}=await c.query('UPDATE pm_users SET is_active=COALESCE($2,is_active),registration_pending=CASE WHEN $2 THEN false ELSE registration_pending END,password_hash=COALESCE($3,password_hash) WHERE id=$1 RETURNING *',[targetId,isActive??null,passwordHash??null]);
    await c.query('DELETE FROM pm_sessions WHERE user_id=$1',[targetId]);
    if(passwordHash||isActive===false)await c.query('DELETE FROM pm_password_resets WHERE user_id=$1',[targetId]);
+   if(approving){await c.query('INSERT INTO pm_approval_notifications(user_id) VALUES ($1) ON CONFLICT(user_id) DO NOTHING',[targetId]);rows[0].approval_mail_status='pending';}
    return publicUser(rows[0]);
+  });
+ }
+ async issueEmailVerification({userId,passwordHash,hash,expires}){
+  return this.transaction(async c=>{
+   const u=(await c.query('SELECT * FROM pm_users WHERE id=$1 FOR UPDATE',[userId])).rows[0];
+   if(!u?.registration_pending||!u.local_login||u.email_verified_at||u.password_hash!==passwordHash)return false;
+   await c.query('DELETE FROM pm_email_verifications WHERE expires_at<now()');
+   await c.query('INSERT INTO pm_email_verifications(user_id,token_hash,password_hash,expires_at) VALUES ($1,$2,$3,$4) ON CONFLICT(user_id) DO UPDATE SET token_hash=$2,password_hash=$3,expires_at=$4',[userId,hash,passwordHash,expires]);return true;
+  });
+ }
+ async revokeEmailVerification(hash){await this.pool.query('DELETE FROM pm_email_verifications WHERE token_hash=$1',[hash]);}
+ async consumeEmailVerification(hash,{passwordHash,name}){
+  return this.transaction(async c=>{
+   const invalid=()=>fail(400,'VERIFICATION_INVALID','유효하지 않거나 만료된 링크입니다. 인증 메일을 다시 요청해 주세요.');
+   const entry=(await c.query('SELECT user_id FROM pm_email_verifications WHERE token_hash=$1 AND expires_at>now()',[hash])).rows[0];if(!entry)invalid();
+   const u=(await c.query('SELECT * FROM pm_users WHERE id=$1 FOR UPDATE',[entry.user_id])).rows[0];
+   const proof=(await c.query('DELETE FROM pm_email_verifications WHERE user_id=$1 AND token_hash=$2 AND expires_at>now() RETURNING password_hash',[entry.user_id,hash])).rows[0];
+   if(!proof||!u?.registration_pending||!u.local_login||u.email_verified_at||proof.password_hash!==u.password_hash)invalid();
+   // The mailbox owner chooses credentials, including after an unsolicited pre-registration.
+   await c.query('UPDATE pm_users SET email_verified_at=now(),password_hash=$2,name=$3 WHERE id=$1',[u.id,passwordHash,name]);
+   await c.query('DELETE FROM pm_sessions WHERE user_id=$1',[u.id]);
+   await c.query('DELETE FROM pm_auth_attempts WHERE key=$1',[digest('local:'+u.email)]);return {id:u.id};
+  });
+ }
+ async claimApprovalNotification(){
+  return this.transaction(async c=>{
+   const row=(await c.query("SELECT n.user_id,u.email FROM pm_approval_notifications n JOIN pm_users u ON u.id=n.user_id WHERE u.is_active AND NOT u.registration_pending AND u.email_verified_at IS NOT NULL AND n.state IN ('pending','sending') AND n.available_at<=now() ORDER BY n.available_at FOR UPDATE OF n SKIP LOCKED LIMIT 1")).rows[0];
+   if(!row)return null;
+   const lease=randomUUID();await c.query("UPDATE pm_approval_notifications SET state='sending',attempts=attempts+1,lease=$2,available_at=now()+interval '2 minutes',updated_at=now() WHERE user_id=$1",[row.user_id,lease]);return {userId:row.user_id,email:row.email,lease};
+  });
+ }
+ async finishApprovalNotification(userId,lease,sent){
+  await this.pool.query("UPDATE pm_approval_notifications SET state=CASE WHEN $3 THEN 'sent' WHEN attempts>=3 THEN 'failed' ELSE 'pending' END,lease=NULL,available_at=now()+interval '1 minute',updated_at=now() WHERE user_id=$1 AND lease=$2 AND state='sending'",[userId,lease,sent]);
+ }
+ async retryApprovalNotification(actorId,targetId){
+  return this.transaction(async c=>{
+   const actor=(await c.query('SELECT is_admin,is_active FROM pm_users WHERE id=$1 FOR UPDATE',[actorId])).rows[0];if(!actor?.is_admin||!actor.is_active)fail(403,'FORBIDDEN','관리자 권한이 필요합니다.');
+   const u=(await c.query('SELECT * FROM pm_users WHERE id=$1 FOR UPDATE',[targetId])).rows[0];
+   if(!u?.is_active||u.registration_pending||!u.email_verified_at)fail(409,'NOTICE_UNAVAILABLE','가입 승인이 완료된 계정만 안내 메일을 보낼 수 있습니다.');
+   const r=await c.query("UPDATE pm_approval_notifications SET state='pending',attempts=0,lease=NULL,available_at=now(),updated_at=now() WHERE user_id=$1 AND state='failed' RETURNING user_id",[targetId]);
+   if(!r.rowCount)fail(409,'NOTICE_UNAVAILABLE','발송에 실패한 안내 메일만 다시 요청할 수 있습니다.');
   });
  }
  async getMailSettings(){return (await this.pool.query('SELECT config,password_encrypted,revision FROM pm_mail_settings WHERE id=true')).rows[0]||null;}

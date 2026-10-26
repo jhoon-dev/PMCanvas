@@ -18,10 +18,16 @@ export class MemoryRepository{
   else{if(!state?.recovery_hashes.includes(recoveryHash))fail(401,'MFA_REPLAY','복구 코드 재사용');state.recovery_hashes=state.recovery_hashes.filter(h=>h!==recoveryHash);}
   this.transients.delete(key);
  }
- constructor(users=[]){this.users=new Map(users.map(u=>[u.id,u]));this.sessions=new Map();this.projects=new Map();this.events=new Map();this.transients=new Map();this.identities=new Map();this.resets=new Map();}
+ constructor(users=[]){this.users=new Map(users.map(u=>[u.id,u]));this.sessions=new Map();this.projects=new Map();this.events=new Map();this.transients=new Map();this.identities=new Map();this.resets=new Map();this.verifications=new Map();this.notices=new Map();}
  async health(){}
  async findUserByEmail(email){return [...this.users.values()].find(u=>u.email===email);}
- async listUsers(){return [...this.users.values()].map(publicUser);}
+ async listUsers(){return [...this.users.values()].map(u=>publicUser({...u,approval_mail_status:this.notices.get(u.id)?.state}));}
+ async issueEmailVerification({userId,passwordHash,hash,expires}){const u=this.users.get(userId);if(!u?.registration_pending||u.local_login===false||u.email_verified_at||u.password_hash!==passwordHash)return false;this.verifications.set(userId,{hash,passwordHash,expires});return true;}
+ async revokeEmailVerification(hash){for(const [id,v] of this.verifications)if(v.hash===hash)this.verifications.delete(id);}
+ async consumeEmailVerification(hash,{passwordHash,name}){const entry=[...this.verifications].find(([,v])=>v.hash===hash&&new Date(v.expires)>new Date()),u=entry?this.users.get(entry[0]):null,v=entry?.[1];if(!u?.registration_pending||u.local_login===false||u.email_verified_at||u.password_hash!==v.passwordHash)fail(400,'VERIFICATION_INVALID','유효하지 않거나 만료된 링크입니다.');this.verifications.delete(u.id);u.email_verified_at=new Date();u.password_hash=passwordHash;u.name=name;this.revokeSessions(u.id);this.attempts?.delete(digest('local:'+u.email));return {id:u.id};}
+ async claimApprovalNotification(){for(const [userId,n] of this.notices){const u=this.users.get(userId);if(u.is_active&&!u.registration_pending&&u.email_verified_at&&['pending','sending'].includes(n.state)&&n.available<=Date.now()){n.state='sending';n.attempts++;n.lease=randomUUID();n.available=Date.now()+120000;return {userId,email:u.email,lease:n.lease};}}return null;}
+ async finishApprovalNotification(userId,lease,sent){const n=this.notices.get(userId);if(n?.state==='sending'&&n.lease===lease){n.state=sent?'sent':n.attempts>=3?'failed':'pending';n.lease=null;n.available=Date.now()+60000;}}
+ async retryApprovalNotification(actorId,targetId){const a=this.users.get(actorId),u=this.users.get(targetId),n=this.notices.get(targetId);if(!a?.is_admin||a.is_active===false)fail(403,'FORBIDDEN','관리자 필요');if(!u?.is_active||u.registration_pending||!u.email_verified_at||n?.state!=='failed')fail(409,'NOTICE_UNAVAILABLE','재발송 불가');Object.assign(n,{state:'pending',attempts:0,lease:null,available:0});}
  async getMailSettings(){return this.mailSettings?structuredClone(this.mailSettings):null;}
  async saveMailSettings(actorId,{config,passwordEncrypted,revision}){const actor=this.users.get(actorId);if(!actor?.is_admin||actor.is_active===false)fail(403,'FORBIDDEN','관리자 권한이 필요합니다.');if((this.mailSettings?.revision||0)!==revision)fail(409,'MAIL_CONFLICT','다른 관리자가 설정을 변경했습니다.');this.mailSettings={config:structuredClone(config),password_encrypted:passwordEncrypted,revision:revision+1};}
  async issuePasswordReset({userId,passwordHash,hash,expires}){const u=this.users.get(userId);if(!u||u.is_active===false||u.local_login===false||u.registration_pending||u.password_hash!==passwordHash)return false;this.resets.set(userId,{userId,passwordHash,hash,expires});return true;}
@@ -39,7 +45,7 @@ export class MemoryRepository{
  async listIdentities(){return [...this.identities].map(([key,id])=>{const [providerKey,...subject]=key.split('|'),u=this.users.get(id);return {providerKey,subject:subject.join('|'),email:u.email,name:u.name};});}
  async linkIdentity(actorId,{providerKey,subject,email}){const actor=this.users.get(actorId),u=await this.findUserByEmail(email);if(!actor?.is_admin)fail(403,'FORBIDDEN','관리자 필요');if(!u)fail(404,'USER_NOT_FOUND','계정 없음');if(u.is_admin)fail(403,'ADMIN_PROTECTED','관리자 보호');const key=providerKey+'|'+subject;if(this.identities.has(key))fail(409,'IDENTITY_EXISTS','연결 있음');this.identities.set(key,u.id);return {ok:true};}
  async unlinkIdentity(actorId,providerKey,subject){if(!this.users.get(actorId)?.is_admin)fail(403,'FORBIDDEN','관리자 필요');const key=providerKey+'|'+subject,id=this.identities.get(key);if(!id)fail(404,'IDENTITY_NOT_FOUND','연결 없음');this.identities.delete(key);this.revokeSessions(id);return {ok:true};}
- async createUser({email,name,passwordHash,isAdmin=false,registrationPending=false}){if(await this.findUserByEmail(email))fail(409,'EMAIL_EXISTS','이미 등록된 이메일입니다.');const u={id:randomUUID(),email,name,password_hash:passwordHash,is_admin:isAdmin,is_active:!registrationPending,registration_pending:registrationPending};this.users.set(u.id,u);return publicUser(u);}
+ async createUser({email,name,passwordHash,isAdmin=false,registrationPending=false}){if(await this.findUserByEmail(email))fail(409,'EMAIL_EXISTS','이미 등록된 이메일입니다.');const u={id:randomUUID(),email,name,password_hash:passwordHash,is_admin:isAdmin,is_active:!registrationPending,registration_pending:registrationPending,email_verification_required:registrationPending,email_verified_at:null};this.users.set(u.id,u);return publicUser(u);}
  async createSession({hash,passwordHash,...data}){const u=this.users.get(data.userId);if(!u||u.is_active===false||u.password_hash!==passwordHash)fail(401,'LOGIN_FAILED','계정 정보가 변경되었습니다.');this.sessions.set(hash,data);}
  async findSession(hash){const s=this.sessions.get(hash);if(!s||new Date(s.expires)<new Date())return null;const u=this.users.get(s.userId);if(!u||u.is_active===false)return null;return {user:publicUser(u),csrf:s.csrf};}
  async deleteSession(hash){this.sessions.delete(hash);}
@@ -50,9 +56,11 @@ export class MemoryRepository{
   if(!actor?.is_admin||actor.is_active===false)fail(403,'FORBIDDEN','권한이 없습니다.');
   if(!target)fail(404,'USER_NOT_FOUND','계정이 없습니다.');
   if(target.is_admin||actorId===targetId)fail(403,'ADMIN_PROTECTED','관리자 계정은 보호됩니다.');
+  if(isActive===true&&target.registration_pending&&!target.email_verified_at)fail(409,'EMAIL_UNVERIFIED','이메일 인증이 필요합니다.');
+  if(isActive===true&&target.registration_pending&&!this.notices.has(targetId))this.notices.set(targetId,{state:'pending',attempts:0,available:0});
   if(isActive!==undefined)target.is_active=isActive;if(isActive===true)target.registration_pending=false;
   if(passwordHash!==undefined)target.password_hash=passwordHash;if(passwordHash||isActive===false)this.resets.delete(targetId);
-  this.revokeSessions(targetId);return publicUser(target);
+  this.revokeSessions(targetId);return publicUser({...target,approval_mail_status:this.notices.get(targetId)?.state});
  }
  access(userId,id,minimum='viewer'){const p=this.projects.get(id),role=p?.roles[userId];if(!role)fail(404,'NOT_FOUND','프로젝트를 찾을 수 없습니다.');if(minimum==='owner'&&role!=='owner'||minimum==='editor'&&role==='viewer')fail(403,'FORBIDDEN','권한이 없습니다.');return p;}
  document(p,userId){return {...structuredClone(p.data),id:p.id,_revision:p.revision,_role:p.roles[userId]};}
