@@ -20,7 +20,9 @@
     "backup": "node scripts/manage.mjs backup",
     "restore": "node scripts/manage.mjs restore",
     "auth:check": "node --env-file-if-exists=.env scripts/check-auth.mjs",
-    "mail:check": "node --env-file-if-exists=.env scripts/check-mail.mjs"
+    "mail:check": "node --env-file-if-exists=.env scripts/check-mail.mjs",
+    "format": "prettier --write public server scripts test package.json .prettierrc.json",
+    "format:check": "prettier --check public server scripts test package.json .prettierrc.json"
   },
   "dependencies": {
     "@node-saml/node-saml": "5.1.0",
@@ -33,6 +35,7 @@
     "yauzl": "3.4.0"
   },
   "devDependencies": {
+    "prettier": "3.9.10",
     "selfsigned": "5.5.0",
     "xml-crypto": "6.4.0"
   },
