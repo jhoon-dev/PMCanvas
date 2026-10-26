@@ -14,7 +14,9 @@ npm test
 git config blame.ignoreRevsFile .git-blame-ignore-revs
 ```
 
-프론트엔드는 빌드 없이 ES 모듈을 사용합니다. 기능별 화면은 public/*-ui.js, 공통 다이얼로그와 HTML 이스케이프는 info-dialog.js와 html.js에 둡니다. 사용자 입력을 HTML 문자열에 넣을 때는 escapeHtml을 적용하세요. 새 브라우저 모듈은 server/http.mjs의 정적 파일 허용 목록에도 등록해야 합니다.
+프론트엔드는 빌드 없이 ES 모듈을 사용합니다. 대시보드는 `public/dashboard-view.js`, WBS 화면과 서버 연결은 `public/wbs-view.js`, WBS 표·간트·초안 편집은 `public/wbs-workspace.js`에 둡니다. 대시보드 렌더러는 프로젝트·계산 결과·보고일을 명시적으로 받으며 전역 선택 프로젝트를 읽지 않습니다. `app.js`는 화면 선택과 공유 상태 연결을 담당합니다.
+
+공통 아이콘·날짜 도구·인력 표시 등은 `view-ui.js`, 공통 다이얼로그와 HTML 이스케이프는 `info-dialog.js`와 `html.js`에 둡니다. 계정·메일·백업·내 업무의 기능별 화면은 `public/*-ui.js`에 있습니다. 사용자 입력을 HTML 문자열에 넣을 때는 escapeHtml을 적용하세요. 새 브라우저 모듈은 server/http.mjs의 정적 파일 허용 목록에도 등록하고 하위 경로 HTTP 테스트를 갱신해야 합니다.
 
 DB 변경은 migrations/에 연속 번호의 `NNN_description.sql` 파일을 추가합니다. 서버가 번호 순서로 발견하고 트랜잭션·advisory lock 안에서 미적용 파일만 실행합니다. 기존 마이그레이션은 수정하지 않습니다. 파일 누락·중복·잘못된 이름은 기동 실패로 알려줍니다.
 

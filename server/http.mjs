@@ -119,6 +119,9 @@ export function createHandler({
     ['/index.html', 'index.html'],
     ...[
       'app.js',
+      'dashboard-view.js',
+      'wbs-view.js',
+      'view-ui.js',
       'api-client.js',
       'styles.css',
       'engine.js',

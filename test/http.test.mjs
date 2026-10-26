@@ -554,6 +554,12 @@ test('하위 경로 /pmcanvas에서 화면과 API 실행, 임의 파일은 비�
   assert.equal((await f.call(c, 'projects')).status, 200);
   assert.equal((await f.inject('/pmcanvas/')).status, 200);
   assert.equal((await f.inject('/pmcanvas/api-client.js')).status, 200);
+  for (const file of ['dashboard-view.js', 'wbs-view.js', 'view-ui.js']) {
+    const response = await f.inject('/pmcanvas/' + file);
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get('content-type'), /javascript/);
+    assert.match(response.body, /export/);
+  }
   assert.equal((await f.inject('/pmcanvas/server/main.mjs')).status, 404);
   assert.equal((await f.inject('/api/projects')).status, 404);
 });
