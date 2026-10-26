@@ -54,6 +54,9 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts
       - run: npm run format:check
+      - run: npm run public:check
+      - name: Build and inspect the public release ZIP
+        run: npm run release -- --out "$RUNNER_TEMP/pmcanvas-public.zip"
       - run: node --test --test-concurrency=2 test/*.test.mjs
       - run: npm run test:http
         env:

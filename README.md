@@ -1,4 +1,4 @@
-# PM Canvas 0.20.0
+# PM Canvas 0.20.1
 
 [English](README.en.md) · 한국어
 
@@ -72,6 +72,7 @@ npm run service:stop
 ```sh
 npm ci --ignore-scripts
 npm run format:check
+npm run public:check
 npm test
 npx playwright install chromium --only-shell
 npm run test:browser
@@ -79,3 +80,5 @@ npm run test:performance
 ```
 
 실제 HTTP/SMTP 테스트는 `RUN_HTTP_TESTS=1 npm run test:http`, PostgreSQL 테스트는 별도 `_test` DB와 `RUN_POSTGRES_TESTS=1 npm run test:postgres`로 실행합니다. [개발 지침](CONTRIBUTING.md) · [검증 기록](docs/validation/) · [변경 이력](CHANGELOG.md) · [코드 리뷰 반영](docs/REVIEW.md)
+
+공개 문서·설정 예제에는 예약 도메인을 사용합니다. 변경을 커밋한 뒤 `npm run release`를 실행하면 공개 파일과 ZIP 내부를 검사한 배포본을 `releases/`에 만듭니다. 실제 `.env`·인증/메일 설정·키·덤프는 포함하지 않습니다. [공개 파일과 배포 검사](docs/PUBLIC-FILES.md)

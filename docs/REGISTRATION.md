@@ -41,7 +41,7 @@
 |---|---|---|
 | REGISTRATION_MODE | approval | 이메일 인증 후 관리자 승인 |
 | REGISTRATION_MODE=disabled | | 신규 신청·인증 재발송 차단, 회원가입 링크 숨김 |
-| REGISTRATION_DOMAINS | 빈 값 | 모든 이메일로 신청 가능. company.com,example.org로 설정하면 정확한 도메인만 허용. 하위 도메인은 별도 등록 |
+| REGISTRATION_DOMAINS | 빈 값 | 모든 이메일로 신청 가능. company.example,example.org로 설정하면 정확한 도메인만 허용. 하위 도메인은 별도 등록 |
 
 발송 중지나 신규 가입 중지 후에도 이미 받은 링크는 만료 전까지 인증할 수 있습니다.
 

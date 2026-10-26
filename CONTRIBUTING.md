@@ -5,6 +5,7 @@ Node.js 22.18 이상에서 `npm ci --ignore-scripts`로 고정 의존성을 설�
 ```sh
 npm run format
 npm run format:check
+npm run public:check
 npm test
 ```
 
@@ -37,3 +38,5 @@ UI 문구는 사용자 데이터를 붙이기 **전에** `ui('화면 문구')`�
 충돌 모델은 project-merge.js, 비교 다이얼로그는 conflict-ui.js에 둡니다. 운영 알림은 operation-alerts.mjs와 alerts-ui.js가 담당합니다. 새 실패에는 고정 분류만 저장하고 SMTP 원문 오류·계정 비밀을 알림에 넣지 않습니다. 알림 발송 자체의 실패를 재귀적으로 기록하지 마세요.
 
 운영 계정이나 외부 수신자를 테스트에 사용하지 마세요. test/support/mail-admin-preview.mjs는 RUN_MAIL_ADMIN_PREVIEW=1로만 시작되는 일회용 메모리 저장소·loopback SMTP 환경이며 10분 후 종료됩니다.
+
+공개 문서·컨피그 예제·프록시 예제에는 예약 도메인과 loopback/문서 전용 IP를 사용합니다. 실제 연결 정보는 Git에서 제외된 `.env`와 `config`에 보관합니다. 공개 파일 검사는 추적 파일과 새 공개 파일을 검사하며, 의심한 비밀값 원문은 CI 로그에 출력하지 않습니다. 배포본은 변경을 커밋한 뒤 `npm run release`로 만들고 ZIP 검사까지 통과해야 합니다. [검사 범위와 배포 절차](docs/PUBLIC-FILES.md)

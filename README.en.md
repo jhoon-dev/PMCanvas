@@ -1,4 +1,4 @@
-# PM Canvas 0.20.0
+# PM Canvas 0.20.1
 
 English · [한국어](README.md)
 
@@ -35,6 +35,7 @@ Back up the database before upgrades. Keep the DB dumps and encryption key in se
 
 ```sh
 npm run format:check
+npm run public:check
 npm test
 npx playwright install chromium --only-shell
 npm run test:browser
@@ -42,3 +43,5 @@ npm run test:performance
 ```
 
 Linux browser setup may require `npx playwright install --with-deps chromium --only-shell`. The browser suite starts its own memory store and loopback TLS mailbox on ports 4193/4192, with no production accounts, DB or external email. CI also runs HTTP/SMTP, dedicated PostgreSQL, dependency audit, backup/restore verification and CodeQL. See [development notes](CONTRIBUTING.md).
+
+Use reserved example domains in public documentation and configuration examples. After committing changes, run `npm run release` to build and inspect a public ZIP in `releases/`. Private environment files, live authentication/mail settings, keys and dumps are excluded. See [public file checks](docs/PUBLIC-FILES.md).
