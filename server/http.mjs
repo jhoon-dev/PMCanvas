@@ -119,6 +119,12 @@ export function createHandler({
     ['/index.html', 'index.html'],
     ...[
       'app.js',
+      'project-editor.js',
+      'report-ui.js',
+      'admin-ui.js',
+      'sharing-ui.js',
+      'security-ui.js',
+      'help-ui.js',
       'dashboard-view.js',
       'auth-ui.js',
       'daily-view.js',

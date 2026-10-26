@@ -561,6 +561,12 @@ test('하위 경로 /pmcanvas에서 화면과 API 실행, 임의 파일은 비�
     'auth-ui.js',
     'daily-view.js',
     'people-view.js',
+    'project-editor.js',
+    'report-ui.js',
+    'admin-ui.js',
+    'sharing-ui.js',
+    'security-ui.js',
+    'help-ui.js',
   ]) {
     const response = await f.inject('/pmcanvas/' + file);
     assert.equal(response.status, 200);
