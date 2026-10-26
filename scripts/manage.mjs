@@ -125,7 +125,9 @@ async function main() {
       console.log(
         'Moved ' +
           moved +
-          ' legacy recovery key(s) outside the backup directory. Store recovery keys separately from DB dumps.',
+          ' legacy recovery key(s) to ' +
+          path.join(root, 'recovery-keys') +
+          '. Move this folder to secure storage outside this project and separate from DB dumps. A full-project backup would otherwise include both.',
       );
     compose(['up', '-d', '--build', '--wait', '--wait-timeout', '180']);
     return;

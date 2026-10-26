@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { createHash, randomUUID } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { createPool } from './pg-pool.mjs';
+import { migrationFiles } from './migrations.mjs';
 
 export function runCommand(command, args, env) {
   return new Promise((resolve, reject) => {
@@ -136,12 +137,20 @@ export class BackupWorker {
         stage = '복원 데이터 확인';
         const check = await this.connect({ ...this.env, PGDATABASE: target });
         try {
+          const expected = migrationFiles().map(({ version }) => version);
+          const versions = (
+            await check.query('SELECT version FROM pm_schema_migrations ORDER BY version')
+          ).rows.map(({ version }) => Number(version));
           const r = (
             await check.query(
-              "SELECT (SELECT count(*) FROM pm_schema_migrations) AS migrations,(SELECT count(*) FROM pm_users) AS users,(SELECT count(*) FROM pm_tasks) AS tasks,(SELECT count(*) FROM pm_projects p WHERE NOT EXISTS(SELECT 1 FROM pm_project_access a WHERE a.project_id=p.id AND a.role='owner')) AS orphaned",
+              "SELECT (SELECT count(*) FROM pm_users) AS users,(SELECT count(*) FROM pm_tasks) AS tasks,(SELECT count(*) FROM pm_projects p WHERE NOT EXISTS(SELECT 1 FROM pm_project_access a WHERE a.project_id=p.id AND a.role='owner')) AS orphaned",
             )
           ).rows[0];
-          if (Number(r.migrations) < 12 || Number(r.orphaned) !== 0)
+          if (
+            versions.length !== expected.length ||
+            versions.some((version, index) => version !== expected[index]) ||
+            Number(r.orphaned) !== 0
+          )
             throw Error('Invalid restored data');
           verified = true;
         } finally {

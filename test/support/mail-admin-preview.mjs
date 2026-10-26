@@ -11,6 +11,8 @@ import { PasswordReset } from '../../server/password-reset.mjs';
 import { AdminMfa } from '../../server/admin-mfa.mjs';
 import { createApplication } from '../../server/http.mjs';
 import { hashPassword } from '../../server/security.mjs';
+import { escapeHtml } from '../../public/html.js';
+const walkthrough = process.env.RUN_WALKTHROUGH_PREVIEW === '1';
 const smtp = await smtpFixture(),
   key = Buffer.alloc(32, 7),
   hash = await hashPassword('preview-admin-password'),
@@ -43,10 +45,12 @@ const makeMailer = (config) =>
 if (process.env.RUN_WORKSPACE_PREVIEW === '1') {
   const admin = [...repo.users.values()].find((u) => u.is_admin),
     member = [...repo.users.values()].find((u) => !u.is_admin);
-  for (const [name, verified] of [
-    ['인증 완료 신청자', true],
-    ['인증 대기 신청자', false],
-  ]) {
+  for (const [name, verified] of walkthrough
+    ? []
+    : [
+        ['인증 완료 신청자', true],
+        ['인증 대기 신청자', false],
+      ]) {
     const u = await repo.createUser({
       email: verified ? 'verified@example.com' : 'unverified@example.com',
       name,
@@ -56,23 +60,25 @@ if (process.env.RUN_WORKSPACE_PREVIEW === '1') {
     if (verified) repo.users.get(u.id).email_verified_at = new Date();
   }
   const p = await repo.createProject(admin.id, randomUUID(), {
-    name: '운영 기능 검증 프로젝트',
+    name: walkthrough ? '우리 팀 첫 프로젝트' : '운영 기능 검증 프로젝트',
     description: '일회용 테스트',
     holidays: [],
     members: [{ id: 'm1', name: '담당자', role: '개발', grade: '중급', hours: 8, allocation: 100 }],
-    tasks: [
-      {
-        id: 't1',
-        name: '내 담당 업무',
-        phase: '개발',
-        owner: 'm1',
-        start: '2026-10-19',
-        end: '2026-10-30',
-        predecessor: '',
-        memo: '',
-        items: [{ id: 'i1', title: '완료 체크', hours: 8, doneDate: null }],
-      },
-    ],
+    tasks: walkthrough
+      ? []
+      : [
+          {
+            id: 't1',
+            name: '내 담당 업무',
+            phase: '개발',
+            owner: 'm1',
+            start: '2026-10-19',
+            end: '2026-10-30',
+            predecessor: '',
+            memo: '',
+            items: [{ id: 'i1', title: '완료 체크', hours: 8, doneDate: null }],
+          },
+        ],
   });
   await repo.grantAccess(admin.id, p.id, member.email, 'editor');
   await repo.setMemberAccount(admin.id, p.id, { memberId: 'm1', userId: admin.id });
@@ -105,6 +111,66 @@ const app = createApplication({
     adminMfa: new AdminMfa(repo, key),
   }),
   mailbox = http.createServer((req, res) => {
+    if (req.url === '/inbox' && walkthrough) {
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-store');
+      res.setHeader(
+        'Content-Security-Policy',
+        "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'",
+      );
+      res.end(
+        `<!doctype html>
+        <html lang="ko">
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>PMCanvas 데모 메일함</title>
+        <style>
+          body {
+            font: 16px system-ui;
+            max-width: 900px;
+            margin: 48px auto;
+            padding: 24px;
+            background: #f5f7fb;
+            color: #18263c;
+          }
+          article {
+            background: white;
+            border: 1px solid #dce3ee;
+            border-radius: 12px;
+            padding: 24px;
+            margin: 20px 0;
+          }
+          pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; line-height: 1.7; }
+          a {
+            display: inline-block;
+            padding: 12px 18px;
+            background: #245bd6;
+            color: white;
+            border-radius: 8px;
+            text-decoration: none;
+          }
+        </style>
+        <h1>데모 메일함</h1>
+        <p>실제 외부 메일은 발송하지 않습니다. 새 메일은 화면을 새로고침하면 표시됩니다.</p>${
+          smtp.messages
+            .slice()
+            .reverse()
+            .map((m) => {
+              const body = mailText(m),
+                link =
+                  verificationLink(m) ||
+                  body.match(/https?:\/\/[^\s<>]+#registration-approvals/)?.[0];
+              const action = verificationLink(m) ? '이메일 인증하기' : '가입 승인 요청 열기';
+              return `<article>
+                <pre>${escapeHtml(body)}</pre>
+                ${link ? `<a href="${escapeHtml(link)}">${action}</a>` : ''}
+              </article>`;
+            })
+            .join('') || '<article>아직 도착한 메일이 없습니다.</article>'
+        }</html>`,
+      );
+      return;
+    }
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Cache-Control', 'no-store');
     res.end(
@@ -141,4 +207,4 @@ async function stop() {
 }
 process.once('SIGINT', stop);
 process.once('SIGTERM', stop);
-setTimeout(stop, 10 * 60 * 1000).unref();
+setTimeout(stop, (walkthrough ? 60 : 10) * 60 * 1000).unref();

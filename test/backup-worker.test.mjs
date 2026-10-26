@@ -5,7 +5,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { BackupWorker, automaticBackupFile } from '../server/backup-worker.mjs';
-async function fixture(t, { failAt = '', verify = true } = {}) {
+import { migrationFiles } from '../server/migrations.mjs';
+const expectedVersions = migrationFiles().map(({ version }) => version);
+async function fixture(t, { failAt = '', verify = true, versions = expectedVersions } = {}) {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'pmcanvas-backup-test-'));
   t.after(() => fs.rm(directory, { recursive: true, force: true }));
   const key = path.join(directory, 'test.key');
@@ -25,8 +27,10 @@ async function fixture(t, { failAt = '', verify = true } = {}) {
       if (cmd === 'pg_dump') await fs.writeFile(args[2], 'dump');
     },
     connect: async () => ({
-      async query() {
-        return { rows: [{ migrations: 12, users: 1, tasks: 1, orphaned: 0 }] };
+      async query(sql) {
+        if (sql.includes('pm_schema_migrations'))
+          return { rows: versions.map((version) => ({ version })) };
+        return { rows: [{ users: 1, tasks: 1, orphaned: 0 }] };
       },
       async end() {},
     }),
@@ -53,6 +57,30 @@ test('백업은 격리 DB에서 복원 점검하고 덤프 폴더에 암호화 �
   assert.match(f.queries.find((q) => q.sql.includes('key_fingerprint')).args[1], /^[a-f0-9]{64}$/);
   assert.ok((await fs.readdir(f.directory)).some(automaticBackupFile));
 });
+
+for (const [name, versions] of [
+  ['최신 버전 누락', expectedVersions.slice(0, -1)],
+  [
+    '같은 개수지만 중간 버전 누락',
+    expectedVersions.map((v) => (v === 2 ? 999 : v)).sort((a, b) => a - b),
+  ],
+  ['배포 버전보다 새로운 스키마', [...expectedVersions, expectedVersions.at(-1) + 1]],
+]) {
+  test('복원 점검은 마이그레이션 불일치를 거부: ' + name, async (t) => {
+    const f = await fixture(t, { versions });
+    await f.worker.execute(f.job);
+    assert.ok(
+      f.queries.some(
+        (q) => q.sql.includes("state='failed'") && q.args[3].includes('복원 데이터 확인'),
+      ),
+    );
+    assert.equal(
+      f.queries.some((q) => q.sql.includes("state='success'")),
+      false,
+    );
+    assert.ok(f.calls.some((c) => c[0] === 'dropdb'));
+  });
+}
 test('DB 생성 실패 시 기존 DB를 지우지 않으며 오류에 비밀값을 노출하지 않음', async (t) => {
   const f = await fixture(t, { failAt: 'createdb' });
   await f.worker.execute(f.job);
