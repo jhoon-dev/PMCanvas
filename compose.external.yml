@@ -54,7 +54,7 @@ services:
         condition: service_healthy
     volumes:
       - ./backups:/backups
-      - ./config/secrets/mfa.key:/run/secrets/mfa.key:ro
+      - ./config:/app/config:ro
       - ./certs:/app/certs:ro
     environment:
       PGHOST: ${PGHOST:?Set PGHOST}
@@ -65,3 +65,4 @@ services:
       PGSSLMODE: ${PGSSLMODE:-verify-full}
       PGSSLROOTCERT: ${PGSSLROOTCERT:-}
       BACKUP_RESTORE_OWNER: ${PGUSER:-pmcanvas}
+      BACKUP_KEY_FILE: ${MFA_KEY_FILE:-/app/config/secrets/mfa.key}

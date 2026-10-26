@@ -70,7 +70,7 @@ services:
         condition: service_healthy
     volumes:
       - ./backups:/backups
-      - ./config/secrets/mfa.key:/run/secrets/mfa.key:ro
+      - ./config:/app/config:ro
     environment:
       PGHOST: db
       PGPORT: 5432
@@ -79,5 +79,6 @@ services:
       PGPASSWORD: ${DB_ADMIN_PASSWORD:?Set DB_ADMIN_PASSWORD}
       PGSSLMODE: disable
       BACKUP_RESTORE_OWNER: pmcanvas
+      BACKUP_KEY_FILE: ${MFA_KEY_FILE:-/app/config/secrets/mfa.key}
 volumes:
   pgdata:
