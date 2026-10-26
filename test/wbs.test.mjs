@@ -64,3 +64,9 @@ test('WBS 저장 충돌은 초안을 유지하고, 명시적 취소·조회자 �
  w.options.onReload=async()=>{throw Object.assign(Error('프로젝트 접근이 해제되었습니다.'),{status:404});};await w.action('discard');assert.equal(w.dirty,false);assert.equal(w.draft.tasks[0].name,'기획');
  w.reset(base);w.ensure({...base,_role:'viewer'},'2026-10-25');assert.equal(w.readOnly,true);assert.throws(()=>w.changed(editCell(base,'a','name','거절'),{paint:false}));
 });
+
+test('간단한 표의 다섯 열 붙여넣기는 숨긴 단계·선행·메모를 보존',()=>{
+ const p=fixture();p.tasks[1].memo='보존할 메모';const layout=columns.filter(([f])=>!['phase','predecessor','memo'].includes(f));
+ const next=pasteCells(p,['b'],0,0,'업무명\t담당자\t시작일\t종료일\t공수(h)\n화면 구현\t홍길동\t2026-10-29\t2026-11-03\t20',{layout});
+ assert.equal(next.tasks[1].name,'화면 구현');assert.equal(next.tasks[1].phase,'개발');assert.equal(next.tasks[1].predecessor,'a');assert.equal(next.tasks[1].memo,'보존할 메모');assert.equal(next.tasks[1].items[0].hours,20);assert.equal(p.tasks[1].name,'개발');
+});

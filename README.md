@@ -1,6 +1,10 @@
-# PM Canvas 설치형 서버 0.10.0
+# PM Canvas 설치형 서버 0.11.0
 
 직접 운영하는 웹서버에 설치하는 프로젝트 관리 앱입니다. Node.js API가 PostgreSQL에 프로젝트를 저장하고 브라우저가 같은 API를 사용합니다. 프로젝트 원본은 서버에 저장하며 브라우저에는 WBS 미저장 초안의 복구 사본을 보관합니다.
+
+## 쉬운 업무 입력 (0.11.0)
+
+기본 화면은 **업무 추가 → 표 입력 → 저장** 흐름에 집중합니다. 업무명·담당자·시작일·종료일·공수만 먼저 보여 주고, Excel·추가 열·기준 계획은 **더 보기**, 일정 분석은 **일정 옵션**에서 펼칩니다. 선택한 업무에만 복제·삭제·계층 도구가 나타납니다. [업무·일정 사용법](docs/WBS.md)을 참고하세요.
 
 ## 보안 강화 (0.10.0)
 
@@ -12,11 +16,11 @@
 
 ## Excel 출력 (0.8.0)
 
-WBS 화면에서 **Excel 출력**을 누르면 현재 초안과 검색 조건을 반영한 .xlsx 파일을 내려받습니다. WBS·간트·세부 작업을 시트로 제공하며 날짜·공수·진척률 형식을 유지합니다. [Excel 출력 안내](docs/EXCEL.md)를 참고하세요.
+WBS 화면에서 **더 보기 → Excel 내려받기**를 누르면 현재 초안과 검색 조건을 반영한 .xlsx 파일을 내려받습니다. WBS·간트·세부 작업을 시트로 제공하며 날짜·공수·진척률 형식을 유지합니다. [Excel 출력 안내](docs/EXCEL.md)를 참고하세요.
 
 ## WBS · 간트 편집 (0.7.0)
 
-표에서 셀 편집·엑셀 여러 행 붙여넣기·행 추가/복제/이동을 하고, 간트 막대를 끌거나 양 끝을 조절해 일정을 변경합니다. 실행 취소·다시 실행과 후속 일정 조정을 지원하며 여러 변경을 확인한 뒤 **WBS 저장**으로 일괄 저장합니다. 상세 입력 순서와 키보드 사용법은 [WBS·간트 안내](docs/WBS.md)를 참고하세요.
+표에서 셀 편집·엑셀 여러 행 붙여넣기·행 추가/복제/이동을 하고, 간트 막대를 끌거나 양 끝을 조절해 일정을 변경합니다. 실행 취소·다시 실행과 후속 일정 조정을 지원하며 여러 변경을 확인한 뒤 **저장**으로 일괄 저장합니다. 상세 입력 순서와 키보드 사용법은 [WBS·간트 안내](docs/WBS.md)를 참고하세요.
 
 ## 외부 인증 연결 (0.6.0)
 
@@ -26,20 +30,20 @@ config/auth.json에 OIDC, SAML, AD LDAPS 연결을 등록하고 재기동하면 
 
 Node.js 22.18 이상과 실행 중인 Docker Compose v2가 필요합니다.
 
-`sh
+```sh
 npm run setup -- --email admin@example.com
 npm run service:up
 npm run service:status
-`
+```
 
 setup은 기존 .env를 덮어쓰지 않으며 DB 관리자·앱 DB·초기 관리자 비밀번호를 각각 무작위 생성합니다. .env의 ADMIN_PASSWORD로 로그인하세요. .env는 비밀번호가 들어 있는 비공개 파일입니다. Windows에서는 파일 접근 권한을 운영 계정으로 제한하세요. 기본 주소는 http://localhost:3000/pmcanvas/ 입니다. 포트 변경은 setup에 --port 4180을, 운영 도메인은 --origin https://pm.example.com을 지정합니다.
 
-`sh
+```sh
 npm run backup
 npm run restore -- backups/파일.dump pmcanvas_restore_check
 npm run service:logs
 npm run service:stop
-`
+```
 
 위 운영 명령은 PostgreSQL 포함 compose.yml용입니다. 외부 DB는 compose.external.yml과 해당 DB의 백업 절차를 사용합니다. restore는 새 DB만 만들며 기존 DB 이름을 재사용하면 중단합니다. 실패한 새 DB는 자동 삭제하지 않습니다. 복원 내용을 확인한 후 .env의 APP_DATABASE를 새 DB 이름으로 변경하고 npm run service:up을 실행하면 앱이 복원 DB를 사용합니다. 원래 DB는 남아 있습니다. 되돌릴 때는 이전 APP_DATABASE 값으로 변경하고 다시 기동하세요.
 
@@ -67,14 +71,14 @@ npm run service:stop
 2. `.env`에서 `DB_ADMIN_PASSWORD`, `DB_PASSWORD`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`를 채웁니다. 관리자 로그인 비밀번호는 12자 이상입니다.
 3. 터미널에서 실행합니다.
 
-```sh
+`````sh
 docker compose up -d --build
 docker compose logs -f app
 ```
 
 로컬 접속 주소: http://localhost:3000/pmcanvas/
 
-최초 기동 시 DB 마이그레이션과 최초 관리자 계정 생성을 수행합니다. 관리자로 로그인한 뒤 상단 계정 버튼에서 사용자 계정을 추가하세요. 프로젝트 소유자가 대시보드의 프로젝트 공유에서 해당 이메일에 편집자 또는 조회자 권한을 부여합니다. `.env`의 관리자 비밀번호 변경은 이미 생성된 계정의 비밀번호를 변경하지 않습니다.
+최초 기동 시 DB 마이그레이션과 최초 관리자 계정 생성을 수행합니다. 관리자로 로그인한 뒤 상단 계정 버튼에서 사용자 계정을 추가하세요. 프로젝트 소유자가 대시보드의 프로젝트 관리 → 공유에서 해당 이메일에 편집자 또는 조회자 권한을 부여합니다. `.env`의 관리자 비밀번호 변경은 이미 생성된 계정의 비밀번호를 변경하지 않습니다.
 
 DB 데이터는 `pgdata` 볼륨에 보관됩니다. 앱용 DB 계정은 전용 일반 계정이며 DB 관리 계정과 분리됩니다. DB 포트는 호스트에 공개하지 않습니다. `docker compose down -v`는 데이터를 삭제하므로 사용하지 마세요. DB 초기화 스크립트는 비어 있는 새 볼륨에만 적용됩니다. 생성 후 `.env`의 DB 비밀번호만 바꾸면 기존 DB 계정 비밀번호와 달라지므로, 변경할 때는 DB 계정도 함께 변경해야 합니다.
 
@@ -92,7 +96,7 @@ Rocky Linux에서 Apache 프록시 연결이 거절되면 웹서버 로그와 SE
 
 `.env`에서 `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD`, `PGSSLMODE`를 지정한 뒤 다음 구성만 실행합니다.
 
-```sh
+`````sh
 docker compose -f compose.external.yml up -d --build
 ```
 
@@ -103,7 +107,7 @@ docker compose -f compose.external.yml up -d --build
 
 Node.js 22.18 이상과 PostgreSQL이 필요합니다. `.env`에 PG 접속 정보, PUBLIC_ORIGIN, BASE_PATH, 최초 관리자 정보를 설정합니다.
 
-```sh
+`````sh
 npm install
 npm start
 ```
@@ -135,13 +139,13 @@ package-lock.json을 포함합니다. npm ci로 고정된 의존성을 설치하
 
 진척률은 완료한 세부 작업의 예상 공수 합계 / 전체 예상 공수 합계입니다. 계획 속도, 최근 완료 기록, 근무시간·투입률, 주말·등록 휴무일, 선행 FS 관계로 예상 완료일을 계산합니다. 등급별 생산성 차이를 자동 가정하지 않습니다. 계산은 같은 공통 engine.js를 사용합니다.
 
-현재는 단계/분류와 세부 체크리스트 구조이며, 다단계 계층형 WBS·임계경로·정식 기준 계획 버전·자원 최적화는 아직 구현하지 않았습니다. 실시간 push 대신 주기적 갱신을 사용합니다. 계정 관리에서 본인 비밀번호 변경, 관리자의 일반 사용자 비밀번호 재설정 및 계정 비활성화·재활성화를 지원합니다. OIDC·SAML 2.0·AD LDAPS를 컨피그로 연결할 수 있습니다. docs/AUTHENTICATION.md를 참고하세요.
+계층형 WBS, 하위 포함 집계, 임계 경로와 프로젝트당 한 벌의 기준 계획을 지원합니다. 자원 최적화와 여러 기준 계획 버전 보관은 아직 제공하지 않습니다. 실시간 push 대신 주기적 갱신을 사용합니다. 계정 관리에서 본인 비밀번호 변경, 관리자의 일반 사용자 비밀번호 재설정 및 계정 비활성화·재활성화를 지원합니다. OIDC·SAML 2.0·AD LDAPS를 컨피그로 연결할 수 있습니다. docs/AUTHENTICATION.md를 참고하세요.
 
 ## 검증
 
 계산·CSV·인증·권한·충돌·변경 이력·브라우저 API 클라이언트의 단위/요청 처리 테스트를 제공합니다. 요청 처리 테스트는 메모리 저장 어댑터를 사용하며 실제 DB 검증을 대신하지 않습니다.
 
-```sh
+`````sh
 npm test
 ```
 
@@ -157,7 +161,7 @@ JSON 백업은 현재 프로젝트만 포함하고 계정·권한·전체 변경
 
 컨테이너 내부 파일로 pg_dump를 만든 뒤 복사하면 Windows의 출력 리다이렉션 차이를 피할 수 있습니다.
 
-```sh
+`````sh
 docker compose exec -T db pg_dump -U postgres -d pmcanvas -Fc -f /tmp/pmcanvas.dump
 docker compose cp db:/tmp/pmcanvas.dump ./pmcanvas.dump
 ```

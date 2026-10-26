@@ -71,20 +71,20 @@ export function editCell(project,id,field,value,{cascade=false}={}){
  const p=structuredClone(project),task=p.tasks.find(t=>t.id===id);if(!task)throw Error('업무를 찾을 수 없습니다.');
  setCell(p,task,field,value);if(cascade&&['start','end','predecessor'].includes(field))alignSuccessors(p,[id]);return checkDraft(p);
 }
-export function pasteCells(project,visibleIds,rowIndex,columnIndex,text,{cascade=false,id=newId,date=today()}={}){
+export function pasteCells(project,visibleIds,rowIndex,columnIndex,text,{cascade=false,id=newId,date=today(),layout=columns}={}){
  const p=structuredClone(project),rows=parseTsv(text),ids=[...visibleIds],changed=[];
- if(columnIndex<0||columnIndex>=columns.length||rowIndex<0||rowIndex>ids.length)throw Error('붙여넣을 셀을 선택해 주세요.');
- if(columnIndex===0&&rows[0]?.length===columns.length&&rows[0].every((v,i)=>v.trim()===columns[i][1]))rows.shift();
+ if(columnIndex<0||columnIndex>=layout.length||rowIndex<0||rowIndex>ids.length)throw Error('붙여넣을 셀을 선택해 주세요.');
+ if(columnIndex===0&&rows[0]?.length===layout.length&&rows[0].every((v,i)=>v.trim()===layout[i][1]))rows.shift();
  const deferred=[];
  for(let r=0;r<rows.length;r++){
-  if(rows[r].length+columnIndex>columns.length)throw Error((r+1)+'행: 붙여넣기 열 수가 표 범위를 넘습니다.');
+  if(rows[r].length+columnIndex>layout.length)throw Error((r+1)+'행: 붙여넣기 열 수가 표 범위를 넘습니다.');
   let task=p.tasks.find(t=>t.id===ids[rowIndex+r]);
   if(!task){task=newTask(p,{id,date});p.tasks.push(task);ids[rowIndex+r]=task.id;}
   changed.push(task.id);
   for(let c=0;c<rows[r].length;c++){
-   const field=columns[columnIndex+c][0];
+   const field=layout[columnIndex+c][0];
    try{if(field==='predecessor')deferred.push([task,rows[r][c]]);else setCell(p,task,field,rows[r][c]);}
-   catch(error){throw Error((r+1)+'행 '+columns[columnIndex+c][1]+': '+error.message);}
+   catch(error){throw Error((r+1)+'행 '+layout[columnIndex+c][1]+': '+error.message);}
   }
  }
  for(const [task,value]of deferred)setCell(p,task,'predecessor',value);

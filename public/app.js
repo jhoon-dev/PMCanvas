@@ -48,6 +48,7 @@ function pageHead(eyebrow,title,subtitle,buttons){return '<section class="page-h
 function dateToolbar(extra=''){return '<div class="view-toolbar"><div class="date-control">'+icon('calendar')+'<label for="reportDate">보고 기준일</label><input id="reportDate" type="date" value="'+asOf+'" max="'+TODAY+'" aria-label="보고 기준일"><span class="date-tag">'+(asOf===TODAY?'오늘':'과거 조회')+'</span></div>'+extra+'</div>';}
 function empty(title,body,action='task',label='첫 업무 등록'){return '<div class="empty-state">'+icon('layers')+'<h3>'+esc(title)+'</h3><p>'+esc(body)+'</p>'+btn('＋ '+label,action,'primary')+'</div>';}
 function render(){
+ document.body.dataset.appView=view;
 if(!state.projects.length){
  $('#breadcrumbProject').textContent='프로젝트 시작하기';$('#projectSelect').innerHTML='';$('#projectList').innerHTML='';$('#taskNavCount').textContent='';
  $('#main').innerHTML=pageHead('PROJECT WORKSPACE','팀의 프로젝트를 시작하세요','프로젝트를 만들고 팀원과 함께 업무를 관리하세요.',btn('새 프로젝트','project','primary'))+empty('아직 접근할 수 있는 프로젝트가 없습니다','새 프로젝트를 만들거나 소유자에게 공유 권한을 요청하세요.','project','새 프로젝트');
@@ -67,7 +68,7 @@ function hydrateIcons(){document.querySelectorAll('[data-icon]').forEach(e=>{e.i
 function overview(p,s){
  const delta=s.planned-s.progress,forecast=s.forecast,late=s.end&&forecast.end?Math.max(0,workdays(addDays(s.end,1),forecast.end,p.holidays)):0;
  const completedToday=p.tasks.reduce((n,t)=>n+t.items.filter(i=>i.doneDate===asOf).length,0),pending=p.tasks.reduce((n,t)=>n+t.items.filter(i=>!i.doneDate&&t.start<=asOf).length,0),eff=p.members.reduce((n,m)=>n+m.allocation/100,0);
- return pageHead('PROJECT OVERVIEW',p.name,p.description||'팀의 오늘을 기록하고, 프로젝트의 내일을 확인하세요.',btn('변경 이력','audit')+(p._role==='owner'?btn('프로젝트 공유','sharing'):'')+btn('프로젝트 설정','settings')+btn('＋ 업무 추가','task','primary'))+
+ return pageHead('PROJECT OVERVIEW',p.name,p.description||'팀의 오늘을 기록하고, 프로젝트의 내일을 확인하세요.',btn('＋ 업무 추가','quick-task','primary')+'<details class="action-menu"><summary class="button">프로젝트 관리</summary><div class="menu-popover">'+btn('변경 이력','audit')+(p._role==='owner'?btn('공유','sharing'):'')+btn('설정','settings')+'</div></details>')+
  dateToolbar('<span class="period-label">프로젝트 기간 <strong>'+short(s.start)+' — '+short(s.end)+'</strong></span>')+
  '<section class="metric-grid"><article class="metric"><div class="metric-label">실제 진척률 <span class="metric-icon">'+icon('layers')+'</span></div><div class="metric-number">'+Math.round(s.progress*100)+'<small>%</small><span class="metric-context">계획 '+pct(s.planned)+'</span></div>'+meter(s.progress)+'<div class="metric-foot '+(delta>0.005?'red-text':'green-text')+'">'+(s.total?(delta>0.005?'계획보다 '+(delta*100).toFixed(1)+'%p 늦어요':delta<-.005?'계획보다 '+(-delta*100).toFixed(1)+'%p 앞서요':'계획대로 진행 중'):'첫 업무를 등록해 주세요')+'</div></article>'+
  '<article class="metric"><div class="metric-label">예상 완료일 <span class="metric-icon">'+icon('calendar')+'</span></div><div class="metric-number date-number">'+(forecast.end?short(forecast.end):'—')+'<small>'+(forecast.end?forecast.end.slice(0,4):'')+'</small></div><div class="metric-foot">'+(s.total?'<span class="badge '+(late?'amber':'green')+'">'+(forecast.end?(late?'계획 대비 +'+late+'근무일':'계획 기한 이내'):'담당자 확인 필요')+'</span>':'계산할 업무가 없어요')+'</div><div class="subtle">'+(forecast.observed?'최근 완료 속도를 반영한 추정':'완료 기록이 적어 계획 기준으로 추정')+'</div></article>'+
@@ -105,7 +106,7 @@ function peopleProgress(p){
 }
 function filterControls(){return '<div class="filter-controls"><input type="search" id="taskSearch" placeholder="업무 검색" value="'+esc(query)+'" aria-label="업무 검색"><select id="ownerFilter" aria-label="담당자 필터"><option value="">전체 담당자</option>'+project().members.map(m=>'<option value="'+esc(m.id)+'" '+(m.id===ownerFilter?'selected':'')+'>'+esc(m.name)+'</option>').join('')+'</select><select id="statusFilter" aria-label="상태 필터"><option value="">전체 상태</option><option value="active" '+(statusFilter==='active'?'selected':'')+'>진행 중</option><option value="late" '+(statusFilter==='late'?'selected':'')+'>지연</option><option value="done" '+(statusFilter==='done'?'selected':'')+'>완료</option></select></div>';}
 function filteredTasks(p){return p.tasks.filter(t=>(!ownerFilter||t.owner===ownerFilter)&&(!query||t.name.toLowerCase().includes(query.toLowerCase()))&&(!statusFilter||(statusFilter==='done'?progress(t,asOf)===1:statusFilter==='late'?t.end<asOf&&progress(t,asOf)<1:progress(t,asOf)>0&&progress(t,asOf)<1)));}
-function tasksView(p,s){return pageHead('WORK BREAKDOWN STRUCTURE','WBS · 일정 편집','표에서 업무를 입력하고, 간트로 일정을 조정한 뒤 한 번에 저장하세요.',btn('Excel 출력','export-excel')+btn('CSV 출력','export-wbs')+btn('상세 업무 추가','task'))+dateToolbar()+wbs.markup(p,asOf);}
+function tasksView(p,s){return pageHead('WORKSPACE','업무와 일정','업무를 입력하고, 일정을 조정하세요.','')+dateToolbar()+wbs.markup(p,asOf);}
 function dailyView(p,s){
  const ts=filteredTasks(p),items=ts.flatMap(t=>t.items.map(i=>({t,i}))),done=items.filter(x=>x.i.doneDate===asOf).length;
  return pageHead('DAILY CHECK-IN','매일 작업 체크','담당자를 선택하고, 실제로 완료한 작업만 체크해 주세요.',btn('완료 내역','history')+btn('＋ 업무 추가','task','primary'))+dateToolbar(filterControls())+'<div class="daily-summary"><div class="daily-summary-icon">'+icon('check')+'</div><div><strong>'+full(asOf)+'의 완료 기록</strong><p>체크하면 완료일이 기록되고 진척률과 예상 완료일이 다시 계산됩니다.</p></div><span class="daily-count">'+done+'<small>개 완료</small></span></div><div class="section-toolbar"><span>'+items.length+'개 체크 항목 · 예상 공수 기준으로 반영</span><label class="toggle-label"><input type="checkbox" id="onlyPending" '+(onlyPending?'checked':'')+'>미완료만 보기</label></div>'+
@@ -173,7 +174,7 @@ document.addEventListener('click',e=>{
  const task=e.target.closest('[data-edit-task]');if(task){openEditor('task',task.dataset.editTask);return;}
  const m=e.target.closest('[data-edit-member]');if(m){openEditor('member',m.dataset.editMember);return;}
  const a=e.target.closest('[data-action]')?.dataset.action;if(!a)return;
- if(a.startsWith('view:'))navigate(a.slice(5));else if(a==='method')method();else if(a==='export-excel')exportExcel();else if(a==='export-wbs')exportWbs();else if(a==='history')openHistory();else if(a==='export-history')exportHistory();else if(a==='retry-save')persist().then(saved=>{render();if(saved)toast('서버에 저장했습니다.');});else if(a==='reload-server')reloadServer();else if(a==='sharing')openSharing();else if(a==='audit')openAudit();else if(a==='connections')openConnections();else if(a==='security-audit')openSecurityAudit();else if(a==='logout'){if(saveInFlight){toast('저장 완료 후 로그아웃해 주세요.');return;}if((storageError||wbs.dirty)&&!confirm('미저장 변경사항과 보관 초안을 삭제하고 로그아웃할까요?'))return;api('auth/logout',{method:'POST',body:{}}).then(()=>{DraftStore.clearUser(currentUser.id);clearTimeout(wbs.draftTimer);wbs.draft=null;wbs.pending.clear();location.reload();}).catch(e=>toast(e.message));}else openEditor(a);
+ if(a.startsWith('view:'))navigate(a.slice(5));else if(a==='quick-task'){navigate('tasks');wbs.action('add');}else if(a==='method')method();else if(a==='export-excel')exportExcel();else if(a==='export-wbs')exportWbs();else if(a==='history')openHistory();else if(a==='export-history')exportHistory();else if(a==='retry-save')persist().then(saved=>{render();if(saved)toast('서버에 저장했습니다.');});else if(a==='reload-server')reloadServer();else if(a==='sharing')openSharing();else if(a==='audit')openAudit();else if(a==='connections')openConnections();else if(a==='security-audit')openSecurityAudit();else if(a==='logout'){if(saveInFlight){toast('저장 완료 후 로그아웃해 주세요.');return;}if((storageError||wbs.dirty)&&!confirm('미저장 변경사항과 보관 초안을 삭제하고 로그아웃할까요?'))return;api('auth/logout',{method:'POST',body:{}}).then(()=>{DraftStore.clearUser(currentUser.id);clearTimeout(wbs.draftTimer);wbs.draft=null;wbs.pending.clear();location.reload();}).catch(e=>toast(e.message));}else openEditor(a);
 });
 $('#main').addEventListener('change',async e=>{
  const el=e.target;
@@ -186,7 +187,7 @@ $('#main').addEventListener('change',async e=>{
  }
 });
 $('#main').addEventListener('input',e=>{if(e.target.id==='taskSearch'){const pos=e.target.selectionStart;query=e.target.value;render();$('#taskSearch').focus();$('#taskSearch').setSelectionRange(pos,pos);}});
-window.addEventListener('hashchange',()=>{const next=normalizeView(location.hash.slice(1));if(wbs.dirty&&next!=='tasks'){history.replaceState(null,'','#tasks');toast('WBS 변경사항을 먼저 저장하거나 취소해 주세요.');return;}view=next;render();});
+window.addEventListener('hashchange',()=>{const next=normalizeView(location.hash.slice(1));if(next===view)return;if(wbs.dirty&&next!=='tasks'){history.replaceState(null,'','#tasks');toast('WBS 변경사항을 먼저 저장하거나 취소해 주세요.');return;}view=next;render();});
 $('#projectSelect').onchange=e=>{if(storageError||wbs.dirty){toast('WBS 변경사항을 먼저 저장하거나 취소해 주세요.');render();return;}state.activeId=e.target.value;ownerFilter='';statusFilter='';query='';render();};$('#mobileNewProject').onclick=()=>openEditor('project');
 $('#closeDialog').onclick=$('#cancelDialog').onclick=()=>$('#editorDialog').close();$('#closeInfo').onclick=()=>$('#infoDialog').close();$('#helpButton').onclick=help;$('#methodFooter').onclick=method;$('#newProjectSide').onclick=()=>openEditor('project');
 $('#backupButton').onclick=()=>{
@@ -248,7 +249,7 @@ function setBusy(value){
 function updateAccessUi(){
  const p=project(),readOnly=p?._role==='viewer';
  document.querySelectorAll('[data-edit-task],[data-edit-member],[data-check-item]').forEach(el=>{if(readOnly)el.disabled=true;});
- document.querySelectorAll('[data-action="task"],[data-action="member"],[data-action="settings"]').forEach(el=>{el.disabled=readOnly;});
+ document.querySelectorAll('[data-action="task"],[data-action="quick-task"],[data-action="member"],[data-action="settings"]').forEach(el=>{el.disabled=readOnly;});
  const account=$('#accountButton');if(account)account.textContent=currentUser?.name||'계정';
  $('#saveStatus').textContent=saveInFlight?'서버 저장 중…':storageError?'저장 실패 · 백업 필요':wbs.dirty?'WBS 미저장 변경사항':readOnly?'조회 권한 · 서버 저장':'서버에 저장됨';
  $('#saveStatus').classList.toggle('error',!!storageError);
@@ -435,3 +436,6 @@ function showMfaLogin(challenge){
 }
 $('#infoBody').addEventListener('change',e=>{if(e.target.id==='draftPersist')try{DraftStore.setPersistent(currentUser.id,e.target.checked);wbs.persistDraft();}catch{e.target.checked=!e.target.checked;toast('초안 보관 설정을 바꾸지 못했습니다. 저장 공간 설정을 확인해 주세요.');}});
 async function openSecurityAudit(){try{const {events}=await api('auth/security-events');openInfo('인증·계정 관리 감사 로그','<p>최근 200건 · 보관 기간 90일 · IP는 해시로 저장합니다. 비밀번호·MFA 키·인증 코드는 기록하지 않습니다.</p>'+events.map(e=>'<article class="audit-entry"><strong>'+esc(e.kind)+'</strong><small>'+esc(new Date(e.at).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'}))+'</small><p>'+esc(e.details.code||e.details.change||'')+'</p></article>').join(''));}catch(error){toast(error.message);}}
+
+document.addEventListener('click',e=>{document.querySelectorAll('.action-menu[open]').forEach(menu=>{if(!menu.contains(e.target)||e.target.closest('button'))menu.open=false;});});
+document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;document.querySelectorAll('.action-menu[open]').forEach(menu=>{if(menu.contains(document.activeElement)){menu.open=false;menu.querySelector('summary')?.focus();e.preventDefault();}});});
