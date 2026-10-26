@@ -5,5 +5,6 @@
   "secure": false,
   "from": "pmcanvas@example.com",
   "username": "pmcanvas@example.com",
-  "passwordFile": "secrets/smtp-password.txt"
+  "passwordFile": "secrets/smtp-password.txt",
+  "reviewRecipients": []
 }

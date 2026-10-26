@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
-import {MailSettings} from '../server/mail-settings.mjs';
+import {MailSettings,reviewRecipients} from '../server/mail-settings.mjs';
 import {MemoryRepository} from './support/memory-repository.mjs';
 const key=Buffer.alloc(32,17),input={revision:0,enabled:true,host:'smtp.example.com',port:587,secure:false,from:'sender@example.com',authEnabled:true,username:'smtp-user',password:'test-only-secret'};
 function fixture(makeMailer){const admin=randomUUID(),other=randomUUID(),repo=new MemoryRepository([{id:admin,email:'admin@example.com',is_admin:true},{id:other,email:'other@example.com',is_admin:false}]);return {repo,admin,other,service:new MailSettings({repo,key,makeMailer})};}
@@ -30,4 +30,13 @@ test('메일 테스트: 오류 비밀 미노출·고정 수신자·잘못된 설
  await f.service.save(f.admin,{...input,revision:1,password:'',enabled:false});await assert.rejects(f.service.test('test@example.com'),e=>e.code==='MAIL_DISABLED');
  let release;const wait=new Promise(resolve=>release=resolve),limited=fixture(()=>({sendTest:()=>wait,close(){}}));await limited.service.save(limited.admin,input);
  const jobs=[limited.service.test('test@example.com'),limited.service.test('test@example.com')];await assert.rejects(limited.service.test('test@example.com'),e=>e.code==='MAIL_BUSY');release();await Promise.all(jobs);
+});
+test('승인 요청 수신 주소: 정규화·중복 제거·기존 설정 보존·삭제·재시작과 잘못된 입력 거절',async()=>{
+ const f=fixture();assert.deepEqual((await f.service.public()).reviewRecipients,[]);
+ let saved=await f.service.save(f.admin,{...input,reviewRecipients:' Team@Example.com, admin@example.com\nteam@example.com '});assert.deepEqual(saved.reviewRecipients,['team@example.com','admin@example.com']);
+ saved=await f.service.save(f.admin,{...input,revision:1,password:''});assert.deepEqual(saved.reviewRecipients,['team@example.com','admin@example.com']);assert.equal(saved.hasPassword,true);
+ const restarted=new MailSettings({repo:f.repo,key});assert.deepEqual((await restarted.public()).reviewRecipients,saved.reviewRecipients);
+ for(const value of ['bad-address','x@example.com\r\nBcc:y@example.com',['x@example.com\nsecond@example.com'],['Name <x@example.com>'],[5],{},null,Array.from({length:11},(_,i)=>i+'@example.com')])await assert.rejects(f.service.save(f.admin,{...input,revision:2,reviewRecipients:value}),e=>e.status===400);
+ saved=await f.service.save(f.admin,{...input,revision:2,password:'',reviewRecipients:''});assert.deepEqual(saved.reviewRecipients,[]);assert.equal(saved.hasPassword,true);
+ assert.deepEqual(reviewRecipients(''),[]);assert.deepEqual(reviewRecipients(['A@example.com','a@example.com']),['a@example.com']);
 });

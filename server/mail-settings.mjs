@@ -5,7 +5,12 @@ import {seal,unseal} from './admin-mfa.mjs';
 import {fail} from './errors.mjs';
 import {mailConfig,createMailer,mailAddress} from './mailer.mjs';
 
-const empty=()=>({enabled:false,host:'',port:587,secure:false,from:'',authEnabled:true,username:''});
+export function reviewRecipients(value=[]){
+ if(typeof value==='string'){if(value.length>4096)fail(400,'MAIL_RECIPIENTS','승인 요청 수신 이메일은 최대 10개까지 입력해 주세요.');value=value.split(/[,\r\n]+/).map(s=>s.trim()).filter(Boolean);}
+ if(!Array.isArray(value)||value.length>10||value.some(v=>typeof v!=='string'))fail(400,'MAIL_RECIPIENTS','승인 요청 수신 이메일은 쉼표나 줄바꿈으로 구분해 최대 10개까지 입력해 주세요.');
+ return [...new Set(value.map(v=>mailAddress(v.trim())))];
+}
+const empty=()=>({enabled:false,host:'',port:587,secure:false,from:'',authEnabled:true,username:'',reviewRecipients:[]});
 export function legacyMailSettings(env=process.env){
  const file=env.MAIL_CONFIG_FILE||'config/mail.json';
  if(!fs.existsSync(file)){if(env.MAIL_CONFIG_FILE)throw Error('MAIL_CONFIG_FILE was not found.');return {config:empty(),password:''};}
@@ -13,7 +18,7 @@ export function legacyMailSettings(env=process.env){
  mailConfig(raw,{directory:path.dirname(path.resolve(file))});
  let password='';
  if(raw.username&&raw.passwordFile){const secret=path.resolve(path.dirname(file),raw.passwordFile);if(fs.existsSync(secret))password=fs.readFileSync(secret,'utf8').replace(/\r?\n$/,'');}
- return {config:{enabled:raw.enabled,host:raw.host||'',port:raw.port||587,secure:!!raw.secure,from:raw.from||'',authEnabled:!!raw.username,username:raw.username||''},password};
+ return {config:{enabled:raw.enabled,host:raw.host||'',port:raw.port||587,secure:!!raw.secure,from:raw.from||'',authEnabled:!!raw.username,username:raw.username||'',reviewRecipients:reviewRecipients(raw.reviewRecipients)},password};
 }
 export class MailSettings{
  constructor({repo,key,legacy={config:empty(),password:''},makeMailer=createMailer}){
@@ -26,7 +31,8 @@ export class MailSettings{
   let password='';try{password=decrypt&&row.password_encrypted?unseal(row.password_encrypted,this.key):'';}catch{fail(503,'MAIL_KEY','메일 인증 정보를 읽지 못했습니다. 서버 설정을 확인해 주세요.');}
   return {config:row.config,password,hasPassword:!!row.password_encrypted,revision:row.revision};
  }
- async public(){const state=await this.current({decrypt:false});return {...state.config,hasPassword:state.hasPassword,revision:state.revision};}
+ async public(){const state=await this.current({decrypt:false});return {...state.config,reviewRecipients:reviewRecipients(state.config.reviewRecipients),hasPassword:state.hasPassword,revision:state.revision};}
+ reviewRecipients(){return reviewRecipients(this.legacy.config.reviewRecipients);}
  async enabled(){return (await this.public()).enabled;}
  async save(actorId,body){
   const old=await this.current({decrypt:false});
@@ -34,7 +40,7 @@ export class MailSettings{
   for(const flag of ['enabled','secure','authEnabled'])if(typeof body[flag]!=='boolean')fail(400,'MAIL_CONFIG','메일 사용·보안 연결·인증 설정을 확인해 주세요.');
   if(typeof body.host!=='string'||body.host.length>253||/[\s/@?#:]/.test(body.host)||!Number.isInteger(body.port)||body.port<1||body.port>65535)fail(400,'MAIL_CONFIG','SMTP 서버 주소와 포트를 확인해 주세요.');
   if(typeof body.from!=='string'||typeof body.username!=='string'||body.username.length>254||/[\r\n]/.test(body.username)||typeof body.password!=='string'||body.password.length>4096)fail(400,'MAIL_CONFIG','발신 이메일과 인증 계정을 확인해 주세요.');
-  const config={enabled:body.enabled,host:body.host,port:body.port,secure:body.secure,from:body.from?mailAddress(body.from):'',authEnabled:body.authEnabled,username:body.authEnabled?body.username:''};
+  const config={enabled:body.enabled,host:body.host,port:body.port,secure:body.secure,from:body.from?mailAddress(body.from):'',authEnabled:body.authEnabled,username:body.authEnabled?body.username:'',reviewRecipients:reviewRecipients(body.reviewRecipients===undefined?old.config.reviewRecipients:body.reviewRecipients)};
   const sameIdentity=config.host===old.config.host&&config.username===old.config.username;
   const password=config.authEnabled?(body.password||(sameIdentity&&old.hasPassword?(await this.current()).password:'')):'';
   if(config.enabled&&(!config.host||!config.from||config.authEnabled&&(!config.username||!password)))fail(400,'MAIL_CONFIG','서버·발신 이메일·인증 정보를 입력해 주세요. 서버나 계정을 바꾸면 비밀번호를 다시 입력해야 합니다.');

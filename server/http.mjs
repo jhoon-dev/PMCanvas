@@ -188,7 +188,7 @@ export function createHandler({repo,origin='http://localhost:3000',basePath='',l
      catch(error){await audit(req,'mail.test.failed',{code:error.code||'MAIL_ERROR'});throw error;}
     }
     if(path==='/api/admin/mail-settings'&&method==='GET')return json(res,200,{settings:await mailSettings.public()});
-    if(path==='/api/admin/mail-settings'&&method==='PUT'){await reserve('smtp-settings:'+user.id,20,600000);const settings=await mailSettings.save(user.id,await readJson(req,16384));await audit(req,'mail.settings.updated',{enabled:settings.enabled});return json(res,200,{settings});}
+    if(path==='/api/admin/mail-settings'&&method==='PUT'){await reserve('smtp-settings:'+user.id,20,600000);const settings=await mailSettings.save(user.id,await readJson(req,16384));registrationEmail?.notify();await audit(req,'mail.settings.updated',{enabled:settings.enabled});return json(res,200,{settings});}
     fail(405,'METHOD_NOT_ALLOWED','지원하지 않는 요청입니다.');
    }
    if(path==='/api/auth/security-events'&&method==='GET'){if(!user.isAdmin)fail(403,'FORBIDDEN','관리자 권한이 필요합니다.');return json(res,200,{events:repo.securityEvents?await repo.securityEvents():[]});}

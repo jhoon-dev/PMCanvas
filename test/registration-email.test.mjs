@@ -81,3 +81,14 @@ test('관리자 승인 요청 템플릿은 단일 수신자·고정 제목·평�
  assert.equal(mails[0].subject,'[PM Canvas] 회원가입 승인 요청');assert.deepEqual(mails[0].to,{address:'admin@example.com'});assert.equal('html' in mails[0],false);assert.equal('attachments' in mails[0],false);assert.ok(mails[0].text.includes('신청자 이름: 본인  <script>'));assert.ok(mails[0].text.includes('관리자 계정으로 로그인'));
  await assert.rejects(mailer.sendReviewRequest({to:'one,two@example.com',name:'본인',email:'applicant@example.com',url:'x'}),e=>e.status===400);
 });
+test('승인 요청 수신 주소 변경은 대기·실패 작업에 반영, 오래된 작업 결과 무시·전달 완료 중복 방지',async()=>{
+ const f=await fixture();f.repo.users.get(f.admin).email='admin@example.com';
+ const hash=digest('routing-proof');await f.repo.issueEmailVerification({userId:f.u.id,passwordHash:HASH,hash,expires:new Date(Date.now()+60000)});await f.repo.consumeEmailVerification(hash,{name:'본인',passwordHash:HASH});
+ const old=await f.repo.claimApprovalNotification();assert.equal(old.email,'admin@example.com');
+ const settings={enabled:false,reviewRecipients:['inbox@example.com']};await f.repo.saveMailSettings(f.admin,{config:settings,passwordEncrypted:null,revision:0});const next=await f.repo.claimApprovalNotification();assert.equal(next.email,'inbox@example.com');assert.equal(next.recipientId,null);
+ await f.repo.finishApprovalNotification(old.userId,old.lease,true);assert.equal(f.repo.reviewNotices.get(f.u.id+'|'+f.admin).state,'cancelled');await f.repo.finishApprovalNotification(next.userId,next.lease,false);
+ await f.repo.saveMailSettings(f.admin,{config:{...settings,reviewRecipients:['new@example.com','second@example.com']},passwordEncrypted:null,revision:1});const a=await f.repo.claimApprovalNotification(),b=await f.repo.claimApprovalNotification();assert.deepEqual(new Set([a.email,b.email]),new Set(['new@example.com','second@example.com']));await f.repo.finishApprovalNotification(a.userId,a.lease,true);await f.repo.finishApprovalNotification(b.userId,b.lease,true);
+ await f.repo.saveMailSettings(f.admin,{config:{...settings,reviewRecipients:['second@example.com','new@example.com']},passwordEncrypted:null,revision:2});assert.equal(await f.repo.claimApprovalNotification(),null);
+ await f.repo.saveMailSettings(f.admin,{config:{...settings,reviewRecipients:[]},passwordEncrypted:null,revision:3});const fallback=await f.repo.claimApprovalNotification();assert.equal(fallback.email,'admin@example.com');await f.repo.finishApprovalNotification(fallback.userId,fallback.lease,true);
+ await f.repo.saveMailSettings(f.admin,{config:{...settings,reviewRecipients:['admin@example.com']},passwordEncrypted:null,revision:4});assert.equal(await f.repo.claimApprovalNotification(),null);
+});

@@ -24,3 +24,5 @@ v0.7.0: Added WBS grid, transactional draft editing, clipboard TSV and interacti
 0.15.0: mailbox verification before registration approval; expiring one-use hashed proofs; mailbox-owner credential confirmation; transactional approval notification queue with leases, bounded retries and administrator retry. No new dependencies.
 
 0.16.0: registration verification atomically queues per-administrator review requests; shared durable notification worker with independent retry, active-role checks, safe inbox links and preserved MFA recovery display. No new dependencies.
+
+0.17.0: administrator-configured review email recipients with normalization and bounded lists; atomic routing changes for pending registration notices, per-address deduplication and default administrator fallback. No new dependencies.

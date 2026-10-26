@@ -132,6 +132,17 @@ networkTest('가입 이메일 HTTP·TLS SMTP: 인증 메일 수신·승인 전 �
  await f.call(admin,route,{method:'PATCH',body:{isActive:true}});await f.registrationEmail.idle();assert.equal(smtp.messages.length,3);
 });
 
+networkTest('승인 요청 지정 수신자 HTTP·TLS SMTP: 여러 주소 개별 발송·중복 주소 제거·설정 변경 반영',async t=>{
+ const smtp=await smtpFixture();t.after(()=>smtp.close());const f=await fixture(t,{basePath:'/pmcanvas',mailSettingsFactory:repo=>new MailSettings({repo,key:Buffer.alloc(32,27),makeMailer:config=>createMailer({...config,transport:{...config.transport,tls:{...config.transport.tls,ca:smtp.ca,servername:'localhost'}}})})}),admin=await f.login('owner@example.com'),guest=f.client();
+ const settings={revision:0,enabled:true,host:'127.0.0.1',port:smtp.port,secure:true,from:'sender@example.com',authEnabled:true,username:'fixture',password:'test-only-secret',reviewRecipients:'Inbox@example.com, security@example.com\ninbox@example.com'};
+ const saved=await f.call(admin,'admin/mail-settings',{method:'PUT',body:settings});assert.equal(saved.status,200);assert.deepEqual(saved.data.settings.reviewRecipients,['inbox@example.com','security@example.com']);
+ assert.equal((await f.call(guest,'admin/mail-settings')).status,401);const publicPolicy=await f.call(guest,'auth/providers');assert.equal(JSON.stringify(publicPolicy.data).includes('inbox@example.com'),false);
+ const email='custom-review@example.com';await f.call(guest,'auth/register',{method:'POST',body:{email,name:'신청자'}});await f.registrationEmail.idle();const proof={token:new URL(verificationLink(smtp.messages[0])).hash.slice('#verify-email='.length),name:'본인',newPassword:PASSWORD,confirmPassword:PASSWORD};assert.equal((await f.call(guest,'auth/verify-email',{method:'POST',body:proof})).status,200);await f.registrationEmail.idle();assert.equal(smtp.messages.length,3);
+ assert.ok(smtp.messages[1].includes('To: inbox@example.com'));assert.ok(smtp.messages[2].includes('To: security@example.com'));assert.equal(smtp.messages[1].includes('security@example.com'),false);assert.equal(smtp.messages[2].includes('inbox@example.com'),false);
+ await f.call(admin,'admin/mail-settings',{method:'PUT',body:{...settings,revision:1,password:'',reviewRecipients:'new@example.com'}});f.registrationEmail.notify();await f.registrationEmail.idle();assert.equal(smtp.messages.length,4);assert.ok(smtp.messages[3].includes('To: new@example.com'));
+ const u=await f.repo.findUserByEmail(email);assert.equal(u.registration_pending,true);assert.equal(u.is_active,false);
+});
+
 networkTest('이메일 재설정 HTTP·TLS SMTP: 실제 메일 수신·링크 사용·새 비밀번호 로그인',async t=>{
  const smtp=await smtpFixture();t.after(()=>smtp.close());
  const mailer=createMailer({from:'sender@example.com',transport:{host:'127.0.0.1',port:smtp.port,secure:true,auth:{user:'fixture',pass:'test-only-secret'},tls:{ca:smtp.ca,servername:'localhost',rejectUnauthorized:true},connectionTimeout:2000,socketTimeout:3000,disableFileAccess:true,disableUrlAccess:true}});

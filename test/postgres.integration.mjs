@@ -218,15 +218,17 @@ test('실제 PostgreSQL: 관리자별 승인 요청 원자 보관·중복 방지
   await repo.manageUser(a.id,u.id,{isActive:true});await pool.query("UPDATE pm_approval_notifications SET state='pending',available_at=now() WHERE user_id=$1 AND kind='review'",[u.id]);const approved=await repo.claimApprovalNotification();assert.equal(approved.kind,'approval');assert.equal(approved.email,u.email);await repo.finishApprovalNotification(u.id,approved.lease,true);assert.equal(await repo.claimApprovalNotification(),null);await assert.rejects(repo.retryApprovalNotification(a.id,u.id,'review'),e=>e.code==='NOTICE_UNAVAILABLE');
  }finally{for(const id of ids.reverse())await pool.query('DELETE FROM pm_users WHERE id=$1',[id]);await pool.end();}
 });
-test('실제 PostgreSQL: 010 업그레이드는 기존 발송 기록을 유지하고 인증된 대기 신청만 관리자에게 알린다',{skip:process.env.RUN_POSTGRES_TESTS!=='1'},async()=>{
+test('실제 PostgreSQL: 010·011 업그레이드는 기존 발송 기록 보존·대기 신청 등록·지정 수신 주소 제약을 적용한다',{skip:process.env.RUN_POSTGRES_TESTS!=='1'},async()=>{
  if(!/_test$/.test(process.env.PGDATABASE||''))throw Error('Use a dedicated _test database.');
  const pool=await createPool(),c=await pool.connect();
  try{
   await c.query('BEGIN');await c.query('CREATE TEMP TABLE pm_users(id uuid PRIMARY KEY,is_admin boolean,is_active boolean,registration_pending boolean,email_verified_at timestamptz)');
-  await c.query("CREATE TEMP TABLE pm_approval_notifications(user_id uuid PRIMARY KEY REFERENCES pm_users(id),state text DEFAULT 'pending',attempts integer DEFAULT 0,lease uuid,available_at timestamptz DEFAULT now(),updated_at timestamptz DEFAULT now())");
+  await c.query("CREATE TEMP TABLE pm_approval_notifications(user_id uuid PRIMARY KEY REFERENCES pm_users(id),state text DEFAULT 'pending' CHECK (state IN ('pending','sending','sent','failed')),attempts integer DEFAULT 0,lease uuid,available_at timestamptz DEFAULT now(),updated_at timestamptz DEFAULT now())");
   const admin=randomUUID(),pending=randomUUID(),unverified=randomUUID(),approved=randomUUID(),inactive=randomUUID();await c.query("INSERT INTO pm_users VALUES ($1,true,true,false,NULL),($2,false,false,true,now()),($3,false,false,true,NULL),($4,false,true,false,now()),($5,true,false,false,NULL)",[admin,pending,unverified,approved,inactive]);await c.query("INSERT INTO pm_approval_notifications(user_id,state,attempts) VALUES ($1,'sent',2)",[approved]);
   await c.query(fs.readFileSync(new URL('../migrations/010_registration_review.sql',import.meta.url),'utf8'));
   const rows=(await c.query('SELECT user_id,recipient_id,kind,state,attempts FROM pm_approval_notifications ORDER BY kind')).rows;assert.equal(rows.length,2);assert.deepEqual(rows.find(r=>r.kind==='approval'),{user_id:approved,recipient_id:approved,kind:'approval',state:'sent',attempts:2});assert.equal(rows.find(r=>r.kind==='review').user_id,pending);assert.equal(rows.find(r=>r.kind==='review').recipient_id,admin);
+  await c.query(fs.readFileSync(new URL('../migrations/011_review_recipients.sql',import.meta.url),'utf8'));assert.equal((await c.query("SELECT count(*)::int AS n FROM pm_approval_notifications WHERE state='sent' AND recipient_id=$1",[approved])).rows[0].n,1);
+  await c.query("INSERT INTO pm_approval_notifications(user_id,kind,recipient_email) VALUES ($1,'review','team@example.com') ON CONFLICT DO NOTHING",[pending]);await c.query("INSERT INTO pm_approval_notifications(user_id,kind,recipient_email) VALUES ($1,'review','team@example.com') ON CONFLICT DO NOTHING",[pending]);assert.equal((await c.query("SELECT count(*)::int AS n FROM pm_approval_notifications WHERE recipient_email='team@example.com'")).rows[0].n,1);
  }finally{await c.query('ROLLBACK');c.release();await pool.end();}
 });
 
@@ -244,6 +246,23 @@ test('실제 PostgreSQL: 재설정 링크 교체·동시 소비·세션 폐기·
   const disabled=digest(token());await issue(disabled);await repo.manageUser(admin.id,user.id,{isActive:false});await repo.manageUser(admin.id,user.id,{isActive:true});await assert.rejects(repo.consumePasswordReset(disabled,'new-hash'),e=>e.code==='RESET_INVALID');
   assert.equal(await repo.issuePasswordReset({userId:user.id,passwordHash:'wrong-snapshot',hash:digest(token()),expires:new Date(Date.now()+60000)}),false);
  }finally{for(const id of ids.reverse())await pool.query('DELETE FROM pm_users WHERE id=$1',[id]);await pool.end();}
+});
+
+test('실제 PostgreSQL: 수신 주소 변경과 인증 경합·대기 작업 전환·완료 중복 방지·기본 관리자 복원',{skip:process.env.RUN_POSTGRES_TESTS!=='1'},async()=>{
+ if(!/_test$/.test(process.env.PGDATABASE||''))throw Error('Use a dedicated _test database.');
+ const pool=await createPool(),repo=new PgRepository(pool),ids=[];
+ try{
+  await migrate(pool);await migrate(pool);const suffix=randomUUID(),admin=await repo.createUser({email:'routing-admin-'+suffix+'@example.com',name:'관리자',passwordHash:'hash',isAdmin:true}),u=await repo.createUser({email:'routing-user-'+suffix+'@example.com',name:'신청자',passwordHash:'hash',registrationPending:true});ids.push(admin.id,u.id);
+  const service=new MailSettings({repo,key:Buffer.alloc(32,31)}),body={revision:0,enabled:false,host:'',port:587,secure:false,from:'',authEnabled:false,username:'',password:'',reviewRecipients:['review@example.com']},hash=digest(token());await repo.issueEmailVerification({userId:u.id,passwordHash:'hash',hash,expires:new Date(Date.now()+60000)});
+  await Promise.all([service.save(admin.id,body),repo.consumeEmailVerification(hash,{name:'본인',passwordHash:'verified'})]);const first=await repo.claimApprovalNotification();assert.equal(first.email,'review@example.com');assert.equal(first.recipientId,null);assert.equal((await repo.listUsers()).filter(x=>x.id===u.id).length,1);
+  await service.save(admin.id,{...body,revision:1,reviewRecipients:['next@example.com','second@example.com']});await repo.finishApprovalNotification(u.id,first.lease,true);assert.equal((await pool.query("SELECT state FROM pm_approval_notifications WHERE user_id=$1 AND recipient_email='review@example.com'",[u.id])).rows[0].state,'cancelled');
+  const jobs=await Promise.all([repo.claimApprovalNotification(),repo.claimApprovalNotification()]);assert.deepEqual(new Set(jobs.map(j=>j.email)),new Set(['next@example.com','second@example.com']));for(const j of jobs)await repo.finishApprovalNotification(u.id,j.lease,true);
+  await service.save(admin.id,{...body,revision:2,reviewRecipients:['second@example.com','next@example.com']});assert.equal(await repo.claimApprovalNotification(),null);
+  await service.save(admin.id,{...body,revision:3,reviewRecipients:[]});const fallback=await repo.claimApprovalNotification();assert.equal(fallback.email,admin.email);await repo.finishApprovalNotification(u.id,fallback.lease,true);
+  await service.save(admin.id,{...body,revision:4,reviewRecipients:[admin.email]});assert.equal(await repo.claimApprovalNotification(),null);
+  const restarted=new MailSettings({repo:new PgRepository(pool),key:Buffer.alloc(32,31)});assert.deepEqual((await restarted.public()).reviewRecipients,[admin.email]);
+  await repo.manageUser(admin.id,u.id,{isActive:true});await service.save(admin.id,{...body,revision:5,reviewRecipients:['after-approval@example.com']});const approved=await repo.claimApprovalNotification();assert.equal(approved.kind,'approval');assert.equal(approved.email,u.email);await repo.finishApprovalNotification(u.id,approved.lease,true);assert.equal(await repo.claimApprovalNotification(),null);
+ }finally{await pool.query('DELETE FROM pm_mail_settings WHERE id=true');for(const id of ids.reverse())await pool.query('DELETE FROM pm_users WHERE id=$1',[id]);await pool.end();}
 });
 
 test('실제 PostgreSQL: 관리자 SMTP 암호화·재시작 복구·권한·동시 설정 저장 충돌',{skip:process.env.RUN_POSTGRES_TESTS!=='1'},async()=>{
