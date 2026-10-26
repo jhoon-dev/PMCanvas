@@ -26,13 +26,14 @@ function compose(args,{capture=false}={}){
 }
 async function main(){
  const [command,...args]=process.argv.slice(2);
+ const ensureMfaKey=()=>{const dir=path.join(root,'config','secrets');fs.mkdirSync(dir,{recursive:true,mode:0o700});const key=path.join(dir,'mfa.key');if(!fs.existsSync(key))fs.writeFileSync(key,randomBytes(32),{flag:'wx',mode:0o600});};
  if(command==='setup'){
   if(fs.existsSync(envPath))throw Error('.env already exists; setup will not overwrite it.');
   const options={};
   for(let i=0;i<args.length;i+=2){if(!['--email','--origin','--port'].includes(args[i])||!args[i+1])throw Error('Use setup --email address [--origin URL] [--port port].');options[args[i].slice(2)]=args[i+1];}
   if(!options.email){const rl=createInterface({input:process.stdin,output:process.stdout});try{options.email=await rl.question('Administrator email: ');}finally{rl.close();}}
   if(options.port&&!options.origin)options.origin='http://localhost:'+options.port;
-  const values=setupValues(options);
+  const values=setupValues(options);ensureMfaKey();
   const config=path.join(root,'config','auth.json');
   if(!fs.existsSync(config))fs.copyFileSync(path.join(root,'config','auth.example.json'),config,fs.constants.COPYFILE_EXCL);
   fs.writeFileSync(envPath,Object.entries(values).map(([k,v])=>`${k}=${JSON.stringify(v)}`).join('\n')+'\n',{flag:'wx',mode:0o600});
@@ -42,7 +43,7 @@ async function main(){
  const env=parseEnv(fs.readFileSync(envPath,'utf8'));
  const database=env.APP_DATABASE||'pmcanvas';
  if(!/^[a-z][a-z0-9_]{0,62}$/.test(database))throw Error('Invalid APP_DATABASE.');
- if(command==='up'){compose(['up','-d','--build','--wait','--wait-timeout','180']);return;}
+ if(command==='up'){ensureMfaKey();compose(['up','-d','--build','--wait','--wait-timeout','180']);return;}
  if(command==='status'){compose(['ps']);return;}
  if(command==='stop'){compose(['stop']);return;}
  if(command==='logs'){compose(['logs','--tail','100','app']);return;}
@@ -61,6 +62,7 @@ async function main(){
    compose(['cp',source,'db:'+remote]);
    compose(['exec','-T','db','createdb','-U','postgres','-O','pmcanvas',target]);
    compose(['exec','-T','db','pg_restore','-U','postgres','--role=pmcanvas','--no-owner','--no-acl','--exit-on-error','--single-transaction','-d',target,remote]);
+   compose(['exec','-T','db','psql','-U','postgres','-d',target,'-v','ON_ERROR_STOP=1','-c',"DO $restore$ DECLARE t text; BEGIN FOREACH t IN ARRAY ARRAY['pm_sessions','pm_auth_transient','pm_auth_attempts'] LOOP IF to_regclass(t) IS NOT NULL THEN EXECUTE format('TRUNCATE %I',t); END IF; END LOOP; IF to_regclass('pm_admin_mfa') IS NOT NULL THEN EXECUTE 'UPDATE pm_admin_mfa SET recovery_hashes=ARRAY[]::text[]'; END IF; END $restore$;"]);
    console.log('Restored to '+target+'. To activate, set APP_DATABASE='+target+' in .env and run npm run service:up.');
   }finally{compose(['exec','-T','db','rm','-f',remote],{capture:true});}return;
  }

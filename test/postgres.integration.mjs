@@ -1,3 +1,4 @@
+import {AdminMfa,totp} from '../server/admin-mfa.mjs';
 import {captureBaseline,setParent} from '../public/planning.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -134,4 +135,15 @@ test('실제 PostgreSQL: 계층·기준 계획 저장/재조회·수정 응답·
   delete loaded.baseline;delete loaded.tasks[1].parentId;loaded=await repo.updateProject(user.id,id,cleanProject(loaded),loaded._revision);assert.equal(loaded.baseline,undefined);assert.equal(loaded.tasks[1].parentId,undefined);
   assert.ok((await repo.listEvents(user.id,id)).some(e=>e.changes.some(c=>c.entity==='project'&&c.after?.baseline===null)));
  }finally{await pool.query('DELETE FROM pm_projects WHERE id=$1',[id]);if(user)await pool.query('DELETE FROM pm_users WHERE id=$1',[user.id]);await pool.end();}
+});
+
+test('실제 PostgreSQL: 공유 시도 제한·MFA 원자 처리·복구 코드·감사 로그',{skip:process.env.RUN_POSTGRES_TESTS!=='1'},async()=>{
+ if(!/_test$/.test(process.env.PGDATABASE||''))throw Error('Use a dedicated _test database.');const pool=await createPool(),repo=new PgRepository(pool),other=new PgRepository(pool),key=randomUUID();let user;
+ try{
+  await migrate(pool);const attempts=await Promise.allSettled(Array.from({length:12},(_,i)=>(i%2?repo:other).reserveAttempt(key,8,60000)));assert.equal(attempts.filter(r=>r.status==='fulfilled').length,8);assert.equal(attempts.filter(r=>r.status==='rejected').length,4);
+  user=await repo.createUser({email:randomUUID()+'@example.com',name:'MFA 통합 검증',passwordHash:'fixture-hash',isAdmin:true});const stored=await repo.findUserByEmail(user.email),mfa=new AdminMfa(repo,Buffer.alloc(32,4)),challenge=await mfa.begin(stored,null),otp=totp(challenge.secret);
+  const result=await mfa.finish(challenge.challenge,otp);assert.equal(result.recoveryCodes.length,10);await assert.rejects(mfa.finish(challenge.challenge,otp));
+  const next=await mfa.begin(stored,null);const recoveries=await Promise.allSettled([mfa.finish(next.challenge,result.recoveryCodes[0]),mfa.finish(next.challenge,result.recoveryCodes[0])]);assert.equal(recoveries.filter(r=>r.status==='fulfilled').length,1);assert.equal((await repo.getMfa(user.id)).recovery_hashes.length,9);
+  await repo.securityEvent({actorId:user.id,kind:'test.security.audit',details:{action:'verified'}});assert.ok((await repo.securityEvents()).some(e=>e.actorId===user.id&&e.kind==='test.security.audit'));
+ }finally{await pool.query('DELETE FROM pm_auth_attempts WHERE key=$1',[key]);if(user){await pool.query('DELETE FROM pm_security_events WHERE actor_id=$1',[user.id]);await pool.query('DELETE FROM pm_auth_transient WHERE value->>\'userId\'=$1',[user.id]);await pool.query('DELETE FROM pm_users WHERE id=$1',[user.id]);}await pool.end();}
 });

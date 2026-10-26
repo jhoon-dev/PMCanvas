@@ -1,3 +1,4 @@
+import {AdminMfa} from '../../server/admin-mfa.mjs';
 // Local, disposable UI verification harness. Never used by server/main.mjs.
 import http from 'node:http';
 import {generateKeyPairSync,createHash,sign,randomUUID} from 'node:crypto';
@@ -36,7 +37,7 @@ const idp=http.createServer(async(req,res)=>{
 });
 const providers=parseAuthConfig({providers:[{id:'demo',type:'oidc',label:'테스트 회사 SSO',issuer,clientId:'pmcanvas',clientSecretFile:'secret.txt',allowLoopbackHttp:true,autoProvision:true,allowedDomains:['example.com']},{id:'ad-preview',type:'ldap',label:'테스트 AD',url:'ldaps://dc.example.com',bindDN:'reader',bindPasswordFile:'secret.txt',searchBase:'dc=example,dc=com',searchFilter:'(sAMAccountName={{username}})',allowedDomains:['example.com'],autoProvision:true}]},{directory,origin});
 const repo=new MemoryRepository([{id:randomUUID(),email:'admin@example.com',name:'테스트 관리자',password_hash:await hashPassword('preview-admin-password'),is_admin:true}]);
-const app=createApplication({repo,origin,basePath:'/pmcanvas',federation:new Federation({repo,origin,basePath:'/pmcanvas',providers})});
+const app=createApplication({repo,origin,adminMfa:new AdminMfa(repo,Buffer.alloc(32,8)),basePath:'/pmcanvas',federation:new Federation({repo,origin,basePath:'/pmcanvas',providers})});
 idp.listen(4182,'127.0.0.1');app.listen(4183,'127.0.0.1');console.log('Disposable SSO preview: '+origin+'/pmcanvas/');
 function stop(){app.closeAllConnections();idp.closeAllConnections();app.close();idp.close();fs.rmSync(directory,{recursive:true,force:true});}
 process.once('SIGINT',()=>{stop();process.exit(0);});process.once('SIGTERM',()=>{stop();process.exit(0);});

@@ -4,6 +4,19 @@ import {fail} from '../../server/errors.mjs';
 import {projectChanges} from '../../server/project.mjs';
 import {publicUser} from '../../server/postgres.mjs';
 export class MemoryRepository{
+ async reserveAttempt(key,limit,windowMs){this.attempts??=new Map();const old=this.attempts.get(key);const value=old&&old.until>Date.now()?old:{count:0,until:Date.now()+windowMs};if(value.count>=limit)fail(429,'RATE_LIMIT','로그인 시도가 많습니다.');value.count++;this.attempts.set(key,value);}
+ async clearAttempt(key){this.attempts?.delete(key);}
+ async upgradeHash(id,oldHash,newHash){const user=this.users.get(id);if(!user||user.password_hash!==oldHash)fail(401,'LOGIN_FAILED','계정 변경');user.password_hash=newHash;}
+ async securityEvent(event){this.security??=[];this.security.push({...event,id:String(this.security.length+1),at:new Date().toISOString()});}
+ async securityEvents(){return [...this.security||[]].reverse().slice(0,200);}
+ async getMfa(id){return this.mfa?.get(id)||null;}
+ async reserveMfaChallenge(key){const entry=this.transients.get(key);if(!entry||entry.until<=Date.now()||entry.value.attempts>=5)return null;entry.value.attempts++;return structuredClone(entry.value);}
+ async completeMfa({key,userId,passwordHash,step,recoveryHash,enrollment}){const user=this.users.get(userId),entry=this.transients.get(key);if(!user?.is_admin||user.is_active===false||user.password_hash!==passwordHash||!entry||entry.until<=Date.now())fail(401,'MFA_EXPIRED','인증 만료');this.mfa??=new Map();let state=this.mfa.get(userId);
+  if(enrollment){if(state)fail(401,'MFA_REPLAY','이미 등록');state={secret:enrollment.secret,recovery_hashes:enrollment.recoveryHashes,last_step:step};this.mfa.set(userId,state);}
+  else if(step!=null){if(!state||state.last_step>=step)fail(401,'MFA_REPLAY','코드 재사용');state.last_step=step;}
+  else{if(!state?.recovery_hashes.includes(recoveryHash))fail(401,'MFA_REPLAY','복구 코드 재사용');state.recovery_hashes=state.recovery_hashes.filter(h=>h!==recoveryHash);}
+  this.transients.delete(key);
+ }
  constructor(users=[]){this.users=new Map(users.map(u=>[u.id,u]));this.sessions=new Map();this.projects=new Map();this.events=new Map();this.transients=new Map();this.identities=new Map();}
  async health(){}
  async findUserByEmail(email){return [...this.users.values()].find(u=>u.email===email);}

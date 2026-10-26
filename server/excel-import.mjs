@@ -1,5 +1,6 @@
 import ExcelJS from 'exceljs';
-import {Worker,isMainThread,parentPort,workerData} from 'node:worker_threads';
+import yauzl from 'yauzl';
+import {fileJob} from './file-jobs.mjs';
 
 function inspectZip(buffer){
  let end=-1;for(let i=buffer.length-22;i>=Math.max(0,buffer.length-65557);i--)if(buffer.readUInt32LE(i)===0x06054b50){end=i;break;}
@@ -14,7 +15,7 @@ function inspectZip(buffer){
  }
 }
 export async function parseWorkbook(buffer){
- if(buffer.length>4*1024*1024)throw Error('Excel 파일은 4MB 이하로 선택해 주세요.');inspectZip(buffer);
+ if(buffer.length>4*1024*1024)throw Error('Excel 파일은 4MB 이하로 선택해 주세요.');inspectZip(buffer);await validateInflation(buffer);
  const book=new ExcelJS.Workbook();await book.xlsx.load(buffer);
  if(book.worksheets.length>12)throw Error('시트는 12개까지 지원합니다.');
  return book.worksheets.map(sheet=>{
@@ -28,16 +29,16 @@ export async function parseWorkbook(buffer){
   }return {name:sheet.name,rows};
  });
 }
-let active=0;
 export async function readWorkbook(base64){
  if(typeof base64!=='string'||base64.length>5592408||base64.length%4!==0||!/^[A-Za-z0-9+/]*={0,2}$/.test(base64))throw Error('Excel 파일 형식을 확인해 주세요.');
- if(active>=2)throw Error('다른 Excel 파일을 처리 중입니다. 잠시 후 다시 시도해 주세요.');active++;
- try{return await new Promise((resolve,reject)=>{
-  const worker=new Worker(new URL(import.meta.url),{workerData:base64,resourceLimits:{maxOldGenerationSizeMb:128}});
-  const timer=setTimeout(()=>{worker.terminate();reject(Error('파일 처리 시간을 초과했습니다. 파일 크기를 줄여 주세요.'));},10000);
-  worker.once('message',result=>{clearTimeout(timer);worker.terminate();result.error?reject(Error(result.error)):resolve(result.sheets);});
-  worker.once('error',()=>{clearTimeout(timer);reject(Error('Excel 파일을 읽지 못했습니다. 파일 형식과 크기를 확인해 주세요.'));});
-  worker.once('exit',()=>{clearTimeout(timer);reject(Error('Excel 처리가 중단되었습니다.'));});
- });}finally{active--;}
+ return JSON.parse((await fileJob('import',{file:base64})).toString());
 }
-if(!isMainThread)parseWorkbook(Buffer.from(workerData,'base64')).then(sheets=>parentPort.postMessage({sheets})).catch(error=>parentPort.postMessage({error:error.message}));
+async function validateInflation(buffer){
+ return new Promise((resolve,reject)=>yauzl.fromBuffer(buffer,{lazyEntries:true,validateEntrySizes:true},(error,zip)=>{
+  if(error)return reject(Error('유효한 XLSX 파일이 아닙니다.'));let total=0,count=0;const names=new Set();const failed=error=>{zip.close();reject(error);};
+  zip.on('error',failed);zip.on('end',resolve);zip.on('entry',entry=>{
+   if(++count>2000||names.has(entry.fileName)||entry.uncompressedSize>32*1024*1024)return failed(Error('압축 항목 제한을 초과했습니다.'));names.add(entry.fileName);
+   zip.openReadStream(entry,(error,stream)=>{if(error)return failed(error);stream.on('error',failed);stream.on('data',chunk=>{total+=chunk.length;if(total>32*1024*1024){stream.destroy();failed(Error('실제 압축 해제 크기가 32MB를 초과합니다.'));}});stream.on('end',()=>zip.readEntry());});
+  });zip.readEntry();
+ }));
+}

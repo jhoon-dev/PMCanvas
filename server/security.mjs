@@ -1,7 +1,11 @@
 import {randomBytes,scrypt as scryptCallback,timingSafeEqual,createHash} from 'node:crypto';
 import {promisify} from 'node:util';
 import {fail} from './errors.mjs';
-const scrypt=promisify(scryptCallback);
+const rawScrypt=promisify(scryptCallback);let running=0;const waiting=[];
+async function scrypt(...args){
+ if(running>=2){if(waiting.length>=24)fail(503,'AUTH_BUSY','인증 요청이 많습니다. 잠시 후 다시 시도해 주세요.');await new Promise(resolve=>waiting.push(resolve));}else running++;
+ try{return await rawScrypt(...args);}finally{const next=waiting.shift();if(next)next();else running--;}
+}
 export const token=()=>randomBytes(32).toString('base64url');
 export const digest=value=>createHash('sha256').update(value).digest('hex');
 export const safeEqual=(a,b)=>typeof a==='string'&&typeof b==='string'&&Buffer.byteLength(a)===Buffer.byteLength(b)&&timingSafeEqual(Buffer.from(a),Buffer.from(b));
@@ -15,14 +19,14 @@ export function passwordValue(value){
 }
 export async function hashPassword(value){
  passwordValue(value);const salt=randomBytes(16).toString('hex');
- const hash=await scrypt(value,salt,64,{N:16384,r:8,p:1,maxmem:64*1024*1024});
- return 'scrypt-v1:'+salt+':'+hash.toString('hex');
+ const hash=await scrypt(value,salt,64,{N:131072,r:8,p:1,maxmem:160*1024*1024});
+ return 'scrypt-v2:'+salt+':'+hash.toString('hex');
 }
 export async function verifyPassword(value,stored){
  if(typeof value!=='string'||value.length>256)return false;
  const [version,salt,expected]=String(stored).split(':');
- if(version!=='scrypt-v1'||!/^[a-f0-9]{32}$/.test(salt||'')||!/^[a-f0-9]{128}$/.test(expected||''))return false;
- const actual=await scrypt(value,salt,64,{N:16384,r:8,p:1,maxmem:64*1024*1024});
+ if(!['scrypt-v1','scrypt-v2'].includes(version)||!/^[a-f0-9]{32}$/.test(salt||'')||!/^[a-f0-9]{128}$/.test(expected||''))return false;
+ const actual=await scrypt(value,salt,64,{N:version==='scrypt-v1'?16384:131072,r:8,p:1,maxmem:160*1024*1024});
  return timingSafeEqual(actual,Buffer.from(expected,'hex'));
 }
 export function cookieValue(req,name){

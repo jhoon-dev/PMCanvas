@@ -1,3 +1,4 @@
+import {fileJob} from './file-jobs.mjs';
 import {hierarchy,rollup,criticalPath,baselineDiff} from '../public/planning.js';
 import ExcelJS from 'exceljs';
 import {dateValue,addDays,daysBetween,forecast,taskHours,progress,earned} from '../public/engine.js';
@@ -12,7 +13,7 @@ function sheet(book,name,headers,widths){
  return s;
 }
 function row(s,values){const r=s.addRow(values);r.height=30;r.alignment={vertical:'middle',wrapText:true};if(r.number%2===0)r.fill=fill('FFF0F4FA');return r;}
-export async function projectWorkbook(project,at,ids=project.tasks.map(t=>t.id),{draft=false}={}){
+export async function buildWorkbook(project,at,ids=project.tasks.map(t=>t.id),{draft=false}={}){
  const book=new ExcelJS.Workbook();book.creator='PMCanvas';book.created=new Date();
  const selected=new Set(ids),tasks=project.tasks.filter(t=>selected.has(t.id)),fc=forecast(project,at).tasks,tree=hierarchy(project),cp=criticalPath(project);
  const owners=new Map(project.members.map(m=>[m.id,m.name])),names=new Map(project.tasks.map(t=>[t.id,t.name]));
@@ -38,3 +39,5 @@ export async function projectWorkbook(project,at,ids=project.tasks.map(t=>t.id),
  row(cover,['간트 한 칸',step===1?'1일':`${step}일 (장기 일정 자동 축약)`]);
  return Buffer.from(await book.xlsx.writeBuffer());
 }
+
+export function projectWorkbook(project,at,ids=project.tasks.map(t=>t.id),options={}){return fileJob('export',{project,at,ids,options});}

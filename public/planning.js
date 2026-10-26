@@ -30,9 +30,9 @@ export function baselineDiff(project){
 }
 export function criticalPath(project){
  if(!project.tasks.length)return {ids:new Set(),slack:{},duration:0};
- const tasks=orderTasks(project.tasks),origin=tasks.map(t=>t.start).sort()[0],h=project.holidays||[],early={},finish={},successors=new Map(tasks.map(t=>[t.id,[]]));
+ const tasks=orderTasks(project.tasks),origin=tasks.map(t=>t.start).sort()[0],h=project.holidays||[],early=Object.create(null),finish=Object.create(null),successors=new Map(tasks.map(t=>[t.id,[]]));
  for(const t of tasks){if(t.predecessor)successors.get(t.predecessor).push(t.id);const release=workdays(origin,addDays(t.start,-1),h),duration=workdays(t.start,t.end,h);early[t.id]=Math.max(release,t.predecessor?finish[t.predecessor]:0);finish[t.id]=early[t.id]+duration;}
- const duration=Math.max(...Object.values(finish)),late={},slack={};
+ const duration=Math.max(...Object.values(finish)),late=Object.create(null),slack=Object.create(null);
  for(const t of [...tasks].reverse()){const next=successors.get(t.id),end=next.length?Math.min(...next.map(id=>late[id])):duration;late[t.id]=end-(finish[t.id]-early[t.id]);slack[t.id]=late[t.id]-early[t.id];}
  return {ids:new Set(tasks.filter(t=>slack[t.id]===0).map(t=>t.id)),slack,duration};
 }

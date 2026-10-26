@@ -18,7 +18,7 @@ export async function migrate(pool){
  try{
   await client.query('BEGIN');await client.query('SELECT pg_advisory_xact_lock(726534001)');
   await client.query('CREATE TABLE IF NOT EXISTS pm_schema_migrations(version integer PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())');
-  for(const [version,file] of [[1,'001_initial.sql'],[2,'002_user_status.sql'],[3,'003_federated_auth.sql'],[4,'004_planning.sql']]){
+  for(const [version,file] of [[1,'001_initial.sql'],[2,'002_user_status.sql'],[3,'003_federated_auth.sql'],[4,'004_planning.sql'],[5,'005_security.sql']]){
    const {rows}=await client.query('SELECT version FROM pm_schema_migrations WHERE version=$1',[version]);
    if(!rows.length){await client.query(fs.readFileSync(new URL('../migrations/'+file,import.meta.url),'utf8'));await client.query('INSERT INTO pm_schema_migrations(version) VALUES ($1)',[version]);}
   }
@@ -31,6 +31,29 @@ export class PgRepository{
   const c=await this.pool.connect();
   try{await c.query(readOnly?'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY':'BEGIN');const value=await fn(c);await c.query('COMMIT');return value;}
   catch(error){await c.query('ROLLBACK');throw error;}finally{c.release();}
+ }
+ async reserveAttempt(key,limit,windowMs){
+  await this.pool.query('DELETE FROM pm_auth_attempts WHERE expires_at<now()');
+  const {rowCount}=await this.pool.query('INSERT INTO pm_auth_attempts(key,attempts,expires_at) VALUES ($1,1,now()+$3*interval \'1 millisecond\') ON CONFLICT(key) DO UPDATE SET attempts=pm_auth_attempts.attempts+1 WHERE pm_auth_attempts.attempts<$2 RETURNING key',[key,limit,windowMs]);
+  if(!rowCount)fail(429,'RATE_LIMIT','로그인 시도가 많습니다. 잠시 후 다시 시도해 주세요.');
+ }
+ async clearAttempt(key){await this.pool.query('DELETE FROM pm_auth_attempts WHERE key=$1',[key]);}
+ async upgradeHash(id,oldHash,newHash){const r=await this.pool.query('UPDATE pm_users SET password_hash=$3 WHERE id=$1 AND password_hash=$2 AND is_active AND local_login RETURNING id',[id,oldHash,newHash]);if(!r.rowCount)fail(401,'LOGIN_FAILED','계정 정보가 변경되었습니다. 다시 로그인해 주세요.');}
+ async securityEvent({actorId=null,kind,ip=null,details={}}){await this.pool.query('DELETE FROM pm_security_events WHERE at<now()-interval \'90 days\'');await this.pool.query('INSERT INTO pm_security_events(actor_id,kind,ip_hash,details) VALUES ($1,$2,$3,$4::jsonb)',[actorId,kind,ip,JSON.stringify(details)]);}
+ async securityEvents(){return (await this.pool.query('SELECT id::text,at,actor_id AS "actorId",kind,ip_hash AS "ipHash",details FROM pm_security_events ORDER BY id DESC LIMIT 200')).rows;}
+ async getMfa(id){return (await this.pool.query('SELECT * FROM pm_admin_mfa WHERE user_id=$1',[id])).rows[0]||null;}
+ async reserveMfaChallenge(key){return (await this.pool.query('UPDATE pm_auth_transient SET value=jsonb_set(value,\'{attempts}\',to_jsonb((value->>\'attempts\')::int+1)) WHERE key=$1 AND expires_at>now() AND (value->>\'attempts\')::int<5 RETURNING value',[key])).rows[0]?.value??null;}
+ async completeMfa({key,userId,passwordHash,step,recoveryHash,enrollment}){
+  return this.transaction(async c=>{
+   const user=(await c.query('SELECT * FROM pm_users WHERE id=$1 FOR UPDATE',[userId])).rows[0];
+   if(!user?.is_admin||!user.is_active||user.password_hash!==passwordHash)fail(401,'MFA_EXPIRED','계정 정보가 변경되었습니다.');
+   const challenge=await c.query('DELETE FROM pm_auth_transient WHERE key=$1 AND expires_at>now() RETURNING key',[key]);if(!challenge.rowCount)fail(401,'MFA_EXPIRED','인증 요청이 만료되었습니다.');
+   let result;
+   if(enrollment)result=await c.query('INSERT INTO pm_admin_mfa(user_id,secret,recovery_hashes,last_step) VALUES ($1,$2,$3,$4) ON CONFLICT(user_id) DO NOTHING RETURNING user_id',[userId,enrollment.secret,enrollment.recoveryHashes,step]);
+   else if(step!=null)result=await c.query('UPDATE pm_admin_mfa SET last_step=$2 WHERE user_id=$1 AND last_step<$2 RETURNING user_id',[userId,step]);
+   else result=await c.query('UPDATE pm_admin_mfa SET recovery_hashes=array_remove(recovery_hashes,$2) WHERE user_id=$1 AND $2=ANY(recovery_hashes) RETURNING user_id',[userId,recoveryHash]);
+   if(!result.rowCount)fail(401,'MFA_REPLAY','이미 사용했거나 유효하지 않은 인증 코드입니다. 다음 코드를 사용해 주세요.');
+  });
  }
  async health(){await this.pool.query('SELECT 1');}
  async findUserByEmail(email){return (await this.pool.query('SELECT * FROM pm_users WHERE email=$1',[email])).rows[0]||null;}

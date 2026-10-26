@@ -1,11 +1,15 @@
 export const DAY=86400000;
 export const dateValue=s=>Date.parse(s+'T00:00:00Z');
-export const validDate=s=>typeof s==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(s)&&Number.isFinite(dateValue(s))&&new Date(dateValue(s)).toISOString().slice(0,10)===s;
+export const validDate=s=>typeof s==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(s)&&s>='1900-01-01'&&s<='2200-12-31'&&Number.isFinite(dateValue(s))&&new Date(dateValue(s)).toISOString().slice(0,10)===s;
 export const addDays=(s,n)=>new Date(dateValue(s)+n*DAY).toISOString().slice(0,10);
 export const daysBetween=(a,b)=>Math.round((dateValue(b)-dateValue(a))/DAY);
 export const today=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Seoul'}).format(new Date());
 export function working(s,h=[]){const d=new Date(dateValue(s)).getUTCDay();return d!==0&&d!==6&&!h.includes(s);}
-export function workdays(a,b,h=[]){if(b<a)return 0;let n=0;for(let d=a;d<=b;d=addDays(d,1))if(working(d,h))n++;return n;}
+export function workdays(a,b,h=[]){
+ if(b<a)return 0;const count=daysBetween(a,b)+1;if(!Number.isFinite(count))throw Error('날짜를 확인해 주세요.');
+ let n=Math.floor(count/7)*5;const weekday=new Date(dateValue(a)).getUTCDay();for(let i=0;i<count%7;i++)if(![0,6].includes((weekday+i)%7))n++;
+ for(const d of new Set(h))if(d>=a&&d<=b&&working(d))n--;return n;
+}
 export function nextWorkday(s,h=[]){let d=s;for(let i=0;i<3700;i++,d=addDays(d,1))if(working(d,h))return d;throw Error('근무일을 찾을 수 없습니다.');}
 export function shiftWorkday(s,n,h=[]){let d=s;for(let i=0;i<Math.abs(n);){d=addDays(d,n<0?-1:1);if(working(d,h))i++;}return d;}
 export const taskHours=t=>t.items.reduce((s,i)=>s+i.hours,0);
@@ -49,14 +53,17 @@ export function summary(project,at){
  return {total,done,progress:total?done/total:0,planned:total?plan/total:0,completed:project.tasks.filter(t=>progress(t,at)===1).length,overdue:project.tasks.filter(t=>t.end<at&&progress(t,at)<1).length,start:starts[0]||null,end:ends.at(-1)||null,forecast:f};
 }
 export function validateProject(p){
+ const currentDay=today();
  if(!p||typeof p!=='object'||!Array.isArray(p.members)||!Array.isArray(p.tasks)||typeof p.name!=='string'||!p.name.trim()||p.name.length>120)throw Error('프로젝트 형식 또는 이름이 올바르지 않습니다.');
  if(p.members.length>200||p.tasks.length>500)throw Error('첫 버전은 인력 200명, 업무 500개까지 지원합니다.');
  if(p.holidays!==undefined&&(!Array.isArray(p.holidays)||p.holidays.length>3660||p.holidays.some(d=>!validDate(d))))throw Error('휴무일 날짜를 확인해 주세요.');
+ const dates=[...p.tasks.flatMap(t=>[t.start,t.end,...(t.items||[]).map(i=>i.doneDate)]),...(Array.isArray(p.baseline?.tasks)?p.baseline.tasks.flatMap(t=>[t.start,t.end]):[])].filter(d=>typeof d==='string').sort();
+ if(dates.length&&daysBetween(dates[0],dates.at(-1))>36525)throw Error('프로젝트 전체 일정과 기준 계획은 100년 이내로 설정해 주세요.');
  const memberIds=new Set(),taskIds=new Set(),itemIds=new Set();
  for(const m of p.members){if(typeof m.id!=='string'||memberIds.has(m.id)||typeof m.name!=='string'||!m.name.trim()||m.name.length>80||!(m.hours>0&&m.hours<=16)||!(m.allocation>0&&m.allocation<=100)||typeof m.grade!=='string'||typeof m.role!=='string')throw Error('참여인력의 이름·근무시간·투입률을 확인해 주세요.');memberIds.add(m.id);}
  for(const t of p.tasks){
   if(typeof t.id!=='string'||taskIds.has(t.id)||typeof t.name!=='string'||!t.name.trim()||t.name.length>200||!validDate(t.start)||!validDate(t.end)||t.end<t.start||daysBetween(t.start,t.end)>3652||!workdays(t.start,t.end,p.holidays)||!Array.isArray(t.items)||!t.items.length||t.items.length>200||(!memberIds.has(t.owner)&&t.owner!==''))throw Error('업무 이름·담당자·일정·체크 항목을 확인해 주세요.');
-  for(const i of t.items){if(typeof i.id!=='string'||itemIds.has(i.id)||typeof i.title!=='string'||!i.title.trim()||i.title.length>300||!Number.isFinite(i.hours)||i.hours<=0||i.hours>10000||(i.doneDate&&(!validDate(i.doneDate)||i.doneDate>today())))throw Error('세부 작업의 이름·예상 시간·완료일을 확인해 주세요.');itemIds.add(i.id);}taskIds.add(t.id);
+  for(const i of t.items){if(typeof i.id!=='string'||itemIds.has(i.id)||typeof i.title!=='string'||!i.title.trim()||i.title.length>300||!Number.isFinite(i.hours)||i.hours<=0||i.hours>10000||(i.doneDate&&(!validDate(i.doneDate)||i.doneDate>currentDay)))throw Error('세부 작업의 이름·예상 시간·완료일을 확인해 주세요.');itemIds.add(i.id);}taskIds.add(t.id);
  }
  orderTasks(p.tasks);return p;
 }

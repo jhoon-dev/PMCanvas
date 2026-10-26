@@ -20,6 +20,11 @@ services:
     build: .
     restart: unless-stopped
     init: true
+    mem_limit: 1g
+    cpus: 2
+    pids_limit: 128
+    security_opt:
+      - no-new-privileges:true
     volumes:
       - ./config:/app/config:ro
     depends_on:
@@ -32,6 +37,8 @@ services:
       PORT: 3000
       PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-http://localhost:3000}
       BASE_PATH: ${BASE_PATH:-/pmcanvas}
+      MFA_KEY_FILE: ${MFA_KEY_FILE:-/app/config/secrets/mfa.key}
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
       AUTH_CONFIG_FILE: ${AUTH_CONFIG_FILE:-}
       NODE_EXTRA_CA_CERTS: ${NODE_EXTRA_CA_CERTS:-}
       PGHOST: db

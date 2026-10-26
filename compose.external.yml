@@ -4,6 +4,11 @@ services:
     build: .
     restart: unless-stopped
     init: true
+    mem_limit: 1g
+    cpus: 2
+    pids_limit: 128
+    security_opt:
+      - no-new-privileges:true
     ports:
       - "127.0.0.1:${APP_PORT:-3000}:3000"
     volumes:
@@ -14,6 +19,8 @@ services:
       PORT: 3000
       PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?Set PUBLIC_ORIGIN}
       BASE_PATH: ${BASE_PATH:-/pmcanvas}
+      MFA_KEY_FILE: ${MFA_KEY_FILE:-/app/config/secrets/mfa.key}
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
       AUTH_CONFIG_FILE: ${AUTH_CONFIG_FILE:-}
       NODE_EXTRA_CA_CERTS: ${NODE_EXTRA_CA_CERTS:-}
       PGHOST: ${PGHOST:?Set PGHOST}

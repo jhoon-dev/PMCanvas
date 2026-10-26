@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import {AdminMfa} from './admin-mfa.mjs';
 import {createPool,migrate,PgRepository} from './postgres.mjs';
 import {createApplication} from './http.mjs';
 import {hashPassword,emailAddress} from './security.mjs';
@@ -13,9 +15,11 @@ try{
  }
  const origin=process.env.PUBLIC_ORIGIN||'http://localhost:3000';
  if(new URL(origin).protocol!=='https:'&&!['localhost','127.0.0.1','[::1]'].includes(new URL(origin).hostname)&&process.env.ALLOW_HTTP!=='true')throw Error('Use HTTPS for PUBLIC_ORIGIN, or explicitly ALLOW_HTTP=true for a private test network.');
+ if(new URL(origin).protocol==='https:'&&!process.env.TRUSTED_PROXIES)throw Error('HTTPS reverse proxy deployments require exact TRUSTED_PROXIES IP addresses and an overwritten X-Forwarded-For header.');
  const basePath=process.env.BASE_PATH||'',providers=loadAuthConfig();
  const federation=new Federation({repo,origin,basePath,providers});
- const server=createApplication({repo,origin,basePath,federation});
+ const keyFile=process.env.MFA_KEY_FILE||'config/secrets/mfa.key';const key=fs.readFileSync(keyFile);if(key.length!==32)throw Error('MFA_KEY_FILE must contain 32 random bytes. Run npm run setup or npm run service:up.');
+ const server=createApplication({repo,origin,basePath,federation,adminMfa:new AdminMfa(repo,key),trustProxies:process.env.TRUSTED_PROXIES||''});
  console.log('Authentication connections:',providers.map(p=>p.id+' ('+p.type+')').join(', ')||'local only');
  const port=Number(process.env.PORT||3000),host=process.env.HOST||'0.0.0.0';
  server.listen(port,host,()=>console.log('PM Canvas API listening on port '+port));

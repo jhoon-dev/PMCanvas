@@ -1,3 +1,4 @@
+import {clientAddress,proxyList,requestLimiter} from './request-security.mjs';
 import {readWorkbook} from './excel-import.mjs';
 import {projectWorkbook} from './excel.mjs';
 import {validDate,today} from '../public/engine.js';
@@ -5,16 +6,23 @@ import http from 'node:http';
 import fs from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 import {HttpError,fail} from './errors.mjs';
-import {token,digest,safeEqual,hashPassword,verifyPassword,emailAddress,cookieValue,sessionCookie,LoginLimiter} from './security.mjs';
+import {token,digest,safeEqual,hashPassword,verifyPassword,emailAddress,cookieValue,sessionCookie} from './security.mjs';
 import {cleanProject,uuid} from './project.mjs';
 import {Federation} from './federation.mjs';
 
-export function createHandler({repo,origin='http://localhost:3000',basePath='',logger=console,federation=new Federation({repo,origin,basePath})}){
+export function createHandler({repo,origin='http://localhost:3000',basePath='',logger=console,trustProxies='',adminMfa=null,federation=new Federation({repo,origin,basePath})}){
  if(new URL(origin).origin!==origin)throw Error('PUBLIC_ORIGIN must contain only scheme and host, without a path or trailing slash.');
  if(basePath&&!/^\/[a-zA-Z0-9_-]+(?:\/[a-zA-Z0-9_-]+)*$/.test(basePath))throw Error('BASE_PATH must be empty or a path without a trailing slash.');
- const secure=new URL(origin).protocol==='https:',limiter=new LoginLimiter(),ipLimiter=new LoginLimiter({limit:40}),passwordLimiter=new LoginLimiter();
+ const secure=new URL(origin).protocol==='https:',reserve=requestLimiter(repo),trusted=proxyList(trustProxies);
+ const audit=async(req,kind,details={})=>{if(kind==='security.request.rejected')try{await reserve('audit:'+(req.clientIp||'local')+':'+details.code,30,60000);}catch{return;}if(repo.securityEvent)await repo.securityEvent({actorId:req.actorId||null,kind,ip:req.clientIp?digest(req.clientIp):null,details:{...details,...(req.loginHash?{accountHash:req.loginHash}:{})}});};
  const cookieConfig={secure,basePath};
- const federationLimiter=new LoginLimiter({limit:30}),directoryLimiter=new LoginLimiter();
+ const completeLogin=async(req,res,user,{recoveryCodes=null}={})=>{
+  const old=cookieValue(req,'pmcanvas_session');if(old)await repo.deleteSession(digest(old));
+  const value=token(),csrf=token();await repo.createSession({hash:digest(value),userId:user.id,csrf,expires:new Date(Date.now()+12*60*60*1000),passwordHash:user.password_hash});
+  req.actorId=user.id;await audit(req,'auth.login.success');
+  if(repo.clearAttempt)await repo.clearAttempt(digest('local:'+user.email));
+  return json(res,200,{user:{id:user.id,email:user.email,name:user.name,isAdmin:!!user.is_admin,localLogin:true},csrf,...(recoveryCodes?{recoveryCodes}:{})},{'Set-Cookie':sessionCookie(value,cookieConfig)});
+ };
  const flowCookie=(value,type,maxAge=600)=>'pmcanvas_sso='+value+'; Path='+(basePath||'')+'/api/auth/sso/; HttpOnly; Max-Age='+maxAge+'; SameSite='+(type==='saml'?'None':'Lax')+(secure?'; Secure':'');
  const externalLogin=async identity=>{
   const value=token(),csrf=token();
@@ -25,9 +33,9 @@ export function createHandler({repo,origin='http://localhost:3000',basePath='',l
  const staticFiles=new Map([['/','index.html'],['/index.html','index.html'],...['app.js','api-client.js','styles.css','engine.js','reports.js','wbs-model.js','wbs-workspace.js','wbs.css','planning.js','draft-store.js','wbs-import.js'].map(f=>['/'+f,f])]);
  const dummyHash=hashPassword('constant-timing-placeholder-password');
  const json=(res,status,body,headers={})=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store',...headers});res.end(JSON.stringify(body));};
- const readJson=async req=>{
+ const readJson=async(req,maxBytes=8*1024*1024)=>{
   let size=0;const chunks=[];
-  for await(const chunk of req){size+=chunk.length;if(size>8*1024*1024)fail(413,'BODY_TOO_LARGE','요청은 8MB 이하로 보내 주세요.');chunks.push(chunk);}
+  for await(const chunk of req){size+=chunk.length;if(size>maxBytes)fail(413,'BODY_TOO_LARGE','요청 본문이 허용 크기를 초과했습니다.');chunks.push(chunk);}
   try{const value=JSON.parse(Buffer.concat(chunks).toString('utf8')||'{}');if(!value||typeof value!=='object'||Array.isArray(value))fail(400,'INVALID_JSON','JSON 객체가 필요합니다.');return value;}catch(error){if(error.status)throw error;fail(400,'INVALID_JSON','JSON 형식을 확인해 주세요.');}
  };
  const authenticate=async req=>{
@@ -37,14 +45,18 @@ export function createHandler({repo,origin='http://localhost:3000',basePath='',l
   return {...session,hash:digest(value)};
  };
  const handler=async(req,res)=>{
+  if(secure)res.setHeader('Strict-Transport-Security','max-age=31536000');
+  res.setHeader('Permissions-Policy','camera=(), microphone=(), geolocation=()');
   res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('X-Frame-Options','DENY');res.setHeader('Referrer-Policy','same-origin');
   res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'");
+  let auditPath='';
   try{
    let path=new URL(req.url,origin).pathname;
    if(basePath&&path===basePath){res.writeHead(308,{Location:basePath+'/'});return res.end();}
    if(basePath){if(!path.startsWith(basePath+'/'))fail(404,'NOT_FOUND','페이지를 찾을 수 없습니다.');path=path.slice(basePath.length);}
-   const method=req.method;
+   auditPath=path;const method=req.method;
    if(path==='/api/health'&&method==='GET'){try{await repo.health();return json(res,200,{ok:true});}catch{return json(res,503,{ok:false});}}
+   req.clientIp=clientAddress(req,trusted);
    if(path==='/api/auth/providers'&&method==='GET')return json(res,200,{providers:federation.list()});
    const sso=path.match(/^\/api\/auth\/sso\/([a-z][a-z0-9_-]{0,39})\/(start|callback|metadata)$/);
    if(sso){
@@ -53,7 +65,7 @@ export function createHandler({repo,origin='http://localhost:3000',basePath='',l
      res.writeHead(200,{'Content-Type':'application/samlmetadata+xml; charset=utf-8','Cache-Control':'no-store'});return res.end(federation.metadata(id));
     }
     if(action==='start'&&method==='GET'){
-     federationLimiter.check(req.socket.remoteAddress||'unknown');federationLimiter.failure(req.socket.remoteAddress||'unknown');
+     await reserve('sso:'+id+':'+(req.clientIp||'local'),30,60000);
      const started=await federation.begin(id);
      res.writeHead(302,{Location:started.location,'Set-Cookie':flowCookie(started.browser,started.type),'Cache-Control':'no-store'});return res.end();
     }
@@ -68,7 +80,7 @@ export function createHandler({repo,origin='http://localhost:3000',basePath='',l
        form=Object.fromEntries(params);
       }
       const identity=await federation.finish(id,{url:new URL(req.url,origin),form,browser:cookieValue(req,'pmcanvas_sso')});
-      const result=await externalLogin(identity);
+      const result=await externalLogin(identity);req.actorId=result.user.id;await audit(req,'auth.sso.success',{provider:id});
       const old=cookieValue(req,'pmcanvas_session');if(old)await repo.deleteSession(digest(old));
       res.writeHead(303,{Location:basePath+'/', 'Set-Cookie':[result.cookie,flowCookie('',p.type,0)],'Cache-Control':'no-store'});return res.end();
      }catch(error){
@@ -91,44 +103,49 @@ export function createHandler({repo,origin='http://localhost:3000',basePath='',l
     if((req.headers['content-type']||'').split(';')[0].trim()!=='application/json')fail(415,'CONTENT_TYPE','application/json 요청이 필요합니다.');
    }
    if(path==='/api/auth/directory'&&method==='POST'){
-    const body=await readJson(req),ip=req.socket.remoteAddress||'unknown';
-    federationLimiter.check(ip);federationLimiter.failure(ip);
+    const body=await readJson(req,16384);if(req.clientIp)await reserve('directory-ip:'+req.clientIp,40);
     if(typeof body.provider!=='string'||!/^[a-z][a-z0-9_-]{0,39}$/.test(body.provider)||typeof body.username!=='string'||!body.username.trim()||body.username.length>254||typeof body.password!=='string'||!body.password||body.password.length>1024)fail(400,'INVALID_LOGIN','디렉터리 계정 정보를 확인해 주세요.');
-    const key=String(body.provider)+'|'+String(body.username).trim().toLowerCase();directoryLimiter.check(key);
+    const key=String(body.provider)+'|'+String(body.username).trim().toLowerCase();await reserve('directory:'+key);
     try{
      const identity=await federation.directory(body.provider,body.username,body.password),result=await externalLogin(identity);
-     directoryLimiter.clear(key);const old=cookieValue(req,'pmcanvas_session');if(old)await repo.deleteSession(digest(old));
+     if(repo.clearAttempt)await repo.clearAttempt(digest('directory:'+key));req.actorId=result.user.id;await audit(req,'auth.directory.success',{provider:body.provider});const old=cookieValue(req,'pmcanvas_session');if(old)await repo.deleteSession(digest(old));
      return json(res,200,{user:result.user,csrf:result.csrf},{'Set-Cookie':result.cookie});
-    }catch(error){directoryLimiter.failure(key);if(error.status===403||error.code==='IDENTITY_UNLINKED')throw error;fail(401,'LOGIN_FAILED','디렉터리 인증에 실패했습니다. 계정 정보와 연결 설정을 확인해 주세요.');}
+    }catch(error){if(error.status===403||error.code==='IDENTITY_UNLINKED')throw error;fail(401,'LOGIN_FAILED','디렉터리 인증에 실패했습니다. 계정 정보와 연결 설정을 확인해 주세요.');}
    }
    if(path==='/api/auth/login'&&method==='POST'){
-    const body=await readJson(req),email=emailAddress(body.email),ip=req.socket.remoteAddress||'unknown';
-    limiter.check(email);ipLimiter.check(ip);
-    const user=await repo.findUserByEmail(email);
-    const valid=await verifyPassword(body.password,user?.password_hash||await dummyHash);
-    if(!user||!valid||user.is_active===false||user.local_login===false){limiter.failure(email);ipLimiter.failure(ip);fail(401,'LOGIN_FAILED','이메일 또는 비밀번호를 확인해 주세요.');}
-    limiter.clear(email);ipLimiter.clear(ip);
-    const old=cookieValue(req,'pmcanvas_session');if(old)await repo.deleteSession(digest(old));
-    const value=token(),csrf=token();
-    await repo.createSession({hash:digest(value),userId:user.id,csrf,expires:new Date(Date.now()+12*60*60*1000),passwordHash:user.password_hash});
-    return json(res,200,{user:{id:user.id,email:user.email,name:user.name,isAdmin:!!user.is_admin,localLogin:true},csrf},{'Set-Cookie':sessionCookie(value,cookieConfig)});
+    const body=await readJson(req,16384),email=emailAddress(body.email);
+    req.loginHash=digest(email);await reserve('local:'+email);if(req.clientIp)await reserve('login-ip:'+req.clientIp,40);
+    const user=await repo.findUserByEmail(email),valid=await verifyPassword(body.password,user?.password_hash||await dummyHash);
+    if(!user||!valid||user.is_active===false||user.local_login===false)fail(401,'LOGIN_FAILED','이메일 또는 비밀번호를 확인해 주세요.');
+    req.actorId=user.id;
+    if(user.password_hash.startsWith('scrypt-v1:')&&repo.upgradeHash){const upgraded=await hashPassword(body.password);await repo.upgradeHash(user.id,user.password_hash,upgraded);user.password_hash=upgraded;await audit(req,'auth.password.rehashed');}
+    if(user.is_admin&&adminMfa)return json(res,200,await adminMfa.begin(user,req.clientIp));
+    return completeLogin(req,res,user);
    }
-   const session=await authenticate(req),user=session.user;
+   if(path==='/api/auth/mfa/verify'&&method==='POST'){
+    if(!adminMfa)fail(404,'NOT_FOUND','MFA를 사용할 수 없습니다.');
+    const body=await readJson(req,16384);if(req.clientIp)await reserve('mfa-ip:'+req.clientIp,40);
+    const result=await adminMfa.finish(body.challenge,body.code);req.actorId=result.user.id;await audit(req,result.recoveryCodes?'auth.mfa.enrolled':'auth.mfa.success');
+    return completeLogin(req,res,result.user,result);
+   }
+   const session=await authenticate(req),user=session.user;req.actorId=user.id;
    if(mutation&&!safeEqual(req.headers['x-csrf-token'],session.csrf))fail(403,'CSRF_FAILED','보안 토큰을 갱신하려면 다시 로그인해 주세요.');
+   if(path==='/api/auth/security-events'&&method==='GET'){if(!user.isAdmin)fail(403,'FORBIDDEN','관리자 권한이 필요합니다.');return json(res,200,{events:repo.securityEvents?await repo.securityEvents():[]});}
+   if(path==='/api/auth/mfa/status'&&method==='GET'){if(!user.isAdmin)fail(403,'FORBIDDEN','관리자 권한이 필요합니다.');const state=adminMfa?await repo.getMfa(user.id):null;return json(res,200,{enabled:!!state,required:!!adminMfa,recoveryRemaining:state?.recovery_hashes.length||0});}
    if(path==='/api/auth/me'&&method==='GET')return json(res,200,{user,csrf:session.csrf});
    if(path==='/api/auth/logout'&&method==='POST'){
-    await repo.deleteSession(session.hash);return json(res,200,{ok:true},{'Set-Cookie':sessionCookie('',{...cookieConfig,maxAge:0})});
+    await repo.deleteSession(session.hash);await audit(req,'auth.logout');return json(res,200,{ok:true},{'Set-Cookie':sessionCookie('',{...cookieConfig,maxAge:0})});
    }
    if(path==='/api/auth/password'&&method==='POST'){
-    const body=await readJson(req);passwordLimiter.check(user.id);
+    const body=await readJson(req);await reserve('password:'+user.id);
     const stored=await repo.findUserByEmail(user.email);
     if(stored?.local_login===false)fail(400,'EXTERNAL_PASSWORD','외부 인증 계정의 비밀번호는 인증 서버에서 변경해 주세요.');
     if(!stored||!await verifyPassword(body.currentPassword,stored.password_hash)){
-     passwordLimiter.failure(user.id);fail(400,'CURRENT_PASSWORD','현재 비밀번호가 일치하지 않습니다.');
+     fail(400,'CURRENT_PASSWORD','현재 비밀번호가 일치하지 않습니다.');
     }
     if(body.currentPassword===body.newPassword)fail(400,'SAME_PASSWORD','현재와 다른 새 비밀번호를 입력해 주세요.');
     const passwordHash=await hashPassword(body.newPassword);
-    await repo.changePassword(user.id,stored.password_hash,passwordHash);passwordLimiter.clear(user.id);
+    await repo.changePassword(user.id,stored.password_hash,passwordHash);await audit(req,'account.password.changed');
     return json(res,200,{ok:true},{'Set-Cookie':sessionCookie('',{...cookieConfig,maxAge:0})});
    }
    if(path==='/api/auth/connections'){
@@ -137,8 +154,7 @@ export function createHandler({repo,origin='http://localhost:3000',basePath='',l
     if(method==='POST'||method==='DELETE'){
      const body=await readJson(req),p=federation.provider(body.provider);
      if(typeof body.subject!=='string'||!body.subject||body.subject.length>1024)fail(400,'INVALID_SUBJECT','외부 계정의 고유 ID를 입력해 주세요.');
-     if(method==='POST')return json(res,200,await repo.linkIdentity(user.id,{providerKey:p.key,subject:body.subject,email:emailAddress(body.email)}));
-     return json(res,200,await repo.unlinkIdentity(user.id,p.key,body.subject));
+     const result=method==='POST'?await repo.linkIdentity(user.id,{providerKey:p.key,subject:body.subject,email:emailAddress(body.email)}):await repo.unlinkIdentity(user.id,p.key,body.subject);await audit(req,method==='POST'?'account.identity.linked':'account.identity.unlinked',{provider:p.id});return json(res,200,result);
     }
    }
    const userMatch=path.match(/^\/api\/users\/([^/]+)$/);
@@ -149,7 +165,7 @@ export function createHandler({repo,origin='http://localhost:3000',basePath='',l
     if(keys.length!==1||!['isActive','password'].includes(keys[0]))fail(400,'INVALID_UPDATE','계정 상태 또는 비밀번호 중 하나를 지정해 주세요.');
     if('isActive' in body&&typeof body.isActive!=='boolean')fail(400,'INVALID_STATUS','계정 상태가 올바르지 않습니다.');
     const update='password' in body?{passwordHash:await hashPassword(body.password)}:{isActive:body.isActive};
-    return json(res,200,{user:await repo.manageUser(user.id,userMatch[1],update)});
+    const managed=await repo.manageUser(user.id,userMatch[1],update);await audit(req,'account.user.updated',{targetId:userMatch[1],change:keys[0]});return json(res,200,{user:managed});
    }
    if(path==='/api/users'){
     if(!user.isAdmin)fail(403,'FORBIDDEN','관리자만 계정을 관리할 수 있습니다.');
@@ -158,19 +174,19 @@ export function createHandler({repo,origin='http://localhost:3000',basePath='',l
      const body=await readJson(req),email=emailAddress(body.email);
      if(typeof body.name!=='string'||!body.name.trim()||body.name.length>80)fail(400,'INVALID_NAME','이름을 확인해 주세요.');
      const passwordHash=await hashPassword(body.password);
-     return json(res,201,{user:await repo.createUser({email,name:body.name.trim(),passwordHash,isAdmin:false})});
+     const created=await repo.createUser({email,name:body.name.trim(),passwordHash,isAdmin:false});await audit(req,'account.user.created',{targetId:created.id});return json(res,201,{user:created});
     }
    }
    const importMatch=path.match(/^\/api\/projects\/([^/]+)\/import-excel$/);
    if(importMatch&&method==='POST'){
     if(!uuid(importMatch[1]))fail(404,'NOT_FOUND','프로젝트를 찾을 수 없습니다.');
     const project=await repo.getProject(user.id,importMatch[1]);if(project._role==='viewer')fail(403,'FORBIDDEN','편집 권한이 필요합니다.');
-    const body=await readJson(req);try{return json(res,200,{sheets:await readWorkbook(body.file)});}catch(e){fail(400,'INVALID_EXCEL',e.message);}
+    await reserve('file:'+user.id,20,60000);const body=await readJson(req);try{return json(res,200,{sheets:await readWorkbook(body.file)});}catch(e){if(e.status)throw e;fail(400,'INVALID_EXCEL',e.message);}
    }
    const exportMatch=path.match(/^\/api\/projects\/([^/]+)\/export\.xlsx$/);
    if(exportMatch&&method==='POST'){
     if(!uuid(exportMatch[1]))fail(404,'NOT_FOUND','프로젝트를 찾을 수 없습니다.');
-    const saved=await repo.getProject(user.id,exportMatch[1]),body=await readJson(req);
+    await reserve('file:'+user.id,20,60000);const saved=await repo.getProject(user.id,exportMatch[1]),body=await readJson(req);
     if(!validDate(body.asOf)||body.asOf>today())fail(400,'INVALID_DATE','보고 기준일을 확인해 주세요.');
     const project=cleanProject(body.project),ids=body.taskIds;
     if(!Array.isArray(ids)||!ids.length||ids.length>500||new Set(ids).size!==ids.length||ids.some(id=>!project.tasks.some(t=>t.id===id)))fail(400,'INVALID_SELECTION','출력할 업무를 확인해 주세요.');
@@ -209,6 +225,7 @@ export function createHandler({repo,origin='http://localhost:3000',basePath='',l
    }
    fail(404,'NOT_FOUND','API를 찾을 수 없습니다.');
   }catch(error){
+   if(auditPath.startsWith('/api/auth/')||auditPath.startsWith('/api/users'))try{await audit(req,'security.request.rejected',{path:auditPath,code:error.code||'INTERNAL_ERROR'});}catch{logger.error('Security audit write failed');}
    if(res.headersSent)return res.destroy();
    if(!(error instanceof HttpError))logger.error('API request failed:',error.code||error.name);
    json(res,error.status||500,{error:{code:error.code&&error.status?error.code:'INTERNAL_ERROR',message:error.status?error.message:'서버 처리 중 오류가 발생했습니다.'}});
