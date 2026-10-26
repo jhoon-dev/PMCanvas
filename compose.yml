@@ -1,0 +1,47 @@
+services:
+  db:
+    image: postgres:18-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: pmcanvas
+      POSTGRES_PASSWORD: ${DB_ADMIN_PASSWORD:?Set DB_ADMIN_PASSWORD in .env}
+      PM_DB_USER: pmcanvas
+      PM_DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql
+      - ./deploy/db-init.sh:/docker-entrypoint-initdb.d/10-pmcanvas.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d pmcanvas"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  app:
+    build: .
+    restart: unless-stopped
+    init: true
+    volumes:
+      - ./config:/app/config:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${APP_PORT:-3000}:3000"
+    environment:
+      HOST: 0.0.0.0
+      PORT: 3000
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-http://localhost:3000}
+      BASE_PATH: ${BASE_PATH:-/pmcanvas}
+      AUTH_CONFIG_FILE: ${AUTH_CONFIG_FILE:-}
+      NODE_EXTRA_CA_CERTS: ${NODE_EXTRA_CA_CERTS:-}
+      PGHOST: db
+      PGPORT: 5432
+      PGDATABASE: ${APP_DATABASE:-pmcanvas}
+      PGUSER: pmcanvas
+      PGPASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+      PGSSLMODE: disable
+      ADMIN_EMAIL: ${ADMIN_EMAIL:?Set ADMIN_EMAIL in .env}
+      ADMIN_NAME: ${ADMIN_NAME:-관리자}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env}
+volumes:
+  pgdata:

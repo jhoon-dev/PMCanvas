@@ -1,0 +1,202 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {Readable} from 'node:stream';
+import {EventEmitter} from 'node:events';
+import {randomUUID} from 'node:crypto';
+import {createHandler} from '../server/http.mjs';
+import {hashPassword} from '../server/security.mjs';
+import {MemoryRepository} from './support/memory-repository.mjs';
+import {Federation} from '../server/federation.mjs';
+const PASSWORD='a-test-password-12345',HASH=await hashPassword(PASSWORD);
+const ORIGIN='http://localhost:3000';
+async function fixture(t,{basePath='',providers=[]}={}){
+ const users=[{id:randomUUID(),email:'owner@example.com',name:'소유자',password_hash:HASH,is_admin:true},{id:randomUUID(),email:'other@example.com',name:'팀원',password_hash:HASH,is_admin:false}];
+ const repo=new MemoryRepository(users),handler=createHandler({repo,origin:ORIGIN,basePath,federation:new Federation({repo,origin:ORIGIN,basePath,providers}),logger:{error(){}}});
+ async function inject(url,{method='GET',body,headers={}}={}){
+  const req=Readable.from(body===undefined?[]:[Buffer.from(JSON.stringify(body))]);
+  Object.assign(req,{url,method,headers,socket:{remoteAddress:'127.0.0.1'}});
+  class Response extends EventEmitter{
+   constructor(){super();this.headers=new Map();this.headersSent=false;this.statusCode=200;this.body='';}
+   setHeader(name,value){this.headers.set(name.toLowerCase(),String(value));}
+   writeHead(status,headers={}){this.statusCode=status;for(const [name,value]of Object.entries(headers))this.setHeader(name,value);this.headersSent=true;return this;}
+   end(body){this.body=body===undefined?'':Buffer.isBuffer(body)?body.toString('utf8'):String(body);this.emit('finish');}
+   destroy(){this.destroyed=true;}
+  }
+  const res=new Response();await handler(req,res);
+  return {status:res.statusCode,body:res.body,headers:new Headers(Object.fromEntries(res.headers))};
+ }
+ const client=()=>({cookie:'',csrf:''});
+ async function call(c,path,{method='GET',body,headers={}}={}){
+  const normalized=Object.fromEntries(Object.entries({...(c.cookie?{Cookie:c.cookie}:{}),...(method==='GET'?{}:{Origin:ORIGIN,'Content-Type':'application/json','X-CSRF-Token':c.csrf}),...headers}).map(([k,v])=>[k.toLowerCase(),v]));
+  const response=await inject(basePath+'/api/'+path,{method,body,headers:normalized});
+  const cookie=response.headers.get('set-cookie');if(cookie)c.cookie=cookie.split(';')[0];
+  const data=JSON.parse(response.body);if(data.csrf)c.csrf=data.csrf;
+  return {status:response.status,data,headers:response.headers};
+ }
+ async function login(email){const c=client(),r=await call(c,'auth/login',{method:'POST',body:{email,password:PASSWORD}});assert.equal(r.status,200);return c;}
+ return {repo,users,client,call,login,inject};
+}
+const project=()=>({id:randomUUID(),name:'팀 프로젝트',description:'',holidays:[],members:[{id:'m1',name:'개발자',grade:'고급',role:'개발',hours:8,allocation:100}],tasks:[{id:'t1',name:'기능 개발',phase:'개발',owner:'m1',start:'2026-10-19',end:'2026-10-23',predecessor:'',memo:'',items:[{id:'i1',title:'기능 구현',hours:8,doneDate:null}]}]});
+test('외부 계정 매핑은 관리자·CSRF 검증, 비밀 제외, 기존 사용자 ID 보존',async t=>{
+ const p={id:'company',key:'company:key',label:'회사 SSO',type:'oidc',clientSecret:'private-secret',allowedDomains:['example.com'],autoProvision:false};
+ const f=await fixture(t,{providers:[p]}),admin=await f.login('owner@example.com'),other=await f.login('other@example.com');
+ const publicList=await f.call(f.client(),'auth/providers');assert.equal(publicList.status,200);assert.equal(JSON.stringify(publicList.data).includes('private-secret'),false);
+ assert.equal((await f.call(other,'auth/connections')).status,403);
+ const body={provider:'company',subject:'stable-sub',email:'other@example.com'};
+ assert.equal((await f.call(admin,'auth/connections',{method:'POST',body,headers:{'X-CSRF-Token':'bad'}})).status,403);
+ assert.equal((await f.call(admin,'auth/connections',{method:'POST',body:{...body,email:'owner@example.com'}})).status,403);
+ assert.equal((await f.call(admin,'auth/connections',{method:'POST',body})).status,200);
+ const list=await f.call(admin,'auth/connections');assert.equal(list.data.identities[0].email,'other@example.com');assert.equal(JSON.stringify(list.data).includes('private-secret'),false);
+ const hash='external-session';const user=await f.repo.externalSession({providerKey:p.key,subject:'stable-sub',email:'other@example.com',name:'external',autoProvision:false,hash,csrf:'csrf',expires:new Date(Date.now()+60000)});
+ assert.equal(user.id,f.users[1].id);
+ assert.equal((await f.call(admin,'auth/connections',{method:'DELETE',body})).status,200);
+ assert.equal(await f.repo.findSession(hash),null);
+});
+test('비밀번호 변경은 현재 비밀번호·확인을 검증하고 모든 세션을 종료',async t=>{
+ const f=await fixture(t),a=await f.login('owner@example.com'),b=await f.login('owner@example.com');
+ const change=body=>f.call(a,'auth/password',{method:'POST',body});
+ assert.equal((await change({currentPassword:'wrong',newPassword:'new-password-12345'})).status,400);
+ assert.equal((await change({currentPassword:PASSWORD,newPassword:'short'})).status,400);
+ assert.equal((await change({currentPassword:PASSWORD,newPassword:PASSWORD})).status,400);
+ assert.equal((await f.call(a,'auth/me')).status,200);
+ const changed=await change({currentPassword:PASSWORD,newPassword:'new-password-12345'});
+ assert.equal(changed.status,200);assert.match(changed.headers.get('set-cookie'),/Max-Age=0/);
+ assert.equal((await f.call(a,'auth/me')).status,401);assert.equal((await f.call(b,'auth/me')).status,401);
+ assert.equal((await f.call(f.client(),'auth/login',{method:'POST',body:{email:'owner@example.com',password:PASSWORD}})).status,401);
+ const c=f.client();assert.equal((await f.call(c,'auth/login',{method:'POST',body:{email:'owner@example.com',password:'new-password-12345'}})).status,200);
+});
+test('비밀번호 변경에 CSRF와 재시도 제한 적용',async t=>{
+ const f=await fixture(t),c=await f.login('owner@example.com');
+ const body={currentPassword:'wrong',newPassword:'new-password-12345'};
+ assert.equal((await f.call(c,'auth/password',{method:'POST',body,headers:{'X-CSRF-Token':'wrong'}})).status,403);
+ for(let i=0;i<8;i++)assert.equal((await f.call(c,'auth/password',{method:'POST',body})).status,400);
+ assert.equal((await f.call(c,'auth/password',{method:'POST',body:{...body,currentPassword:PASSWORD}})).status,429);
+});
+test('관리자의 비활성화는 세션·로그인을 차단하고 재활성화 시 프로젝트 권한 유지',async t=>{
+ const f=await fixture(t),admin=await f.login('owner@example.com'),other=await f.login('other@example.com'),p=project();
+ await f.call(admin,'projects',{method:'POST',body:{project:p}});
+ await f.call(admin,'projects/'+p.id+'/access',{method:'POST',body:{email:'other@example.com',role:'editor'}});
+ const target='users/'+f.users[1].id;
+ assert.equal((await f.call(other,target,{method:'PATCH',body:{isActive:false}})).status,403);
+ assert.equal((await f.call(admin,target,{method:'PATCH',body:{isActive:false}})).data.user.isActive,false);
+ assert.equal((await f.call(other,'auth/me')).status,401);
+ assert.equal((await f.call(f.client(),'auth/login',{method:'POST',body:{email:'other@example.com',password:PASSWORD}})).status,401);
+ assert.equal((await f.call(admin,target,{method:'PATCH',body:{isActive:true}})).status,200);
+ const again=await f.login('other@example.com');assert.equal((await f.call(again,'projects/'+p.id)).data.project._role,'editor');
+});
+test('관리자 비밀번호 재설정은 기존 세션 종료·해시 비공개·관리자 보호',async t=>{
+ const f=await fixture(t),admin=await f.login('owner@example.com'),other=await f.login('other@example.com'),target='users/'+f.users[1].id;
+ assert.equal((await f.call(admin,'users/'+f.users[0].id,{method:'PATCH',body:{isActive:false}})).status,403);
+ assert.equal((await f.call(admin,'users/'+f.users[0].id,{method:'PATCH',body:{password:'new-password-12345'}})).status,403);
+ for(const body of [{isActive:'false'},{isAdmin:true},{password:'short'},{isActive:false,password:'new-password-12345'}])assert.equal((await f.call(admin,target,{method:'PATCH',body})).status,400);
+ assert.equal((await f.call(admin,'users/'+randomUUID(),{method:'PATCH',body:{isActive:false}})).status,404);
+ const reset=await f.call(admin,target,{method:'PATCH',body:{password:'new-password-12345'}});assert.equal(reset.status,200);
+ assert.equal(JSON.stringify(reset.data).includes('password'),false);
+ assert.equal((await f.call(other,'auth/me')).status,401);
+ assert.equal((await f.call(f.client(),'auth/login',{method:'POST',body:{email:'other@example.com',password:PASSWORD}})).status,401);
+ assert.equal((await f.call(f.client(),'auth/login',{method:'POST',body:{email:'other@example.com',password:'new-password-12345'}})).status,200);
+ const list=await f.call(admin,'users');assert.equal(JSON.stringify(list.data).includes('password'),false);
+});
+test('로그인·쿠키·세션 만료·로그아웃',async t=>{
+ const f=await fixture(t),c=f.client();
+ assert.equal((await f.call(c,'projects')).status,401);
+ const r=await f.call(c,'auth/login',{method:'POST',body:{email:'owner@example.com',password:PASSWORD}});
+ assert.equal(r.status,200);assert.match(r.headers.get('set-cookie'),/HttpOnly/);assert.match(r.headers.get('set-cookie'),/SameSite=Lax/);
+ assert.equal(JSON.stringify(r.data).includes('scrypt'),false);assert.equal((await f.call(c,'auth/me')).data.user.isAdmin,true);
+ [...f.repo.sessions.values()][0].expires=new Date(0);assert.equal((await f.call(c,'auth/me')).status,401);
+ assert.equal((await f.call(c,'auth/login',{method:'POST',body:{email:'owner@example.com',password:PASSWORD}})).status,200);
+ assert.equal((await f.call(c,'auth/logout',{method:'POST',body:{}})).status,200);
+ assert.equal((await f.call(c,'auth/me')).status,401);
+});
+test('교차 출처 요청·CSRF 누락은 거절',async t=>{
+ const f=await fixture(t),c=await f.login('owner@example.com');
+ assert.equal((await f.call(c,'projects',{method:'POST',body:{project:project()},headers:{Origin:'https://evil.example'}})).status,403);
+ assert.equal((await f.call(c,'projects',{method:'POST',body:{project:project()},headers:{'X-CSRF-Token':'invalid'}})).status,403);
+ assert.equal((await f.call(c,'projects')).data.projects.length,0);
+});
+test('API 프로젝트 저장 계약: 생성·재조회·응답 유실 재시도·동시 수정 충돌',async t=>{
+ const f=await fixture(t),c=await f.login('owner@example.com'),p=project();
+ const created=await f.call(c,'projects',{method:'POST',body:{project:p}});assert.equal(created.status,201);
+ assert.equal((await f.call(c,'projects',{method:'POST',body:{project:p}})).status,201);
+ assert.equal((await f.call(c,'projects')).data.projects.length,1);
+ const changed={...p,name:'변경됨'};
+ const saved=await f.call(c,'projects/'+p.id,{method:'PUT',body:{project:changed,revision:1}});assert.equal(saved.status,200);assert.equal(saved.data.project._revision,2);
+ const conflict=await f.call(c,'projects/'+p.id,{method:'PUT',body:{project:{...p,name:'덮어쓰기'},revision:1}});assert.equal(conflict.status,409);
+ assert.equal((await f.call(c,'projects/'+p.id)).data.project.name,'변경됨');
+});
+test('계정별 격리·조회자 쓰기 차단·편집 권한·공유 해제',async t=>{
+ const f=await fixture(t),owner=await f.login('owner@example.com'),other=await f.login('other@example.com'),p=project();
+ await f.call(owner,'projects',{method:'POST',body:{project:p}});
+ assert.equal((await f.call(other,'projects/'+p.id)).status,404);
+ assert.equal((await f.call(other,'projects')).data.projects.length,0);
+ await f.call(owner,'projects/'+p.id+'/access',{method:'POST',body:{email:'other@example.com',role:'viewer'}});
+ assert.equal((await f.call(other,'projects/'+p.id)).data.project._role,'viewer');
+ assert.equal((await f.call(other,'projects/'+p.id,{method:'PUT',body:{project:p,revision:1}})).status,403);
+ assert.equal((await f.call(other,'projects/'+p.id+'/access')).status,403);
+ await f.call(owner,'projects/'+p.id+'/access',{method:'POST',body:{email:'other@example.com',role:'editor'}});
+ assert.equal((await f.call(other,'projects/'+p.id,{method:'PUT',body:{project:{...p,name:'편집 가능'},revision:1}})).status,200);
+ assert.equal((await f.call(owner,'projects/'+p.id+'/access/'+f.users[1].id,{method:'DELETE',body:{}})).status,200);
+ assert.equal((await f.call(other,'projects/'+p.id)).status,404);
+ assert.equal((await f.call(owner,'projects/'+p.id+'/access/'+f.users[0].id,{method:'DELETE',body:{}})).status,409);
+});
+test('관리자만 계정 생성, 잘못된 데이터는 저장하지 않음',async t=>{
+ const f=await fixture(t),owner=await f.login('owner@example.com'),other=await f.login('other@example.com');
+ const body={email:'new@example.com',name:'신규',password:PASSWORD};
+ assert.equal((await f.call(other,'users',{method:'POST',body})).status,403);
+ assert.equal((await f.call(owner,'users',{method:'POST',body:{...body,password:'123'}})).status,400);
+ assert.equal((await f.call(owner,'users',{method:'POST',body})).status,201);
+ const p=project();p.tasks[0].items[0].hours=0;
+ assert.equal((await f.call(owner,'projects',{method:'POST',body:{project:p}})).status,400);
+ assert.equal((await f.call(owner,'projects')).data.projects.length,0);
+});
+test('완료 체크·취소·삭제 전 값을 서버 이력에 보존',async t=>{
+ const f=await fixture(t),owner=await f.login('owner@example.com'),p=project();
+ await f.call(owner,'projects',{method:'POST',body:{project:p}});
+ p.tasks[0].items[0].doneDate='2026-10-23';
+ await f.call(owner,'projects/'+p.id,{method:'PUT',body:{project:p,revision:1}});
+ p.tasks[0].items[0].doneDate=null;
+ await f.call(owner,'projects/'+p.id,{method:'PUT',body:{project:p,revision:2}});
+ p.tasks=[];
+ await f.call(owner,'projects/'+p.id,{method:'PUT',body:{project:p,revision:3}});
+ const events=(await f.call(owner,'projects/'+p.id+'/events')).data.events;
+ assert.ok(events.some(e=>e.changes.some(c=>c.entity==='item'&&c.before?.doneDate==='2026-10-23'&&c.after?.doneDate===null)));
+ assert.ok(events.some(e=>e.changes.some(c=>c.entity==='item'&&c.action==='delete'&&c.before.title==='기능 구현')));
+});
+test('하위 경로 /pmcanvas에서 화면과 API 실행, 임의 파일은 비공개',async t=>{
+ const f=await fixture(t,{basePath:'/pmcanvas'}),c=await f.login('owner@example.com');
+ assert.match(c.cookie,/pmcanvas_session/);assert.equal((await f.call(c,'projects')).status,200);
+ assert.equal((await f.inject('/pmcanvas/')).status,200);
+ assert.equal((await f.inject('/pmcanvas/api-client.js')).status,200);
+ assert.equal((await f.inject('/pmcanvas/server/main.mjs')).status,404);
+ assert.equal((await f.inject('/api/projects')).status,404);
+});
+
+test('JSON 객체가 아닌 요청은 400으로 응답',async t=>{const f=await fixture(t),c=f.client();assert.equal((await f.call(c,'auth/login',{method:'POST',body:null})).status,400);assert.equal((await f.call(c,'auth/login',{method:'POST',body:[]})).status,400);});
+
+test('Excel API는 인증·CSRF·프로젝트 권한·출력 조건을 검증한다',async t=>{
+ const f=await fixture(t),owner=await f.login('owner@example.com'),other=await f.login('other@example.com'),p=project();
+ await f.call(owner,'projects',{method:'POST',body:{project:p}});
+ const path='projects/'+p.id+'/export.xlsx',body={project:p,asOf:'2026-10-23',taskIds:['t1']};
+ assert.equal((await f.call(f.client(),path,{method:'POST',body})).status,401);
+ assert.equal((await f.call(other,path,{method:'POST',body})).status,404);
+ assert.equal((await f.call(owner,path,{method:'POST',body,headers:{'X-CSRF-Token':'bad'}})).status,403);
+ assert.equal((await f.call(owner,path,{method:'POST',body:{...body,taskIds:['missing']}})).status,400);
+ assert.equal((await f.call(owner,path,{method:'POST',body:{...body,asOf:'bad'}})).status,400);
+ const response=await f.inject('/api/'+path,{method:'POST',body,headers:{cookie:owner.cookie,origin:ORIGIN,'content-type':'application/json','x-csrf-token':owner.csrf}});
+ assert.equal(response.status,200);assert.match(response.headers.get('content-type'),/spreadsheetml/);assert.match(response.headers.get('content-disposition'),/filename\*=UTF-8/);assert.ok(response.body.startsWith('PK'));
+ assert.equal((await f.call(owner,'projects/'+p.id)).data.project._revision,1);
+});
+
+test('Excel 가져오기 API는 인증·CSRF·편집 권한과 파일 형식을 검증한다',async t=>{
+ const f=await fixture(t),owner=await f.login('owner@example.com'),viewer=await f.login('other@example.com'),p=project();await f.call(owner,'projects',{method:'POST',body:{project:p}});
+ const path='projects/'+p.id+'/import-excel',body={file:'broken'};
+ assert.equal((await f.call(f.client(),path,{method:'POST',body})).status,401);
+ assert.equal((await f.call(viewer,path,{method:'POST',body})).status,404);
+ await f.call(owner,'projects/'+p.id+'/access',{method:'POST',body:{email:'other@example.com',role:'viewer'}});
+ assert.equal((await f.call(viewer,path,{method:'POST',body})).status,403);
+ assert.equal((await f.call(owner,path,{method:'POST',body,headers:{'X-CSRF-Token':'bad'}})).status,403);
+ assert.equal((await f.call(owner,path,{method:'POST',body})).status,400);
+ const {projectWorkbook}=await import('../server/excel.mjs');const file=(await projectWorkbook(p,'2026-10-26')).toString('base64');
+ const response=await f.call(owner,path,{method:'POST',body:{file}});assert.equal(response.status,200);assert.equal(response.data.sheets.find(s=>s.name==='WBS').rows[1][2],'기능 개발');
+ assert.equal((await f.call(owner,'projects/'+p.id)).data.project._revision,1);
+});

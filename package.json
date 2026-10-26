@@ -1,0 +1,41 @@
+{
+  "name": "pmcanvas-server",
+  "version": "0.9.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env server/main.mjs",
+    "test": "node --test test/*.test.mjs",
+    "test:postgres": "node --env-file-if-exists=.env --test test/postgres.integration.mjs",
+    "migrate": "node --env-file-if-exists=.env scripts/migrate.mjs",
+    "test:http": "node --test test/http.network.integration.mjs",
+    "setup": "node scripts/manage.mjs setup",
+    "service:up": "node scripts/manage.mjs up",
+    "service:status": "node scripts/manage.mjs status",
+    "service:stop": "node scripts/manage.mjs stop",
+    "service:logs": "node scripts/manage.mjs logs",
+    "backup": "node scripts/manage.mjs backup",
+    "restore": "node scripts/manage.mjs restore",
+    "auth:check": "node --env-file-if-exists=.env scripts/check-auth.mjs"
+  },
+  "dependencies": {
+    "@node-saml/node-saml": "5.1.0",
+    "@xmldom/xmldom": "0.8.15",
+    "exceljs": "4.4.0",
+    "ldapts": "9.2.0",
+    "openid-client": "6.8.8",
+    "pg": "8.23.1"
+  },
+  "devDependencies": {
+    "selfsigned": "5.5.0",
+    "xml-crypto": "6.4.0"
+  },
+  "overrides": {
+    "exceljs": {
+      "uuid": "11.1.1"
+    }
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "providers": [
+    {
+      "id": "entra",
+      "enabled": false,
+      "type": "oidc",
+      "label": "Microsoft 회사 계정",
+      "issuer": "https://login.microsoftonline.com/YOUR-TENANT-ID/v2.0",
+      "clientId": "YOUR-APPLICATION-CLIENT-ID",
+      "clientSecretFile": "secrets/entra-client-secret.txt",
+      "clientAuth": "client_secret_post",
+      "emailClaim": "preferred_username",
+      "nameClaim": "name",
+      "trustEmail": true,
+      "autoProvision": true,
+      "allowedDomains": ["company.example"]
+    },
+    {
+      "id": "keycloak",
+      "enabled": false,
+      "type": "oidc",
+      "label": "사내 SSO",
+      "issuer": "https://sso.company.example/realms/company",
+      "clientId": "pmcanvas",
+      "clientSecretFile": "secrets/keycloak-client-secret.txt",
+      "clientAuth": "client_secret_basic",
+      "autoProvision": true,
+      "allowedDomains": ["company.example"]
+    },
+    {
+      "id": "saml",
+      "enabled": false,
+      "type": "saml",
+      "label": "SAML 회사 계정",
+      "entryPoint": "https://idp.company.example/sso",
+      "idpIssuer": "https://idp.company.example/issuer",
+      "entityId": "https://pm.company.example/pmcanvas/saml",
+      "idpCertFile": "secrets/idp-signing.crt",
+      "privateKeyFile": "secrets/sp-signing.key",
+      "publicCertFile": "secrets/sp-signing.crt",
+      "emailClaim": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress",
+      "nameClaim": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name",
+      "autoProvision": true,
+      "allowedDomains": ["company.example"]
+    },
+    {
+      "id": "ad",
+      "enabled": false,
+      "type": "ldap",
+      "label": "Active Directory",
+      "url": "ldaps://dc.company.example:636",
+      "bindDN": "CN=PMCanvas Reader,OU=Service Accounts,DC=company,DC=example",
+      "bindPasswordFile": "secrets/ad-bind-password.txt",
+      "caFile": "secrets/ad-root-ca.crt",
+      "searchBase": "DC=company,DC=example",
+      "searchFilter": "(&(objectClass=user)(sAMAccountName={{username}})(!(userAccountControl:1.2.840.113556.1.4.803:=2)))",
+      "subjectAttribute": "objectGUID",
+      "emailAttribute": "mail",
+      "nameAttribute": "displayName",
+      "autoProvision": true,
+      "allowedDomains": ["company.example"]
+    }
+  ]
+}

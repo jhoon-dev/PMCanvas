@@ -1,0 +1,14 @@
+ZIP SHA256: 49377B2F0434989794631873D1111279C408023667DED583696C5C16038554D7
+HTML SHA256: 3447A5769B34050447CDC5147A50E6A7821F5531F1FB367741836FA73656329E
+Source: user-provided local archive (private source path omitted).
+ZIP inspection: 8 entries; no absolute paths, traversal, symlinks, reparse points or case-insensitive duplicates.
+Original source files preserved unchanged in originals/ and at source location.
+
+Server v0.3.0 ZIP SHA256: 27D40E199AEE048FE0400EECC1FD4F39D5DB1D6BC8521195604A1A51A8A70E9D
+User-provided source imported and upgraded to v0.4.0. Archive preserved unchanged. Legacy v0.1 metadata and test preserved under originals/legacy-v0.1/.
+v0.6.0: Added configurable OIDC/SAML/LDAPS integrations, external identity/session persistence, config examples and validation. Runtime secrets excluded from release package.
+v0.7.0: Added WBS grid, transactional draft editing, clipboard TSV and interactive Gantt scheduling. Existing calculation engine and database model retained.
+
+0.8.0: authenticated XLSX report export (WBS, Gantt, work items), ExcelJS 4.4.0 (MIT), uuid override 11.1.1.
+
+0.9.0: scoped browser draft recovery, hierarchical WBS rollups, workload checks, bounded XLSX import preview, baseline comparison, workday CPM.

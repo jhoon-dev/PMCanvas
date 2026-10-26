@@ -1,0 +1,22 @@
+node_modules/
+.env
+.env.*
+!.env.example
+backups/
+certs/*
+!certs/.gitkeep
+*.zip
+.import-v03/
+config/*
+!config/auth.example.json
+!config/secrets.example/
+
+# Local verification and legacy source archives
+.playwright-mcp/
+releases/
+originals/
+dist/
+/server.mjs
+/*.png
+*.log
+*.dump
