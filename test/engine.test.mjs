@@ -1,24 +1,169 @@
-import test from 'node:test';import assert from 'node:assert/strict';
-import {working,workdays,addDays,shiftWorkday,validDate,progress,planned,forecast,summary,validateProject} from '../public/engine.js';
-const member=(id='a',extra={})=>({id,name:id,role:'개발',grade:'중급',hours:8,allocation:100,...extra});
-const item=(id,hours,doneDate=null)=>({id,title:id,hours,doneDate});
-const task=(id,extra={})=>({id,name:id,phase:'개발',owner:'a',start:'2026-10-19',end:'2026-10-23',predecessor:'',items:[item(id+'i',40)],...extra});
-const project=(tasks=[],members=[member()],holidays=[])=>({id:'p',name:'Test',description:'',members,tasks,holidays});
-test('근무일은 양끝 포함, 주말과 등록 휴무일 제외',()=>{assert.equal(workdays('2026-10-19','2026-10-25'),5);assert.equal(workdays('2026-10-19','2026-10-25',['2026-10-21']),4);assert.equal(shiftWorkday('2026-10-23',1),'2026-10-26');assert.equal(working('2026-10-25'),false);assert.equal(workdays('2026-10-20','2026-10-19'),0);});
-test('실제로 존재하지 않는 날짜 거부',()=>{assert.equal(validDate('2026-02-30'),false);assert.equal(validDate('2026-02-28'),true);assert.equal(validDate('2026-2-01'),false);});
-test('진척은 개수 평균 대신 예상 공수로 가중',()=>{const t=task('a',{items:[item('small',2,'2026-10-20'),item('large',18)]});assert.equal(progress(t,'2026-10-20'),.1);assert.equal(progress(t,'2026-10-19'),0);});
-test('계획 진척은 보고일 이전 0, 이후 100%, 당일 종료 기준',()=>{const t=task('a');assert.equal(planned(t,'2026-10-18'),0);assert.equal(planned(t,'2026-10-19'),8);assert.equal(planned(t,'2026-10-30'),40);});
-test('완료 기록 부족 시 계획 기준, 보고 다음 근무일부터 재배치',()=>{const p=project([task('a',{items:[item('i1',8,'2026-10-19'),item('i2',32)]})]),f=forecast(p,'2026-10-20');assert.equal(f.tasks.a.method,'plan');assert.equal(f.tasks.a.end,'2026-10-26');assert.equal(f.tasks.a.remaining,32);});
-test('실적 속도는 최소 3근무일과 서로 다른 2일 완료가 필요',()=>{const p=project([task('a',{items:[item('i1',4,'2026-10-19'),item('i2',4,'2026-10-20'),item('i3',32)]})]);assert.equal(forecast(p,'2026-10-20').tasks.a.method,'plan');const f=forecast(p,'2026-10-21');assert.equal(f.tasks.a.method,'velocity');assert.ok(Math.abs(f.pace.a.ratio-1/3)<1e-8);assert.ok(f.tasks.a.end>'2026-10-26');});
-test('인력 등급만 바꿔도 예상일은 바뀌지 않음',()=>{const p=project([task('x')]),a=forecast(p,'2026-10-18').end;p.members[0].grade='특급';assert.equal(forecast(p,'2026-10-18').end,a);});
-test('투입률 감소는 가용시간을 제한하고 완료일을 늦춤',()=>{const p=project([task('x')],[member('a',{allocation:50})]),f=forecast(p,'2026-10-18');assert.equal(f.end,'2026-10-30');});
-test('같은 담당자의 병행 업무에 일 가용시간을 중복 배정하지 않음',()=>{const p=project([task('a'),task('b')]),f=forecast(p,'2026-10-18');assert.equal(f.tasks.a.end,'2026-10-23');assert.equal(f.tasks.b.start,'2026-10-26');assert.equal(f.end,'2026-10-30');});
-test('선행 관계는 작업 입력 순서에 무관하게 반영',()=>{const a=task('a',{items:[item('ai',8)],end:'2026-10-19'}),b=task('b',{owner:'b',items:[item('bi',8)],end:'2026-10-19',predecessor:'a'}),f=forecast(project([b,a],[member(),member('b')]),'2026-10-18');assert.equal(f.tasks.b.start,'2026-10-20');assert.equal(f.tasks.b.end,'2026-10-20');});
-test('휴무일은 예상일 배정에서도 제외',()=>{const p=project([task('x',{items:[item('x',16)],start:'2026-10-19',end:'2026-10-20'})],[member()],['2026-10-20']);assert.equal(forecast(p,'2026-10-18').end,'2026-10-21');});
-test('완료된 업무는 계산 날짜 대신 실제 마지막 완료일 사용',()=>{const p=project([task('x',{items:[item('a',8,'2026-10-19'),item('b',32,'2026-10-21')]})]),f=forecast(p,'2026-10-23');assert.equal(f.tasks.x.method,'actual');assert.equal(f.end,'2026-10-21');assert.equal(summary(p,'2026-10-23').completed,1);});
-test('과거 조회는 미래의 완료 체크를 아직 미완료로 계산',()=>{const p=project([task('x',{items:[item('i',40,'2026-10-23')]})]);assert.equal(summary(p,'2026-10-22').done,0);assert.equal(summary(p,'2026-10-23').done,40);});
-test('담당자 미지정 업무와 그 후속 업무는 예상일을 꾸며내지 않음',()=>{const p=project([task('a',{owner:''}),task('b',{predecessor:'a'})]),f=forecast(p,'2026-10-18');assert.equal(f.tasks.a.end,null);assert.equal(f.tasks.b.end,null);assert.equal(f.end,null);});
-test('선행 업무 순환과 없는 선행 업무 거부',()=>{assert.throws(()=>validateProject(project([task('a',{predecessor:'b'}),task('b',{predecessor:'a'})])),/순환/);assert.throws(()=>validateProject(project([task('a',{predecessor:'missing'})])),/존재하지/);});
-test('주말만 있는 일정, 중복 체크 ID, 0 작업량 거부',()=>{assert.throws(()=>validateProject(project([task('a',{start:'2026-10-24',end:'2026-10-25'})])));assert.throws(()=>validateProject(project([task('a',{items:[item('same',1),item('same',2)]})])));assert.throws(()=>validateProject(project([task('a',{items:[item('i',0)]})])));});
-test('빈 프로젝트는 진척 0, 예상 완료일 없음',()=>{const s=summary(project([]),'2026-10-23');assert.equal(s.progress,0);assert.equal(s.forecast.end,null);});
-test('과거 미완료 업무도 기준일 이전에 배정하지 않음',()=>{const f=forecast(project([task('a')]),'2026-10-25');assert.equal(f.tasks.a.start,'2026-10-26');assert.equal(f.tasks.a.end,'2026-10-30');});
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {
+  working,
+  workdays,
+  addDays,
+  shiftWorkday,
+  validDate,
+  progress,
+  planned,
+  forecast,
+  summary,
+  validateProject,
+} from '../public/engine.js';
+const member = (id = 'a', extra = {}) => ({
+  id,
+  name: id,
+  role: '개발',
+  grade: '중급',
+  hours: 8,
+  allocation: 100,
+  ...extra,
+});
+const item = (id, hours, doneDate = null) => ({ id, title: id, hours, doneDate });
+const task = (id, extra = {}) => ({
+  id,
+  name: id,
+  phase: '개발',
+  owner: 'a',
+  start: '2026-10-19',
+  end: '2026-10-23',
+  predecessor: '',
+  items: [item(id + 'i', 40)],
+  ...extra,
+});
+const project = (tasks = [], members = [member()], holidays = []) => ({
+  id: 'p',
+  name: 'Test',
+  description: '',
+  members,
+  tasks,
+  holidays,
+});
+test('근무일은 양끝 포함, 주말과 등록 휴무일 제외', () => {
+  assert.equal(workdays('2026-10-19', '2026-10-25'), 5);
+  assert.equal(workdays('2026-10-19', '2026-10-25', ['2026-10-21']), 4);
+  assert.equal(shiftWorkday('2026-10-23', 1), '2026-10-26');
+  assert.equal(working('2026-10-25'), false);
+  assert.equal(workdays('2026-10-20', '2026-10-19'), 0);
+});
+test('실제로 존재하지 않는 날짜 거부', () => {
+  assert.equal(validDate('2026-02-30'), false);
+  assert.equal(validDate('2026-02-28'), true);
+  assert.equal(validDate('2026-2-01'), false);
+});
+test('진척은 개수 평균 대신 예상 공수로 가중', () => {
+  const t = task('a', { items: [item('small', 2, '2026-10-20'), item('large', 18)] });
+  assert.equal(progress(t, '2026-10-20'), 0.1);
+  assert.equal(progress(t, '2026-10-19'), 0);
+});
+test('계획 진척은 보고일 이전 0, 이후 100%, 당일 종료 기준', () => {
+  const t = task('a');
+  assert.equal(planned(t, '2026-10-18'), 0);
+  assert.equal(planned(t, '2026-10-19'), 8);
+  assert.equal(planned(t, '2026-10-30'), 40);
+});
+test('완료 기록 부족 시 계획 기준, 보고 다음 근무일부터 재배치', () => {
+  const p = project([task('a', { items: [item('i1', 8, '2026-10-19'), item('i2', 32)] })]),
+    f = forecast(p, '2026-10-20');
+  assert.equal(f.tasks.a.method, 'plan');
+  assert.equal(f.tasks.a.end, '2026-10-26');
+  assert.equal(f.tasks.a.remaining, 32);
+});
+test('실적 속도는 최소 3근무일과 서로 다른 2일 완료가 필요', () => {
+  const p = project([
+    task('a', {
+      items: [item('i1', 4, '2026-10-19'), item('i2', 4, '2026-10-20'), item('i3', 32)],
+    }),
+  ]);
+  assert.equal(forecast(p, '2026-10-20').tasks.a.method, 'plan');
+  const f = forecast(p, '2026-10-21');
+  assert.equal(f.tasks.a.method, 'velocity');
+  assert.ok(Math.abs(f.pace.a.ratio - 1 / 3) < 1e-8);
+  assert.ok(f.tasks.a.end > '2026-10-26');
+});
+test('인력 등급만 바꿔도 예상일은 바뀌지 않음', () => {
+  const p = project([task('x')]),
+    a = forecast(p, '2026-10-18').end;
+  p.members[0].grade = '특급';
+  assert.equal(forecast(p, '2026-10-18').end, a);
+});
+test('투입률 감소는 가용시간을 제한하고 완료일을 늦춤', () => {
+  const p = project([task('x')], [member('a', { allocation: 50 })]),
+    f = forecast(p, '2026-10-18');
+  assert.equal(f.end, '2026-10-30');
+});
+test('같은 담당자의 병행 업무에 일 가용시간을 중복 배정하지 않음', () => {
+  const p = project([task('a'), task('b')]),
+    f = forecast(p, '2026-10-18');
+  assert.equal(f.tasks.a.end, '2026-10-23');
+  assert.equal(f.tasks.b.start, '2026-10-26');
+  assert.equal(f.end, '2026-10-30');
+});
+test('선행 관계는 작업 입력 순서에 무관하게 반영', () => {
+  const a = task('a', { items: [item('ai', 8)], end: '2026-10-19' }),
+    b = task('b', { owner: 'b', items: [item('bi', 8)], end: '2026-10-19', predecessor: 'a' }),
+    f = forecast(project([b, a], [member(), member('b')]), '2026-10-18');
+  assert.equal(f.tasks.b.start, '2026-10-20');
+  assert.equal(f.tasks.b.end, '2026-10-20');
+});
+test('휴무일은 예상일 배정에서도 제외', () => {
+  const p = project(
+    [task('x', { items: [item('x', 16)], start: '2026-10-19', end: '2026-10-20' })],
+    [member()],
+    ['2026-10-20'],
+  );
+  assert.equal(forecast(p, '2026-10-18').end, '2026-10-21');
+});
+test('완료된 업무는 계산 날짜 대신 실제 마지막 완료일 사용', () => {
+  const p = project([
+      task('x', { items: [item('a', 8, '2026-10-19'), item('b', 32, '2026-10-21')] }),
+    ]),
+    f = forecast(p, '2026-10-23');
+  assert.equal(f.tasks.x.method, 'actual');
+  assert.equal(f.end, '2026-10-21');
+  assert.equal(summary(p, '2026-10-23').completed, 1);
+});
+test('과거 조회는 미래의 완료 체크를 아직 미완료로 계산', () => {
+  const p = project([task('x', { items: [item('i', 40, '2026-10-23')] })]);
+  assert.equal(summary(p, '2026-10-22').done, 0);
+  assert.equal(summary(p, '2026-10-23').done, 40);
+});
+test('담당자 미지정 업무와 그 후속 업무는 예상일을 꾸며내지 않음', () => {
+  const p = project([task('a', { owner: '' }), task('b', { predecessor: 'a' })]),
+    f = forecast(p, '2026-10-18');
+  assert.equal(f.tasks.a.end, null);
+  assert.equal(f.tasks.b.end, null);
+  assert.equal(f.end, null);
+});
+test('선행 업무 순환과 없는 선행 업무 거부', () => {
+  assert.throws(
+    () =>
+      validateProject(project([task('a', { predecessor: 'b' }), task('b', { predecessor: 'a' })])),
+    /순환/,
+  );
+  assert.throws(
+    () => validateProject(project([task('a', { predecessor: 'missing' })])),
+    /존재하지/,
+  );
+});
+test('주말만 있는 일정, 중복 체크 ID, 0 작업량 거부', () => {
+  assert.throws(() =>
+    validateProject(project([task('a', { start: '2026-10-24', end: '2026-10-25' })])),
+  );
+  assert.throws(() =>
+    validateProject(project([task('a', { items: [item('same', 1), item('same', 2)] })])),
+  );
+  assert.throws(() => validateProject(project([task('a', { items: [item('i', 0)] })])));
+});
+test('빈 프로젝트는 진척 0, 예상 완료일 없음', () => {
+  const s = summary(project([]), '2026-10-23');
+  assert.equal(s.progress, 0);
+  assert.equal(s.forecast.end, null);
+});
+test('과거 미완료 업무도 기준일 이전에 배정하지 않음', () => {
+  const f = forecast(project([task('a')]), '2026-10-25');
+  assert.equal(f.tasks.a.start, '2026-10-26');
+  assert.equal(f.tasks.a.end, '2026-10-30');
+});
