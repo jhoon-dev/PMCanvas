@@ -6,7 +6,21 @@ import { projectChanges } from '../../server/project.mjs';
 import { publicUser } from '../../server/postgres.mjs';
 import { reviewRecipients } from '../../server/mail-settings.mjs';
 import { MemoryOperations } from './memory-operations.mjs';
+import { syncWorkspace } from '../../server/workspace-sync.mjs';
 export class MemoryRepository extends MemoryOperations {
+  async workspace(userId, request) {
+    const entries = [...this.projects.values()].filter((p) => p.roles[userId] && !p.deletedAt);
+    const rows = entries.map((p) => ({
+      ...p.data,
+      id: p.id,
+      revision: p.revision,
+      role: p.roles[userId],
+      member_id: this.links?.get(p.id)?.find((link) => link.userId === userId)?.memberId,
+    }));
+    return syncWorkspace(rows, request, async (wanted) =>
+      wanted.map((row) => this.document(this.projects.get(row.id), userId)),
+    );
+  }
   async reserveAttempt(key, limit, windowMs) {
     this.attempts ??= new Map();
     const old = this.attempts.get(key);

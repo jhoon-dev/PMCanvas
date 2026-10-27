@@ -13,11 +13,13 @@ import { escapeHtml as esc } from './html.js';
 import { createInfoDialog } from './info-dialog.js';
 import { DraftStore } from './draft-store.js';
 import { api } from './api-client.js';
+import { ReportClock } from './report-clock.js';
+import { workspaceKnowledge, applyWorkspaceSync } from './workspace-cache.js';
 import { myWorkView } from './my-work-ui.js';
 import { WbsView } from './wbs-view.js';
 import { dashboardView } from './dashboard-view.js';
 import { icon, btn, pageHead, empty } from './view-ui.js';
-import { today, validDate, progress, summary } from './engine.js';
+import { today, progress, summary } from './engine.js';
 let currentUser = null,
   saveInFlight = false,
   mutationSequence = 0,
@@ -26,8 +28,9 @@ let currentUser = null,
   dailyMode = 'mine';
 let reviewLanding = location.hash === '#registration-approvals';
 let alertLanding = location.hash === '#operation-alerts';
-const $ = (s) => document.querySelector(s),
-  TODAY = today();
+const $ = (s) => document.querySelector(s);
+const reportClock = new ReportClock();
+let TODAY = reportClock.today;
 let state = { version: 1, projects: [], activeId: null },
   storageError = '',
   view = normalizeView(location.hash.slice(1)),
@@ -38,6 +41,14 @@ let state = { version: 1, projects: [], activeId: null },
   onlyPending = false;
 const project = () => state.projects.find((p) => p.id === state.activeId);
 const savedProjects = new Map();
+function clearAccountWorkspace() {
+  mutationSequence++;
+  fetchSequence++;
+  state = { version: 1, projects: [], activeId: null };
+  myProjects = [];
+  storageError = '';
+  savedProjects.clear();
+}
 const wbs = new WbsView({
   resolveConflict: openConflict,
   getDraftStore: () => (currentUser ? new DraftStore(currentUser.id) : null),
@@ -110,6 +121,7 @@ function toast(text) {
   window.toastTimer = setTimeout(() => $('#toast').classList.remove('show'), 3500);
 }
 function render() {
+  refreshDate(false);
   document.body.dataset.appView = view;
   if (!state.projects.length) {
     $('#breadcrumbProject').textContent = ui('프로젝트 시작하기');
@@ -271,11 +283,7 @@ document.addEventListener('click', (e) => {
       toast(ui('현재 변경사항을 먼저 저장하거나 백업한 뒤 취소해 주세요.'));
       return;
     }
-    state.activeId = sw.dataset.project;
-    ownerFilter = '';
-    statusFilter = '';
-    query = '';
-    render();
+    selectProject(sw.dataset.project).catch((error) => toast(ui(error.message)));
     return;
   }
   const task = e.target.closest('[data-edit-task]');
@@ -317,12 +325,13 @@ document.addEventListener('click', (e) => {
 $('#main').addEventListener('change', async (e) => {
   const el = e.target;
   if (el.id === 'reportDate') {
-    if (!validDate(el.value) || el.value > TODAY) {
+    if (!reportClock.select(el.value)) {
       toast(ui('오늘까지의 날짜만 조회할 수 있어요.'));
       el.value = asOf;
       return;
     }
-    asOf = el.value;
+    TODAY = reportClock.today;
+    asOf = reportClock.reportDate;
     render();
   }
   if (el.id === 'ownerFilter') {
@@ -337,7 +346,8 @@ $('#main').addEventListener('change', async (e) => {
     onlyPending = el.checked;
     render();
   }
-  if (el.dataset.checkItem)
+  if (el.dataset.checkItem) {
+    refreshDate(false);
     await recordCompletion({
       project: project(),
       taskId: el.dataset.checkTask,
@@ -349,6 +359,7 @@ $('#main').addEventListener('change', async (e) => {
       onRender: render,
       toast,
     });
+  }
 });
 $('#main').addEventListener('input', (e) => {
   if (e.target.id === 'taskSearch') {
@@ -383,18 +394,27 @@ window.addEventListener('hashchange', () => {
   view = next;
   render();
 });
-$('#projectSelect').onchange = (e) => {
+$('#projectSelect').onchange = async (e) => {
   if (storageError || wbs.dirty) {
     toast(ui('WBS 변경사항을 먼저 저장하거나 취소해 주세요.'));
     render();
     return;
   }
-  state.activeId = e.target.value;
+  try {
+    await selectProject(e.target.value);
+  } catch (error) {
+    toast(ui(error.message));
+    render();
+  }
+};
+async function selectProject(id) {
   ownerFilter = '';
   statusFilter = '';
   query = '';
-  render();
-};
+  const loaded = await loadProjects({ activeId: id });
+  if (!loaded) $('#projectSelect').value = state.activeId ?? '';
+  return loaded;
+}
 $('#mobileNewProject').onclick = () => openEditor('project');
 $('#closeInfo').onclick = () => info.close();
 $('#newProjectSide').onclick = () => openEditor('project');
@@ -442,11 +462,18 @@ function updateAccessUi() {
 function showAuth(message = '') {
   auth.show(message);
 }
-async function loadProjects({ force = false } = {}) {
+async function loadProjects({ force = false, activeId = state.activeId } = {}) {
   if (wbs.dirty || wbs.interacting) return false;
   const checkpoint = mutationSequence,
     request = ++fetchSequence;
-  const [data, mine] = await Promise.all([api('projects'), api('my-work')]);
+  const data = await api('workspace/sync', {
+    method: 'POST',
+    body: {
+      activeId,
+      known: force ? [] : workspaceKnowledge(state.projects),
+      mine: force ? [] : workspaceKnowledge(myProjects),
+    },
+  });
   if (
     wbs.dirty ||
     wbs.interacting ||
@@ -455,19 +482,13 @@ async function loadProjects({ force = false } = {}) {
     (!force && (saveInFlight || storageError || $('#editorDialog').open))
   )
     return false;
-  const previous = state.activeId;
-  state = {
-    version: 1,
-    projects: data.projects,
-    activeId: data.projects.some((p) => p.id === previous)
-      ? previous
-      : data.projects[0]?.id || null,
-  };
-  myProjects = mine.projects;
+  const updated = applyWorkspaceSync(state, myProjects, data);
+  state = updated.state;
+  myProjects = updated.myProjects;
   savedProjects.clear();
-  for (const p of data.projects) savedProjects.set(p.id, structuredClone(p));
+  for (const p of state.projects) if (!p._summary) savedProjects.set(p.id, structuredClone(p));
   storageError = '';
-  render();
+  if (force || updated.changed) render();
   admin.summary();
   return true;
 }
@@ -480,6 +501,7 @@ async function boot() {
       wbs.base = null;
       wbs.pending.clear();
       wbs.recovery = null;
+      clearAccountWorkspace();
     }
     currentUser = session.user;
     await loadProjects();
@@ -533,6 +555,39 @@ setInterval(async () => {
 }, 15000);
 
 window.addEventListener('pagehide', () => wbs.persistDraft());
+
+let datePaintPending = false;
+function refreshDate(paint = true) {
+  const advance =
+    !saveInFlight &&
+    !storageError &&
+    !wbs.dirty &&
+    !wbs.interacting &&
+    !$('#editorDialog').open &&
+    !$('#infoDialog').open &&
+    !document.activeElement?.matches(
+      'input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]),textarea,select,[contenteditable="true"]',
+    );
+  const changed = reportClock.refresh({ advance });
+  TODAY = reportClock.today;
+  asOf = reportClock.reportDate;
+  datePaintPending ||= changed.dayChanged || changed.reportChanged;
+  if (!paint) {
+    if (advance) datePaintPending = false;
+    return;
+  }
+  if (advance && datePaintPending) {
+    datePaintPending = false;
+    render();
+  }
+}
+window.addEventListener('focus', () => refreshDate());
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') refreshDate();
+});
+document.addEventListener('focusout', () => setTimeout(() => refreshDate(), 150));
+document.addEventListener('close', () => refreshDate(), true);
+setInterval(() => refreshDate(), 30000);
 
 async function showApprovalInbox() {
   if (alertLanding && currentUser && !storageError && !wbs.dirty && !saveInFlight) {
@@ -610,7 +665,7 @@ const editorUi = createProjectEditor({
   persist,
   render,
   toast,
-  currentDate: TODAY,
+  currentDate: today,
   onCreate(p) {
     state.projects.push(p);
     state.activeId = p.id;
@@ -636,7 +691,7 @@ const reports = createReportUi({
   toast,
   showAuth,
   openInfo,
-  currentDate: TODAY,
+  currentDate: today,
   onImport(p) {
     state.projects.push(p);
     state.activeId = p.id;
@@ -661,16 +716,17 @@ const admin = createAdminUi({
   canChange: opsCanChange,
   onMailEnabled: (enabled) => auth.setMailEnabled(enabled),
   reload: async (id) => {
-    await loadProjects({ force: true });
-    if (id && state.projects.some((p) => p.id === id)) {
-      state.activeId = id;
-      render();
-    }
+    await loadProjects({ force: true, activeId: id ?? state.activeId });
   },
 
-  openTask: (projectId, taskId) => {
+  openTask: async (projectId, taskId) => {
     if (!opsCanChange()) return;
-    state.activeId = projectId;
+    try {
+      if (!(await loadProjects({ activeId: projectId }))) return;
+    } catch (error) {
+      toast(ui(error.message));
+      return;
+    }
     dailyMode = 'project';
     navigate('daily');
     const selected = project()?.tasks.find((task) => task.id === taskId);
@@ -698,6 +754,7 @@ const auth = createAuthUi({
       wbs.base = null;
       wbs.pending.clear();
       wbs.recovery = null;
+      clearAccountWorkspace();
     }
     currentUser = nextUser;
   },

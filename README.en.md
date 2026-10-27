@@ -1,4 +1,4 @@
-# PM Canvas 0.20.1
+# PM Canvas 0.20.2
 
 English · [한국어](README.md)
 
@@ -42,6 +42,6 @@ npm run test:browser
 npm run test:performance
 ```
 
-Linux browser setup may require `npx playwright install --with-deps chromium --only-shell`. The browser suite starts its own memory store and loopback TLS mailbox on ports 4193/4192, with no production accounts, DB or external email. CI also runs HTTP/SMTP, dedicated PostgreSQL, dependency audit, backup/restore verification and CodeQL. See [development notes](CONTRIBUTING.md).
+Linux browser setup may require `npx playwright install --with-deps chromium --only-shell`. The browser suite starts its own memory store and loopback TLS mailbox on ports 4193/4192, with no production accounts, DB or external email. CI also runs HTTP/SMTP, dedicated PostgreSQL, dependency audit, backup/restore verification and CodeQL. A separate recovery rehearsal dumps and restores synthetic data, then verifies login, MFA, encrypted SMTP settings with actual TLS delivery, task completion records, shared permissions and invalidated old authentication. See [development notes](CONTRIBUTING.md).
 
 Use reserved example domains in public documentation and configuration examples. After committing changes, run `npm run release` to build and inspect a public ZIP in `releases/`. Private environment files, live authentication/mail settings, keys and dumps are excluded. See [public file checks](docs/PUBLIC-FILES.md).

@@ -75,3 +75,5 @@ jobs:
           node --input-type=module -e "import {createPool} from './server/pg-pool.mjs';const p=await createPool();await p.query('UPDATE pm_backup_settings SET enabled=true,next_run_at=now(),verify_restore=true,requested=false,lease_until=NULL');await p.end();"
           docker run --rm --network host --read-only --tmpfs /tmp -v "$RUNNER_TEMP/pmcanvas-backup-key:/run/secrets/mfa.key:ro" -e PGHOST -e PGUSER -e PGPASSWORD -e PGDATABASE -e BACKUP_DIR=/tmp/backups -e BACKUP_RESTORE_OWNER=pmcanvas pmcanvas-backup:ci node server/backup-worker.mjs --once
           node scripts/check-backup.mjs
+      - name: Rehearse application recovery with isolated fixture data
+        run: docker run --rm --network host --read-only --tmpfs /tmp -v "$PWD/test:/app/test:ro" -v "$PWD/public:/app/public:ro" -v "$PWD/node_modules:/app/node_modules:ro" -e PGHOST -e PGUSER -e PGPASSWORD -e PGDATABASE -e RUN_RESTORE_TESTS=1 pmcanvas-backup:ci node --test test/restore.integration.mjs

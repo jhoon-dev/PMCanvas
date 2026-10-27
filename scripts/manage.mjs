@@ -7,6 +7,7 @@ import { spawnSync } from 'node:child_process';
 import { createInterface } from 'node:readline/promises';
 import { emailAddress } from '../server/security.mjs';
 import { runtimeIdentity, prepareRuntimeStorage } from './runtime-storage.mjs';
+import { restoreCleanupSql } from '../server/restore-safety.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const envPath = path.join(root, '.env');
@@ -217,7 +218,7 @@ async function main() {
         '-v',
         'ON_ERROR_STOP=1',
         '-c',
-        "DO $restore$ DECLARE t text; BEGIN FOREACH t IN ARRAY ARRAY['pm_sessions','pm_auth_transient','pm_auth_attempts','pm_password_resets','pm_email_verifications'] LOOP IF to_regclass(t) IS NOT NULL THEN EXECUTE format('TRUNCATE %I',t); END IF; END LOOP; IF to_regclass('pm_admin_mfa') IS NOT NULL THEN EXECUTE 'UPDATE pm_admin_mfa SET recovery_hashes=ARRAY[]::text[]'; END IF; END $restore$;",
+        restoreCleanupSql,
       ]);
       console.log(
         'Restored to ' +

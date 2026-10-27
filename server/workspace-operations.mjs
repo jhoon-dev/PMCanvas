@@ -121,18 +121,17 @@ export class WorkspaceOperations extends AlertRepository {
   async myWork(userId) {
     return this.transaction(async (c) => {
       const rows = (
-          await c.query(
-            'SELECT p.*,a.role,m.member_id FROM pm_projects p JOIN pm_project_access a ON a.project_id=p.id JOIN pm_member_accounts m ON m.project_id=p.id AND m.user_id=a.user_id WHERE a.user_id=$1 AND p.deleted_at IS NULL ORDER BY p.name',
-            [userId],
-          )
-        ).rows,
-        projects = [];
-      for (const row of rows) {
-        const p = await this.hydrate(c, row);
-        p.tasks = p.tasks.filter((t) => t.owner === row.member_id);
-        projects.push(p);
-      }
-      return projects;
+        await c.query(
+          'SELECT p.*,a.role,m.member_id FROM pm_projects p JOIN pm_project_access a ON a.project_id=p.id JOIN pm_member_accounts m ON m.project_id=p.id AND m.user_id=a.user_id WHERE a.user_id=$1 AND p.deleted_at IS NULL ORDER BY p.name',
+          [userId],
+        )
+      ).rows;
+      const documents = await this.hydrateMany(c, rows, true);
+      return documents.map((p, index) => ({
+        ...p,
+        _memberId: rows[index].member_id,
+        tasks: p.tasks.filter((t) => t.owner === rows[index].member_id),
+      }));
     }, true);
   }
   async captureDeletedTasks(c, id, actorId, before, after) {

@@ -253,3 +253,33 @@ test('공개 ZIP: 경로 탈출·중복·심볼릭 링크·암호화·손상·�
   assert.equal(symlink.findings[0].rule, 'SYMLINK');
   await assert.rejects(checkPublicArchive(Buffer.from('not a zip')));
 });
+
+test('상위 폴더와 무관하게 실제 설정·비밀 폴더 차단, 배포 예제 내용도 검사', async () => {
+  for (const name of [
+    'bundle/config/mail.json',
+    'public/config/mail.json',
+    'bundle/Config/auth.json',
+    'public/config/secrets/smtp-password.txt',
+    'bundle/secrets/token.txt',
+    'bundle/certs/root.crt',
+  ]) {
+    assert.ok(inspect(name, 'synthetic-review-fixture').length, name);
+    const result = await checkPublicArchive(archive([{ name, text: 'synthetic-review-fixture' }]));
+    assert.ok(result.findings.length, name);
+  }
+  const name = 'bundle/config/mail.example.json';
+  assert.deepEqual(inspect(name, '{"host":"smtp.example.com"}'), []);
+  assert.ok(inspect(name, '{"host":"private-box","password":"synthetic-review-fixture"}').length);
+  assert.deepEqual(
+    (
+      await checkPublicArchive(
+        archive([
+          { name: 'bundle/' },
+          { name: 'bundle/config/' },
+          { name, text: '{"host":"smtp.example.com"}' },
+        ]),
+      )
+    ).findings,
+    [],
+  );
+});

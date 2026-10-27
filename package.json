@@ -1,6 +1,6 @@
 {
   "name": "pmcanvas-server",
-  "version": "0.20.1",
+  "version": "0.20.2",
   "private": true,
   "type": "module",
   "engines": {
@@ -11,6 +11,7 @@
     "demo": "node scripts/demo.mjs",
     "test": "node --test test/*.test.mjs",
     "test:postgres": "node --env-file-if-exists=.env --test test/postgres.integration.mjs",
+    "test:restore": "node --test test/restore.integration.mjs",
     "migrate": "node --env-file-if-exists=.env scripts/migrate.mjs",
     "test:http": "node --test test/http.network.integration.mjs",
     "test:browser": "playwright test",

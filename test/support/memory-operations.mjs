@@ -107,6 +107,7 @@ export class MemoryOperations {
       .map((p) => {
         const result = this.document(p, user),
           memberId = this.links.get(p.id).find((l) => l.userId === user).memberId;
+        result._memberId = memberId;
         result.tasks = result.tasks.filter((t) => t.owner === memberId);
         return result;
       });

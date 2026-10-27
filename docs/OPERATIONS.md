@@ -51,6 +51,8 @@ npm run restore -- backups/pmcanvas-auto-파일.dump pmcanvas_restore_check
 
 restore는 새 DB에만 복원하고 기존 DB를 덮어쓰지 않습니다. 복원 시 세션·인증 챌린지·비밀번호 재설정·가입 인증 링크를 제거하고 MFA 복구 코드를 무효화합니다. 앱을 연결하기 전에 내용을 확인하세요. 보관한 같은 암호화 키를 config/secrets/mfa.key에 복원해야 기존 인증 앱과 SMTP 설정을 사용할 수 있습니다. 원래 키를 잃었다면 운영자 MFA 초기화와 SMTP 자격 증명 재설정이 필요합니다. APP_DATABASE를 복원 DB 이름으로 바꿔 서비스 기동 후 로그인과 데이터를 확인하세요. 실패한 수동 복원 DB의 정리는 운영자가 수행합니다.
 
+CI에는 별도의 앱 복구 검증도 있습니다. 테스트 데이터의 실제 덤프를 임시 DB에 복원한 뒤 로그인·MFA·SMTP 복호화와 로컬 TLS 메일 발송·완료 기록·공유 권한을 확인합니다. 운영 자동 백업의 복원 점검은 스키마·참조 검사를 수행하며, 운영 계정 로그인이나 실제 수신자 메일 발송은 하지 않습니다. [실행 조건과 격리 범위](../CONTRIBUTING.md)를 참고하세요.
+
 ## 외부 PostgreSQL과 직접 실행
 
 외부 DB에서는 운영 계정이 전체 DB를 읽고 CREATEDB 및 앱 역할로 SET ROLE 할 수 있어야 복원 점검까지 가능합니다. `.env`에 BACKUP_PGUSER·BACKUP_PGPASSWORD를 비공개로 설정합니다. PGHOST·PGPORT·PGDATABASE·PGSSLMODE·PGSSLROOTCERT는 기존 외부 DB 설정을 사용합니다. PostgreSQL 18 클라이언트 이미지이므로 그보다 최신 서버는 해당 버전에 맞게 이미지를 조정해야 합니다.

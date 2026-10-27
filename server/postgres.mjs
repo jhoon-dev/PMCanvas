@@ -6,6 +6,7 @@ import { cleanProject, projectChanges } from './project.mjs';
 import { WorkspaceOperations } from './workspace-operations.mjs';
 import { reviewRecipients } from './mail-settings.mjs';
 import { migrationFiles } from './migrations.mjs';
+import { syncWorkspace } from './workspace-sync.mjs';
 export const publicUser = (u) => ({
   id: u.id,
   email: u.email,
@@ -650,25 +651,66 @@ export class PgRepository extends WorkspaceOperations {
     return row;
   }
   async hydrate(c, row) {
-    const id = row.id;
-    const members = (
-      await c.query(
-        'SELECT id,name,role,grade,hours,allocation FROM pm_members WHERE project_id=$1 ORDER BY position',
-        [id],
-      )
-    ).rows.map((m) => ({ ...m, hours: Number(m.hours), allocation: Number(m.allocation) }));
-    const tasks = (
-      await c.query(
-        "SELECT id,name,phase,coalesce(owner_id,'') AS owner,to_char(start_date,'YYYY-MM-DD') AS start,to_char(end_date,'YYYY-MM-DD') AS end,coalesce(predecessor_id,'') AS predecessor,memo FROM pm_tasks WHERE project_id=$1 ORDER BY position",
-        [id],
-      )
-    ).rows;
-    const items = (
-      await c.query(
-        'SELECT id,task_id,title,hours,to_char(done_date,\'YYYY-MM-DD\') AS "doneDate" FROM pm_task_items WHERE project_id=$1 ORDER BY position',
-        [id],
-      )
-    ).rows;
+    return (await this.hydrateMany(c, [row]))[0];
+  }
+  async hydrateMany(c, rows, ownedOnly = false) {
+    if (!rows.length) return [];
+    const ids = rows.map((row) => row.id);
+    const params = ownedOnly ? [ids, rows.map((row) => row.member_id)] : [ids];
+    const ownerFilter = ownedOnly
+      ? ' AND EXISTS(SELECT 1 FROM unnest($1::uuid[],$2::text[]) AS wanted(project_id,owner_id) WHERE wanted.project_id=t.project_id AND wanted.owner_id=t.owner_id)'
+      : '';
+    const group = (entries) => {
+      const groups = new Map();
+      for (const { project_id, ...entry } of entries) {
+        if (!groups.has(project_id)) groups.set(project_id, []);
+        groups.get(project_id).push(entry);
+      }
+      return groups;
+    };
+    const members = group(
+      (
+        await c.query(
+          'SELECT project_id,id,name,role,grade,hours,allocation FROM pm_members WHERE project_id=ANY($1::uuid[]) ORDER BY project_id,position',
+          [ids],
+        )
+      ).rows,
+    );
+    const tasks = group(
+      (
+        await c.query(
+          "SELECT t.project_id,t.id,t.name,t.phase,coalesce(t.owner_id,'') AS owner,to_char(t.start_date,'YYYY-MM-DD') AS start,to_char(t.end_date,'YYYY-MM-DD') AS end,coalesce(t.predecessor_id,'') AS predecessor,t.memo FROM pm_tasks t WHERE t.project_id=ANY($1::uuid[])" +
+            ownerFilter +
+            ' ORDER BY t.project_id,t.position',
+          params,
+        )
+      ).rows,
+    );
+    const items = group(
+      (
+        await c.query(
+          'SELECT i.project_id,i.id,i.task_id,i.title,i.hours,to_char(i.done_date,\'YYYY-MM-DD\') AS "doneDate" FROM pm_task_items i JOIN pm_tasks t ON t.project_id=i.project_id AND t.id=i.task_id WHERE t.project_id=ANY($1::uuid[])' +
+            ownerFilter +
+            ' ORDER BY i.project_id,i.position',
+          params,
+        )
+      ).rows,
+    );
+    return rows.map((row) =>
+      this.hydratedDocument(
+        row,
+        members.get(row.id) ?? [],
+        tasks.get(row.id) ?? [],
+        items.get(row.id) ?? [],
+      ),
+    );
+  }
+  hydratedDocument(row, memberRows, tasks, items) {
+    const members = memberRows.map((m) => ({
+      ...m,
+      hours: Number(m.hours),
+      allocation: Number(m.allocation),
+    }));
     for (const t of tasks) {
       const parent = Object.hasOwn(row.planning?.parents || {}, t.id)
         ? row.planning.parents[t.id]
@@ -683,7 +725,7 @@ export class PgRepository extends WorkspaceOperations {
     }
     return {
       ...(row.planning?.baseline ? { baseline: row.planning.baseline } : {}),
-      id,
+      id: row.id,
       name: row.name,
       description: row.description,
       demo: row.demo,
@@ -701,9 +743,32 @@ export class PgRepository extends WorkspaceOperations {
         'SELECT p.*,a.role FROM pm_projects p JOIN pm_project_access a ON a.project_id=p.id WHERE a.user_id=$1 AND p.deleted_at IS NULL ORDER BY p.created_at,p.id',
         [userId],
       );
-      const docs = [];
-      for (const row of rows) docs.push(await this.hydrate(c, row));
-      return docs;
+      return this.hydrateMany(c, rows);
+    }, true);
+  }
+  async workspace(userId, request) {
+    return this.transaction(async (c) => {
+      const rows = (
+        await c.query(
+          'SELECT p.id,p.name,p.demo,p.revision,a.role,m.member_id FROM pm_projects p JOIN pm_project_access a ON a.project_id=p.id LEFT JOIN pm_member_accounts m ON m.project_id=p.id AND m.user_id=a.user_id WHERE a.user_id=$1 AND p.deleted_at IS NULL ORDER BY p.created_at,p.id',
+          [userId],
+        )
+      ).rows;
+      return syncWorkspace(rows, request, async (wanted, ownedOnly) => {
+        if (!wanted.length) return [];
+        const details = new Map(
+          (
+            await c.query('SELECT * FROM pm_projects WHERE id=ANY($1::uuid[])', [
+              wanted.map((row) => row.id),
+            ])
+          ).rows.map((row) => [row.id, row]),
+        );
+        return this.hydrateMany(
+          c,
+          wanted.map((row) => ({ ...details.get(row.id), ...row })),
+          ownedOnly,
+        );
+      });
     }, true);
   }
   async getProject(userId, id) {

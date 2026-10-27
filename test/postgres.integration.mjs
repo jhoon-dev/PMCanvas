@@ -9,6 +9,96 @@ import fs from 'node:fs';
 import { createPool, migrate, PgRepository } from '../server/postgres.mjs';
 import { cleanProject } from '../server/project.mjs';
 import { hashPassword, token, digest } from '../server/security.mjs';
+import { screenProject } from './support/screen-fixtures.mjs';
+import { workspaceRequest } from '../server/workspace-sync.mjs';
+import { workspaceKnowledge } from '../public/workspace-cache.js';
+
+test(
+  '실제 PostgreSQL: 증분 요약·일괄 수화·내 담당 필터·역할 변경·접근 회수·무변경 1회 조회',
+  { skip: process.env.RUN_POSTGRES_TESTS !== '1' },
+  async () => {
+    if (!/_test$/.test(process.env.PGDATABASE || ''))
+      throw Error('Dedicated _test database required.');
+    const pool = await createPool(),
+      repo = new PgRepository(pool),
+      users = [],
+      ids = [];
+    try {
+      await migrate(pool);
+      for (const name of ['owner', 'viewer'])
+        users.push(
+          await repo.createUser({
+            email: randomUUID() + '@example.com',
+            name,
+            passwordHash: 'unused',
+          }),
+        );
+      const [owner, viewer] = users;
+      for (let i = 0; i < 2; i++) {
+        const id = randomUUID();
+        await repo.createProject(owner.id, id, cleanProject(screenProject()));
+        ids.push(id);
+      }
+      await repo.grantAccess(owner.id, ids[0], viewer.email, 'viewer');
+      await repo.setMemberAccount(owner.id, ids[0], { memberId: 'm1', userId: viewer.id });
+      const first = await repo.workspace(viewer.id, workspaceRequest({ activeId: ids[1] }));
+      assert.deepEqual(
+        first.projects.map((p) => p.id),
+        [ids[0]],
+      );
+      assert.equal(first.project._role, 'viewer');
+      assert.equal(first.project.tasks.length, 3);
+      assert.equal(first.myWork.projects[0].tasks.length, 2);
+      assert.ok(first.myWork.projects[0].tasks.every((t) => t.owner === 'm1'));
+      assert.equal(
+        first.myWork.projects[0].tasks[0].items.length,
+        first.project.tasks.find((t) => t.owner === 'm1').items.length,
+      );
+      const request = workspaceRequest({
+        activeId: ids[0],
+        known: workspaceKnowledge([first.project]),
+        mine: workspaceKnowledge(first.myWork.projects),
+      });
+      let reads = 0;
+      const counted = new PgRepository({
+        connect: async () => {
+          const c = await pool.connect();
+          return {
+            release: () => c.release(),
+            query: (sql, args) => {
+              if (/^SELECT/.test(sql)) reads++;
+              return c.query(sql, args);
+            },
+          };
+        },
+      });
+      const same = await counted.workspace(viewer.id, request);
+      assert.equal(reads, 1);
+      assert.equal(same.project, null);
+      assert.deepEqual(same.myWork.projects, []);
+      await repo.grantAccess(owner.id, ids[0], viewer.email, 'editor');
+      const changed = await repo.workspace(viewer.id, request);
+      assert.equal(changed.project._role, 'editor');
+      await repo.revokeAccess(owner.id, ids[0], viewer.id);
+      const removed = await repo.workspace(viewer.id, request);
+      assert.deepEqual(removed.projects, []);
+      assert.deepEqual(removed.myWork.ids, []);
+      const all = await repo.listProjects(owner.id);
+      assert.equal(all.length, 2);
+      assert.ok(all.every((p) => p.tasks.length === 3));
+    } finally {
+      try {
+        if (ids.length) await pool.query('DELETE FROM pm_projects WHERE id=ANY($1::uuid[])', [ids]);
+        if (users.length)
+          await pool.query('DELETE FROM pm_users WHERE id=ANY($1::uuid[])', [
+            users.map((u) => u.id),
+          ]);
+      } finally {
+        await pool.end();
+      }
+    }
+  },
+);
 import { pasteCells, duplicateTasks, reorderTasks, moveSchedule } from '../public/wbs-model.js';
 test(
   '실제 PostgreSQL: 운영 알림 설정 충돌·실패 집계·원자 lease·확인 경합과 재시도 제한',

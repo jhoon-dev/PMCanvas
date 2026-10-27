@@ -21,6 +21,7 @@ import { Federation } from './federation.mjs';
 import { registrationDecision, backupSettings } from './workspace-model.mjs';
 import { registrationConfig } from './registration.mjs';
 import { mailAddress } from './mailer.mjs';
+import { workspaceRequest } from './workspace-sync.mjs';
 
 export function createHandler({
   repo,
@@ -145,6 +146,8 @@ export function createHandler({
       'html.js',
       'account-ui.js',
       'my-work-ui.js',
+      'report-clock.js',
+      'workspace-cache.js',
       'info-dialog.js',
       'mail-settings-ui.js',
       'backup-settings-ui.js',
@@ -776,6 +779,12 @@ export function createHandler({
       }
       if (path === '/api/my-work' && method === 'GET')
         return json(res, 200, { projects: await repo.myWork(user.id) });
+      if (path === '/api/workspace/sync' && method === 'POST')
+        return json(
+          res,
+          200,
+          await repo.workspace(user.id, workspaceRequest(await readJson(req, 1048576))),
+        );
       if (path === '/api/trash' && method === 'GET')
         return json(res, 200, { items: await repo.listTrash(user.id) });
       const restoreMatch = path.match(/^\/api\/trash\/(project|tasks)\/([^/]+)\/restore$/);

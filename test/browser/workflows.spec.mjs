@@ -52,6 +52,64 @@ test.beforeEach(async ({ page }) => {
 test.afterEach(async ({ page }) => {
   expect(pageErrors.get(page)).toEqual([]);
 });
+
+test('다음 날 복귀 시 오늘 갱신·편집 내용 보존·과거 조회일 유지', async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2026-10-25T14:59:50Z'));
+  const session = await login(page);
+  const p = await createProject(page, session, { name: '날짜 갱신 검증' });
+  await selectProject(page, p, 'overview');
+  await expect(page.locator('#reportDate')).toHaveValue('2026-10-25');
+  await page.getByText('프로젝트 관리', { exact: true }).click();
+  await page.locator('[data-action=settings]').click();
+  const name = page.locator('#editorDialog [name=name]');
+  await name.fill('자정에도 보존되는 입력');
+  await page.clock.setFixedTime(new Date('2026-10-25T15:00:10Z'));
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await expect(name).toHaveValue('자정에도 보존되는 입력');
+  await expect(page.locator('#reportDate')).toHaveValue('2026-10-25');
+  await page.locator('#closeDialog').click();
+  await expect(page.locator('#reportDate')).toHaveValue('2026-10-26');
+  await page.locator('#reportDate').fill('2026-10-24');
+  await page.locator('#reportDate').press('Tab');
+  await page.clock.setFixedTime(new Date('2026-10-26T15:00:10Z'));
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await expect(page.locator('#reportDate')).toHaveValue('2026-10-24');
+  await page.locator('#reportDate').fill('2026-10-27');
+  await page.locator('#reportDate').press('Tab');
+  await expect(page.locator('#reportDate')).toHaveValue('2026-10-27');
+});
+
+test('프로젝트 목록은 요약·선택 상세만 동기화하고 캐시를 재사용', async ({ page }) => {
+  const session = await login(page);
+  const a = await createProject(page, session, { name: '요약 검증 A' }),
+    b = await createProject(page, session, { name: '요약 검증 B' });
+  let fullReads = 0;
+  page.on('request', (request) => {
+    if (request.method() === 'GET' && request.url().endsWith('/api/projects')) fullReads++;
+  });
+  const initial = page.waitForResponse((r) => r.url().endsWith('/workspace/sync'));
+  await page.reload();
+  const first = await (await initial).json();
+  expect(first.projects.some((p) => 'tasks' in p)).toBe(false);
+  expect(first.project).toBeTruthy();
+  const change = page.waitForResponse((r) => r.url().endsWith('/workspace/sync'));
+  await page.locator('#projectList [data-project="' + b.id + '"]').click();
+  const selected = await (await change).json();
+  expect(selected.project.id).toBe(b.id);
+  await expect(page.locator('#breadcrumbProject')).toHaveText(b.name);
+  const request = await page.request.post(api + 'workspace/sync', {
+    headers: { Origin: origin, 'X-CSRF-Token': session.csrf },
+    data: {
+      activeId: b.id,
+      known: [{ id: b.id, role: selected.project._role, revision: selected.project._revision }],
+      mine: [],
+    },
+  });
+  expect((await request.json()).project).toBeNull();
+  await page.locator('#projectList [data-project="' + a.id + '"]').click();
+  await expect(page.locator('#breadcrumbProject')).toHaveText(a.name);
+  expect(fullReads).toBe(0);
+});
 async function createProject(page, session, source = {}) {
   const p = {
     ...largeProject(),

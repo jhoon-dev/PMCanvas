@@ -27,6 +27,10 @@ DB 변경은 migrations/에 연속 번호의 `NNN_description.sql` 파일을 추
 
 실제 HTTP·TLS SMTP 검증은 RUN_HTTP_TESTS=1로, 실제 PostgreSQL 검증은 이름이 _test로 끝나는 별도 DB와 RUN_POSTGRES_TESTS=1로 실행합니다. CI는 포맷·단위/요청·HTTP/SMTP·PostgreSQL·의존성 감사·실제 백업 복원·CodeQL을 검사합니다.
 
+`RUN_RESTORE_TESTS=1 npm run test:restore`는 로컬 전용 `_test` DB 접속과 PostgreSQL 18의 pg_dump·pg_restore, CREATEDB 권한이 필요합니다. CI는 백업 이미지 안에서 실행합니다. 테스트는 무작위 이름의 원본·복원 DB를 새로 만들고 테스트 계정·메모리 암호화 키·loopback TLS SMTP 수신함만 사용합니다. 복원 후 세션·인증 요청·복구 코드 무효화, 관리자 로그인과 기존 MFA, 암호화된 SMTP 비밀번호를 통한 실제 발송, 업무 완료 기록과 조회자 수정 차단을 확인합니다. 자신이 만든 DB와 임시 덤프만 정리합니다. 운영 자격 증명이나 실제 메일 주소로 실행하지 마세요.
+
+프로젝트 목록 동기화는 `server/workspace-sync.mjs`와 `public/workspace-cache.js`에서 관리합니다. 요약·선택 상세·변경된 내 업무를 한 스냅샷에서 읽고, 캐시 키에 revision·역할·담당 계정을 포함합니다. 접근이 회수된 프로젝트와 계정 전환 시 이전 캐시를 제거해야 합니다. `report-clock.js`는 오늘 날짜와 과거 조회일을 분리하고, 편집 중에는 자동 조회일 전환을 보류합니다.
+
 `npm run test:browser`는 고정 버전 Playwright로 가입·메일 인증·MFA 승인·업무·완료·파일 다운로드·운영 알림·충돌·언어·모바일·500개 업무를 검증합니다. 먼저 `npx playwright install chromium --only-shell`을 실행하세요. 전용 서버는 4193/4192 포트에서만 실행되는 MemoryRepository·TLS SMTP 수신함입니다. 실패 리포트는 playwright-report/, trace와 스크린샷은 test-results/에 있으며 운영 인증 정보를 넣지 마세요. [Playwright 서버 설정](https://playwright.dev/docs/test-webserver), [CI 안내](https://playwright.dev/docs/ci)를 따릅니다.
 
 `npm run test:performance`는 500개 업무·20명·50개 상위 업무의 HTML 생성·검색·모델 편집·간트 이동을 각 5회 측정해 중앙값을 출력합니다. 네트워크·DB·브라우저 페인트 시간을 포함하지 않습니다. 숫자에 환경 의존성이 있으므로 동작 검증과 함께 비교하고 CI에 좁은 절대 시간 한도를 두지 않습니다.

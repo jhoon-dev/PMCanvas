@@ -363,6 +363,8 @@ networkTest('하위 경로 /pmcanvas에서 화면과 API 실행, 임의 파일�
     'project-merge.js',
     'conflict-ui.js',
     'alerts-ui.js',
+    'report-clock.js',
+    'workspace-cache.js',
   ]) {
     const response = await fetch(origin + '/pmcanvas/' + file);
     assert.equal(response.status, 200);

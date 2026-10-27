@@ -106,14 +106,14 @@ export function createReportUi({
   showAuth,
   openInfo,
   onImport,
-  currentDate = today(),
+  currentDate = today,
   document = globalThis.document,
   URL = globalThis.URL,
   schedule = setTimeout,
   uid = () => crypto.randomUUID(),
 }) {
   const $ = (s) => document.querySelector(s),
-    TODAY = currentDate;
+    currentDay = () => (typeof currentDate === 'function' ? currentDate() : currentDate);
   $('#backupButton').onclick = () => {
     const p = wbs.dirty && wbs.draft.id === project()?.id ? wbs.snapshot() : project();
     if (!p) {
@@ -138,7 +138,7 @@ export function createReportUi({
       url = URL.createObjectURL(blob),
       a = document.createElement('a');
     a.href = url;
-    a.download = 'PM-Canvas-' + p.name.replace(/[\\/:*?"<>|]/g, '_') + '-' + TODAY + '.json';
+    a.download = 'PM-Canvas-' + p.name.replace(/[\\/:*?"<>|]/g, '_') + '-' + currentDay() + '.json';
     a.click();
     schedule(() => URL.revokeObjectURL(url), 1000);
     toast(ui('프로젝트 백업을 내려받았습니다.'));

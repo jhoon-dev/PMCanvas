@@ -101,14 +101,29 @@ export function publicPathProblem(file) {
         'test-results',
         'playwright-report',
         '.ssh',
+        'secrets',
+        '.aws',
+        '.azure',
+        '.kube',
       ].includes(part.toLowerCase()),
     )
   )
     return 'PRIVATE_PATH';
   if (parts.some((part) => /^\.env(?:\.|$)/i.test(part) && part !== '.env.example'))
     return 'PRIVATE_ENV';
-  if (file.toLowerCase().startsWith('config/') && !publicConfig.has(file)) return 'PRIVATE_CONFIG';
-  if (file.toLowerCase().startsWith('certs/') && file !== 'certs/.gitkeep')
+  const configIndex = parts.findIndex((part) => part.toLowerCase() === 'config');
+  if (
+    configIndex >= 0 &&
+    configIndex < parts.length - 1 &&
+    !publicConfig.has(parts.slice(configIndex).join('/'))
+  )
+    return 'PRIVATE_CONFIG';
+  const certIndex = parts.findIndex((part) => part.toLowerCase() === 'certs');
+  if (
+    certIndex >= 0 &&
+    certIndex < parts.length - 1 &&
+    parts.slice(certIndex).join('/') !== 'certs/.gitkeep'
+  )
     return 'PRIVATE_CERTIFICATE';
   if (/\.(?:key|pem|p12|pfx|crt|dump|bak|zip)$/i.test(file)) return 'PRIVATE_OR_ARCHIVE_FILE';
   return null;
@@ -148,7 +163,9 @@ export function inspectPublicFile(file, bytes) {
     /\b(?:gh[pousr]_[A-Za-z0-9]{36,255}|github_pat_[A-Za-z0-9_]{60,255}|AKIA[A-Z0-9]{16})\b/g,
   ))
     add('ACCESS_TOKEN', match.index);
-  if (!publicExample(file)) return [...findings.values()];
+  const configIndex = file.split('/').indexOf('config');
+  const examplePath = configIndex >= 0 ? file.split('/').slice(configIndex).join('/') : file;
+  if (!publicExample(examplePath)) return [...findings.values()];
 
   for (const match of content.matchAll(
     /\b(?:https?|ldaps?|postgres(?:ql)?):\/\/(?:\$\{[^}\r\n]*\}|[^\s<>"'`])+/gi,
@@ -203,7 +220,7 @@ export function inspectPublicFile(file, bytes) {
   )) {
     if (!placeholder(match[1])) add('PERSONAL_HOME_PATH', match.index);
   }
-  if (publicConfig.has(file)) {
+  if (publicConfig.has(examplePath)) {
     try {
       const visit = (value, key = '') => {
         if (Array.isArray(value)) return value.forEach((item) => visit(item, key));

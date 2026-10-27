@@ -14,6 +14,37 @@ import { MailSettings } from '../server/mail-settings.mjs';
 const PASSWORD = 'a-test-password-12345',
   HASH = await hashPassword(PASSWORD);
 const ORIGIN = 'http://localhost:3000';
+
+test('워크스페이스 동기화: 인증·CSRF·요약·선택 상세·입력 검증', async (t) => {
+  const f = await fixture(t),
+    owner = await f.login('owner@example.com');
+  assert.equal(
+    (await f.call(f.client(), 'workspace/sync', { method: 'POST', body: {} })).status,
+    401,
+  );
+  assert.equal(
+    (
+      await f.call(owner, 'workspace/sync', {
+        method: 'POST',
+        body: {},
+        headers: { 'X-CSRF-Token': '' },
+      })
+    ).status,
+    403,
+  );
+  assert.equal(
+    (await f.call(owner, 'workspace/sync', { method: 'POST', body: { activeId: 'not-a-uuid' } }))
+      .status,
+    400,
+  );
+  const r = await f.call(owner, 'workspace/sync', { method: 'POST', body: {} });
+  assert.equal(r.status, 200);
+  assert.ok(Array.isArray(r.data.projects));
+  assert.equal(
+    r.data.projects.some((p) => 'tasks' in p),
+    false,
+  );
+});
 test('운영 알림 API는 관리자·CSRF·설정 revision을 검증하고 확인한 횟수 이후 실패를 보존', async (t) => {
   const f = await fixture(t),
     admin = await f.login('owner@example.com'),
@@ -627,6 +658,8 @@ test('하위 경로 /pmcanvas에서 화면과 API 실행, 임의 파일은 비�
     'project-merge.js',
     'conflict-ui.js',
     'alerts-ui.js',
+    'report-clock.js',
+    'workspace-cache.js',
   ]) {
     const response = await f.inject('/pmcanvas/' + file);
     assert.equal(response.status, 200);

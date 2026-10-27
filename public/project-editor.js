@@ -206,13 +206,13 @@ export function createProjectEditor({
   onReplace,
   failureMessage = () => ui('변경했지만 서버 저장에 실패했습니다. 백업을 내려받으세요.'),
   reload,
-  currentDate = today(),
+  currentDate = today,
   document = globalThis.document,
   confirm = globalThis.confirm,
   uid = () => crypto.randomUUID(),
 }) {
   const $ = (s) => document.querySelector(s),
-    TODAY = currentDate;
+    currentDay = () => (typeof currentDate === 'function' ? currentDate() : currentDate);
   let editor = null;
   function openEditor(type, id = '') {
     if (wbs.dirty) {
@@ -233,7 +233,7 @@ export function createProjectEditor({
     $('#deleteButton').textContent = type === 'settings' ? ui('프로젝트 삭제') : ui('삭제');
     $('#submitButton').textContent = type === 'project' ? ui('프로젝트 만들기') : ui('저장하기');
     const p = project();
-    const form = editorForm(type, p, id, { currentDate: TODAY, uid });
+    const form = editorForm(type, p, id, { currentDate: currentDay(), uid });
     const body = form.body;
     $('#dialogTitle').textContent = form.title;
     $('#dialogBody').innerHTML = body;
@@ -255,7 +255,7 @@ export function createProjectEditor({
         project: target,
         created,
         message,
-      } = applyEditor(p, editor, f, items, { uid, currentDate: TODAY });
+      } = applyEditor(p, editor, f, items, { uid, currentDate: currentDay() });
       if (created) onCreate(target);
       else onReplace(target);
       const saved = await persist();
