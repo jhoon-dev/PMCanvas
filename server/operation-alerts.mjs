@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { reviewRecipients } from './mail-settings.mjs';
 import { fail } from './errors.mjs';
+import { mailFailureCategories, mailDeliveryMethods } from './mail-failures.mjs';
 export const alertKinds = ['backup', 'restore', 'mail'];
 export async function recordFailure(pool, kind) {
   if (!alertKinds.includes(kind)) throw Error('Invalid operation alert kind.');
@@ -32,6 +33,27 @@ export class AlertRepository {
   recordOperationFailure(kind) {
     return recordFailure(this.pool, kind);
   }
+  async recordMailFailure({ category, method, responseCode }) {
+    if (
+      !mailFailureCategories.includes(category) ||
+      !mailDeliveryMethods.includes(method) ||
+      (responseCode !== null &&
+        (!Number.isInteger(responseCode) || responseCode < 400 || responseCode > 599))
+    )
+      throw Error('Invalid mail failure classification.');
+    return this.transaction(async (c) => {
+      await c.query(
+        `INSERT INTO pm_mail_failures(category) VALUES($1) ON CONFLICT(category) DO UPDATE SET occurrences=pm_mail_failures.occurrences+1,last_at=now()`,
+        [category],
+      );
+      if (category !== 'recipient') await recordFailure(c, 'mail');
+      await c.query("DELETE FROM pm_security_events WHERE at<now()-interval '90 days'");
+      await c.query(
+        "INSERT INTO pm_security_events(kind,details) VALUES ('mail.delivery.failed',$1::jsonb)",
+        [JSON.stringify({ category, method, responseCode })],
+      );
+    });
+  }
   async operationAlerts() {
     const settings = (
       await this.pool.query(
@@ -43,7 +65,12 @@ export class AlertRepository {
         'SELECT kind,occurrences::integer,first_at AS "firstAt",last_at AS "lastAt",acknowledged::integer,notified::integer,attempts FROM pm_operation_alerts ORDER BY last_at DESC',
       )
     ).rows;
-    return { settings, alerts };
+    const mailFailures = (
+      await this.pool.query(
+        'SELECT category,occurrences::integer,first_at AS "firstAt",last_at AS "lastAt" FROM pm_mail_failures ORDER BY category',
+      )
+    ).rows;
+    return { settings, alerts, mailFailures };
   }
   async saveAlertSettings(actorId, body) {
     const b = alertConfig(body);

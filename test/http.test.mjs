@@ -75,6 +75,13 @@ test('운영 알림 API는 관리자·CSRF·설정 revision을 검증하고 확�
   );
   await f.repo.recordOperationFailure('mail');
   await f.repo.recordOperationFailure('mail');
+  await f.repo.recordMailFailure({
+    category: 'recipient',
+    method: 'sendVerification',
+    responseCode: 550,
+  });
+  const detail = await f.call(admin, 'admin/alerts');
+  assert.equal(detail.data.mailFailures.find((row) => row.category === 'recipient').occurrences, 1);
   assert.equal(
     (
       await f.call(member, 'admin/alerts/acknowledge', {

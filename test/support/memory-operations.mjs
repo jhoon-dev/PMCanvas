@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { fail } from '../../server/errors.mjs';
 import { deletedTaskBundle, restoreTaskBundle } from '../../server/workspace-model.mjs';
 import { alertConfig, alertKinds } from '../../server/operation-alerts.mjs';
+import { mailFailureCategories, mailDeliveryMethods } from '../../server/mail-failures.mjs';
 export class MemoryOperations {
   async operationAlerts() {
     this.alertSettings ??= { enabled: false, recipients: [], revision: 0 };
@@ -9,7 +10,32 @@ export class MemoryOperations {
     return {
       settings: structuredClone(this.alertSettings),
       alerts: structuredClone([...this.operationFailures.values()]),
+      mailFailures: structuredClone([...(this.mailFailures?.values() || [])]),
     };
+  }
+  async recordMailFailure(details) {
+    const { category, method, responseCode } = details;
+    if (
+      !mailFailureCategories.includes(category) ||
+      !mailDeliveryMethods.includes(method) ||
+      (responseCode !== null &&
+        (!Number.isInteger(responseCode) || responseCode < 400 || responseCode > 599))
+    )
+      throw Error('Invalid mail failure classification.');
+    this.mailFailures ??= new Map();
+    const now = new Date().toISOString(),
+      old = this.mailFailures.get(category);
+    this.mailFailures.set(category, {
+      category,
+      occurrences: (old?.occurrences || 0) + 1,
+      firstAt: old?.firstAt || now,
+      lastAt: now,
+    });
+    if (category !== 'recipient') await this.recordOperationFailure('mail');
+    await this.securityEvent({
+      kind: 'mail.delivery.failed',
+      details: { category, method, responseCode },
+    });
   }
   async recordOperationFailure(kind) {
     if (!alertKinds.includes(kind)) throw Error('Invalid operation alert kind.');

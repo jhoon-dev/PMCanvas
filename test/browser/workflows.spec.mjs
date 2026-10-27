@@ -303,6 +303,8 @@ test('가입 → 로컬 인증 메일 → 관리자 MFA 승인 → 업무 등록
   await admin.getByText('운영 상태', { exact: true }).click();
   await admin.locator('[data-action=operation-alerts]').click();
   await expect(admin.locator('.operation-alert-list')).toContainText('메일 발송 실패');
+  await admin.getByText('메일 실패 상세', { exact: true }).click();
+  await expect(admin.locator('#operationAlertsHost')).toContainText('SMTP 연결 실패');
   await admin.locator('#alertSettingsForm [name=enabled]').check();
   await admin.locator('#alertSettingsForm [name=recipients]').fill('admin@example.com');
   await admin.locator('#alertSettingsForm .primary').click();

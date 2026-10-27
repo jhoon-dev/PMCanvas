@@ -4,6 +4,7 @@ import { hkdfSync } from 'node:crypto';
 import { seal, unseal } from './admin-mfa.mjs';
 import { fail } from './errors.mjs';
 import { mailConfig, createMailer, mailAddress } from './mailer.mjs';
+import { classifyMailFailure } from './mail-failures.mjs';
 
 export function reviewRecipients(value = []) {
   if (typeof value === 'string') {
@@ -198,7 +199,7 @@ export class MailSettings {
       else await mailer.sendTest(argument);
     } catch (error) {
       if (mailer && method !== 'sendOperationAlert')
-        await this.repo.recordOperationFailure?.('mail').catch(() => {});
+        await this.repo.recordMailFailure?.(classifyMailFailure(error, method)).catch(() => {});
       throw error;
     } finally {
       mailer?.close();

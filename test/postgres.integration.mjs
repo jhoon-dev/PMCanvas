@@ -14,6 +14,93 @@ import { workspaceRequest } from '../server/workspace-sync.mjs';
 import { workspaceKnowledge } from '../public/workspace-cache.js';
 
 test(
+  '실제 PostgreSQL: 메일 오류 집계·운영 알림 원자 증가·수신자 제외·검증과 민감정보 없는 이력',
+  { skip: process.env.RUN_POSTGRES_TESTS !== '1' },
+  async () => {
+    if (!/_test$/.test(process.env.PGDATABASE || ''))
+      throw Error('Dedicated _test database required.');
+    const pool = await createPool(),
+      repo = new PgRepository(pool);
+    try {
+      await migrate(pool);
+      await pool.query("DELETE FROM pm_operation_alerts WHERE kind='mail'");
+      await pool.query('DELETE FROM pm_mail_failures');
+      await repo.recordMailFailure({
+        category: 'recipient',
+        method: 'sendVerification',
+        responseCode: 550,
+      });
+      assert.equal(
+        (await repo.operationAlerts()).alerts.some((a) => a.kind === 'mail'),
+        false,
+      );
+      await Promise.all(
+        Array.from({ length: 12 }, () =>
+          repo.recordMailFailure({ category: 'auth', method: 'sendReset', responseCode: 535 }),
+        ),
+      );
+      const state = await repo.operationAlerts();
+      assert.equal(state.alerts.find((a) => a.kind === 'mail').occurrences, 12);
+      assert.equal(state.mailFailures.find((a) => a.category === 'auth').occurrences, 12);
+      assert.equal(state.mailFailures.find((a) => a.category === 'recipient').occurrences, 1);
+      const events = (await repo.securityEvents()).filter((e) => e.kind === 'mail.delivery.failed');
+      assert.equal(events.length, 13);
+      assert.deepEqual(Object.keys(events[0].details).sort(), [
+        'category',
+        'method',
+        'responseCode',
+      ]);
+      for (const details of [
+        { category: 'invalid', method: 'sendReset', responseCode: null },
+        { category: 'auth', method: 'sendOperationAlert', responseCode: 535 },
+        { category: 'auth', method: 'sendReset', responseCode: 'private value' },
+      ])
+        await assert.rejects(repo.recordMailFailure(details));
+      assert.equal(
+        (await repo.operationAlerts()).alerts.find((a) => a.kind === 'mail').occurrences,
+        12,
+      );
+      const transaction = repo.transaction.bind(repo);
+      repo.transaction = (fn) =>
+        transaction((c) =>
+          fn({
+            query: (sql, params) => {
+              if (sql.includes('INSERT INTO pm_security_events'))
+                throw Error('injected audit failure');
+              return c.query(sql, params);
+            },
+          }),
+        );
+      try {
+        await assert.rejects(
+          repo.recordMailFailure({
+            category: 'connection',
+            method: 'sendTest',
+            responseCode: null,
+          }),
+        );
+      } finally {
+        repo.transaction = transaction;
+      }
+      const rolledBack = await repo.operationAlerts();
+      assert.equal(
+        rolledBack.mailFailures.some((row) => row.category === 'connection'),
+        false,
+      );
+      assert.equal(rolledBack.alerts.find((row) => row.kind === 'mail').occurrences, 12);
+    } finally {
+      try {
+        await pool.query('DELETE FROM pm_mail_failures');
+        await pool.query("DELETE FROM pm_operation_alerts WHERE kind='mail'");
+        await pool.query("DELETE FROM pm_security_events WHERE kind='mail.delivery.failed'");
+      } finally {
+        await pool.end();
+      }
+    }
+  },
+);
+
+test(
   '실제 PostgreSQL: 증분 요약·일괄 수화·내 담당 필터·역할 변경·접근 회수·무변경 1회 조회',
   { skip: process.env.RUN_POSTGRES_TESTS !== '1' },
   async () => {

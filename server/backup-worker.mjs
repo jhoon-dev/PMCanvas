@@ -7,6 +7,17 @@ import { createPool } from './pg-pool.mjs';
 import { migrationFiles } from './migrations.mjs';
 import { recordFailure } from './operation-alerts.mjs';
 
+export const backupStages = Object.freeze({
+  prepare: { label: '준비', kind: 'backup' },
+  dump: { label: 'DB 백업', kind: 'backup' },
+  archive: { label: '백업 파일 확인', kind: 'backup' },
+  create: { label: '복원 점검용 DB 생성', kind: 'restore' },
+  restore: { label: '별도 DB 복원', kind: 'restore' },
+  verify: { label: '복원 데이터 확인', kind: 'restore' },
+  retain: { label: '보관 기간 정리', kind: 'backup' },
+  cleanup: { label: '점검용 DB 정리', kind: 'restore' },
+});
+
 export function runCommand(command, args, env) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, { env, stdio: 'ignore', shell: false, timeout: 600000 });
@@ -101,7 +112,7 @@ export class BackupWorker {
       file = path.join(this.directory, filename),
       partial = file + '.partial',
       target = 'pmcanvas_verify_' + job.id.replaceAll('-', '');
-    let stage = '준비',
+    let stage = 'prepare',
       created = false,
       verified = false,
       bytes = 0,
@@ -127,28 +138,28 @@ export class BackupWorker {
         job.id,
         createHash('sha256').update(key).digest('hex'),
       ]);
-      stage = 'DB 백업';
+      stage = 'dump';
       const handle = await fs.open(partial, 'wx', 0o600);
       ownsPartial = true;
       await handle.close();
       await this.command('pg_dump', ['-Fc', '--file', partial], this.env);
       bytes = (await fs.stat(partial)).size;
       if (!bytes) throw Error('Empty dump');
-      stage = '백업 파일 확인';
+      stage = 'archive';
       await this.command('pg_restore', ['--list', partial], this.env);
       // Publish only a complete archive; interrupted files never look like usable dumps.
       await fs.rename(partial, file);
       ownsPartial = false;
       published = true;
       if (job.verify_restore) {
-        stage = '복원 점검용 DB 생성';
+        stage = 'create';
         if (!/^pmcanvas_verify_[a-f0-9]{32}$/.test(target) || target === this.env.PGDATABASE)
           throw Error('Invalid target');
         const owner = this.env.BACKUP_RESTORE_OWNER || 'pmcanvas';
         if (!/^[a-z][a-z0-9_]{0,62}$/.test(owner)) throw Error('Invalid owner');
         await this.command('createdb', ['--owner', owner, target], this.env);
         created = true;
-        stage = '별도 DB 복원';
+        stage = 'restore';
         await this.command(
           'pg_restore',
           [
@@ -164,7 +175,7 @@ export class BackupWorker {
           ],
           this.env,
         );
-        stage = '복원 데이터 확인';
+        stage = 'verify';
         const check = await this.connect({ ...this.env, PGDATABASE: target });
         try {
           const expected = migrationFiles().map(({ version }) => version);
@@ -187,10 +198,10 @@ export class BackupWorker {
           await check.end();
         }
       }
-      stage = '보관 기간 정리';
+      stage = 'retain';
       await this.retain(job.retention_days);
       if (created) {
-        stage = '점검용 DB 정리';
+        stage = 'cleanup';
         await this.command('dropdb', ['--force', target], this.env);
         created = false;
       }
@@ -221,15 +232,13 @@ export class BackupWorker {
           job.id,
           published ? filename : partialCleanupFailed ? filename + '.partial' : null,
           published || partialCleanupFailed ? bytes : 0,
-          stage +
+          backupStages[stage].label +
             ' 단계에서 실패했습니다.' +
             (cleanupFailed ? ' 점검용 DB 수동 정리가 필요합니다.' : '') +
             (partialCleanupFailed ? ' 불완전한 백업 파일 수동 정리가 필요합니다.' : ''),
         ],
       );
-      await recordFailure(this.pool, /복원|점검/.test(stage) ? 'restore' : 'backup').catch(
-        () => {},
-      );
+      await recordFailure(this.pool, backupStages[stage].kind).catch(() => {});
     } finally {
       clearInterval(heartbeat);
       await this.pool.query(

@@ -1,5 +1,13 @@
 // UI literals only. User-entered content never passes through this catalog.
 export default {
+  'SMTP 연결 실패': 'SMTP connection failure',
+  'SMTP 보안 연결 실패': 'SMTP TLS failure',
+  'SMTP 인증 실패': 'SMTP authentication failure',
+  '수신자 거부': 'Recipient rejected',
+  '기타 메일 실패': 'Other mail failure',
+  '메일 실패 상세': 'Mail failure details',
+  '분류별 누적 횟수입니다. 명확한 수신자 거부는 운영 알림에서 제외하며, 이전 실패는 소급 분류하지 않습니다.':
+    'Totals by category. Clear recipient rejections do not trigger operation alerts. Earlier failures are not reclassified.',
   '복구 입력: ': 'Restored input: ',
   '백업의 미확정 셀 형식을 확인해 주세요.': 'Check the uncommitted cell data in this backup.',
   '백업의 미확정 입력을 복구했습니다. 내용을 확인한 뒤 저장해 주세요.':

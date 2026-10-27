@@ -5,7 +5,14 @@ export const operationLabels = {
   restore: ui('복원 점검 실패'),
   mail: ui('메일 발송 실패'),
 };
-export function alertsBody({ settings, alerts }) {
+export function alertsBody({ settings, alerts, mailFailures = [] }) {
+  const labels = {
+    connection: ui('SMTP 연결 실패'),
+    tls: ui('SMTP 보안 연결 실패'),
+    auth: ui('SMTP 인증 실패'),
+    recipient: ui('수신자 거부'),
+    other: ui('기타 메일 실패'),
+  };
   return (
     ui(
       '<p>백업·복원 점검·메일 발송 실패만 알립니다. 같은 종류는 묶어서 최대 한 시간에 한 번 발송하며, 실패한 알림 메일은 최대 3회 시도합니다.</p>',
@@ -35,6 +42,28 @@ export function alertsBody({ settings, alerts }) {
       )
       .join('') || ui('<p class="notice">확인할 운영 실패 알림이 없습니다.</p>')) +
     '</div>' +
+    (mailFailures.length
+      ? '<details class="account-section"><summary>' +
+        ui('메일 실패 상세') +
+        '</summary><p class="subtle">' +
+        ui(
+          '분류별 누적 횟수입니다. 명확한 수신자 거부는 운영 알림에서 제외하며, 이전 실패는 소급 분류하지 않습니다.',
+        ) +
+        '</p>' +
+        mailFailures
+          .map(
+            (row) =>
+              '<p><strong>' +
+              esc(labels[row.category] || row.category) +
+              '</strong> · ' +
+              esc(row.occurrences) +
+              ui('회 · ') +
+              esc(row.lastAt) +
+              '</p>',
+          )
+          .join('') +
+        '</details>'
+      : '') +
     '<form id="alertSettingsForm" class="server-form"><label class="toggle-label"><input type="checkbox" name="enabled" ' +
     (settings.enabled ? 'checked' : '') +
     ui(

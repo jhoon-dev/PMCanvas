@@ -68,6 +68,13 @@ export function mailConfig(raw, { directory = process.cwd(), password } = {}) {
 export function createMailer(config, { createTransport = nodemailer.createTransport } = {}) {
   if (!config) return null;
   const transport = createTransport(config.transport);
+  const checkDelivery = (info) => {
+    if (!info.accepted?.length || info.rejected?.length)
+      throw (
+        info.rejectedErrors?.[0] ||
+        Object.assign(Error('SMTP recipient rejected'), { code: 'MAIL_REJECTED' })
+      );
+  };
   return {
     async sendReset({ to, url }) {
       const info = await transport.sendMail({
@@ -80,8 +87,7 @@ export function createMailer(config, { createTransport = nodemailer.createTransp
           url +
           '\n\n요청하지 않았다면 이 메일을 무시하세요. 비밀번호는 링크에서 변경을 완료하기 전까지 유지됩니다.',
       });
-      if (!info.accepted?.length || info.rejected?.length)
-        throw Object.assign(Error('SMTP recipient rejected'), { code: 'MAIL_REJECTED' });
+      checkDelivery(info);
     },
     async sendVerification({ to, url }) {
       const info = await transport.sendMail({
@@ -94,8 +100,7 @@ export function createMailer(config, { createTransport = nodemailer.createTransp
           url +
           '\n\n직접 가입하지 않았다면 이 메일을 무시하세요. 링크를 열기만 해서는 계정이 인증되거나 활성화되지 않습니다.',
       });
-      if (!info.accepted?.length || info.rejected?.length)
-        throw Object.assign(Error('SMTP recipient rejected'), { code: 'MAIL_REJECTED' });
+      checkDelivery(info);
     },
     async sendReviewRequest({ to, url, name, email }) {
       const info = await transport.sendMail({
@@ -112,8 +117,7 @@ export function createMailer(config, { createTransport = nodemailer.createTransp
           url +
           '\n\n링크를 열거나 이 메일에 답장하는 것만으로는 승인되지 않습니다. 이미 처리한 신청이라면 이 알림을 무시하세요.',
       });
-      if (!info.accepted?.length || info.rejected?.length)
-        throw Object.assign(Error('SMTP recipient rejected'), { code: 'MAIL_REJECTED' });
+      checkDelivery(info);
     },
     async sendApproval({ to, url }) {
       const info = await transport.sendMail({
@@ -126,8 +130,7 @@ export function createMailer(config, { createTransport = nodemailer.createTransp
           url +
           '\n\n이 메일에는 비밀번호가 포함되어 있지 않습니다. 비밀번호를 잊으셨다면 로그인 화면에서 비밀번호 찾기를 이용하세요.',
       });
-      if (!info.accepted?.length || info.rejected?.length)
-        throw Object.assign(Error('SMTP recipient rejected'), { code: 'MAIL_REJECTED' });
+      checkDelivery(info);
     },
     async sendTest(to) {
       const info = await transport.sendMail({
@@ -136,8 +139,7 @@ export function createMailer(config, { createTransport = nodemailer.createTransp
         subject: '[PM Canvas] 테스트 메일',
         text: 'PM Canvas 관리자 화면에서 요청한 테스트 메일입니다.\n\n이 메일이 도착했다면 현재 SMTP 설정으로 메일을 전달할 수 있습니다.',
       });
-      if (!info.accepted?.length || info.rejected?.length)
-        throw Object.assign(Error('SMTP recipient rejected'), { code: 'MAIL_REJECTED' });
+      checkDelivery(info);
     },
     async sendOperationAlert({ to, kind, count, url }) {
       const labels = {
@@ -157,7 +159,7 @@ export function createMailer(config, { createTransport = nodemailer.createTransp
           url +
           '\n\n메일 발송 장애에서는 이 알림도 도착하지 않을 수 있습니다. 관리자 화면에서도 확인하세요. / During an SMTP outage, check the administrator screen directly.',
       });
-      if (!info.accepted?.length || info.rejected?.length) throw Error('SMTP recipient rejected');
+      checkDelivery(info);
     },
     verify: () => transport.verify(),
     close: () => transport.close(),

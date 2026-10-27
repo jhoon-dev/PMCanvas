@@ -4,9 +4,38 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { BackupWorker, automaticBackupFile } from '../server/backup-worker.mjs';
+import { BackupWorker, automaticBackupFile, backupStages } from '../server/backup-worker.mjs';
 import { migrationFiles } from '../server/migrations.mjs';
 const expectedVersions = migrationFiles().map(({ version }) => version);
+
+test('백업 실패 분류는 단계 코드에 고정되고 표시 문구 변경에 의존하지 않음', async (t) => {
+  const oldLabel = backupStages.create.label;
+  try {
+    backupStages.create.label = 'Create verification database';
+    const f = await fixture(t, { failAt: 'createdb' });
+    await f.worker.execute(f.job);
+    const failure = f.queries.find((q) => q.sql.includes("state='failed'"));
+    assert.match(failure.args[3], /Create verification database/);
+    assert.deepEqual(
+      f.queries.find((q) => q.sql.includes('INSERT INTO pm_operation_alerts')).args,
+      ['restore'],
+    );
+  } finally {
+    backupStages.create.label = oldLabel;
+  }
+  for (const [command, kind] of [
+    ['pg_dump', 'backup'],
+    ['pg_restore', 'backup'],
+    ['dropdb', 'restore'],
+  ]) {
+    const f = await fixture(t, { failAt: command });
+    await f.worker.execute(f.job);
+    assert.deepEqual(
+      f.queries.find((q) => q.sql.includes('INSERT INTO pm_operation_alerts')).args,
+      [kind],
+    );
+  }
+});
 async function fixture(t, { failAt = '', verify = true, versions = expectedVersions } = {}) {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'pmcanvas-backup-test-'));
   t.after(() => fs.rm(directory, { recursive: true, force: true }));

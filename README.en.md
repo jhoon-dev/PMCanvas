@@ -1,4 +1,4 @@
-# PM Canvas 0.20.3
+# PM Canvas 0.20.4
 
 English · [한국어](README.md)
 
@@ -28,6 +28,8 @@ Concurrent changes are compared against the last loaded version. Independent cha
 ## Operations
 
 Administrator settings contain users, email, authentication/security and backups. Under **Authentication & security → Operations status**, configure failure alerts for backup, restore verification and email delivery. Alerts are disabled until configured. Blank recipients use active administrators; custom recipient lists support up to ten addresses. Incidents are grouped by type, delivered at most hourly and attempted up to three times. SMTP failures may also prevent alert delivery, so check the in-app status. Acknowledging a count preserves later failures.
+
+Mail failure details distinguish connection, TLS, authentication, recipient and other failures. Clear permanent recipient address/mailbox rejections are recorded without triggering operational email alerts. Policy, temporary and ambiguous failures still alert. Earlier failures are not reclassified. SMTP responses, recipient addresses and credentials are excluded from these diagnostic records.
 
 Back up the database before upgrades. Keep the DB dumps and encryption key in separate external locations. JSON export moves individual projects; it does not restore all accounts, permissions or history.
 

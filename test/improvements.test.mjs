@@ -277,7 +277,7 @@ test('SMTP 장애의 알림 발송 실패는 재귀 실패 알림을 만들지 �
     claimed = false;
   const repo = {
     getMailSettings: async () => null,
-    recordOperationFailure: async (kind) => recorded.push(kind),
+    recordMailFailure: async ({ category }) => recorded.push(category),
     claimOperationAlert: async () =>
       claimed
         ? null
@@ -312,11 +312,11 @@ test('SMTP 장애의 알림 발송 실패는 재귀 실패 알림을 만들지 �
     }),
   });
   await assert.rejects(settings.sendReset({ to: 'a@example.com', url: 'https://example.com' }));
-  assert.deepEqual(recorded, ['mail']);
+  assert.deepEqual(recorded, ['other']);
   const alerts = new OperationAlerts({ repo, mailer: settings, origin: 'https://example.com' });
   await alerts.tick();
   assert.equal(finished, false);
-  assert.deepEqual(recorded, ['mail']);
+  assert.deepEqual(recorded, ['other']);
 });
 test('알림 UI는 수신 주소·시각을 이스케이프하고 SMTP 장애 한계를 표시', () => {
   const html = alertsBody({

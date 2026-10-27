@@ -25,6 +25,8 @@ git config blame.ignoreRevsFile .git-blame-ignore-revs
 
 DB 변경은 migrations/에 연속 번호의 `NNN_description.sql` 파일을 추가합니다. 서버가 번호 순서로 발견하고 트랜잭션·advisory lock 안에서 미적용 파일만 실행합니다. 기존 마이그레이션은 수정하지 않습니다. 파일 누락·중복·잘못된 이름은 기동 실패로 알려줍니다.
 
+메일 실패 분류는 `server/mail-failures.mjs`에서 관리합니다. 현지화된 오류 문구로 분류하지 말고 구조화된 코드·SMTP 명령·상태를 확인하세요. 불명확한 수신 거부를 운영 알림에서 제외하지 않습니다. 진단 기록에는 원문 오류나 주소를 전달하지 않습니다. `recordMailFailure`는 집계·운영 알림·감사 기록을 함께 커밋하며, 알림 발송 실패를 재귀 집계하지 않습니다. 백업은 `backupStages`의 단계 코드로 진행하고 표시 이름과 실패 종류를 구분합니다.
+
 실제 HTTP·TLS SMTP 검증은 RUN_HTTP_TESTS=1로, 실제 PostgreSQL 검증은 이름이 _test로 끝나는 별도 DB와 RUN_POSTGRES_TESTS=1로 실행합니다. CI는 포맷·단위/요청·HTTP/SMTP·PostgreSQL·의존성 감사·실제 백업 복원·CodeQL을 검사합니다.
 
 `RUN_RESTORE_TESTS=1 npm run test:restore`는 로컬 전용 `_test` DB 접속과 PostgreSQL 18의 pg_dump·pg_restore, CREATEDB 권한이 필요합니다. CI는 백업 이미지 안에서 실행합니다. 테스트는 무작위 이름의 원본·복원 DB를 새로 만들고 테스트 계정·메모리 암호화 키·loopback TLS SMTP 수신함만 사용합니다. 복원 후 세션·인증 요청·복구 코드 무효화, 관리자 로그인과 기존 MFA, 암호화된 SMTP 비밀번호를 통한 실제 발송, 업무 완료 기록과 조회자 수정 차단을 확인합니다. 자신이 만든 DB와 임시 덤프만 정리합니다. 운영 자격 증명이나 실제 메일 주소로 실행하지 마세요.

@@ -14,6 +14,76 @@ import { OperationAlerts } from '../server/operation-alerts.mjs';
 import { smtpFixture, resetLink, verificationLink, mailText } from './support/smtp-fixture.mjs';
 const networkTest = (name, fn) => test(name, { skip: process.env.RUN_HTTP_TESTS !== '1' }, fn);
 networkTest(
+  '실제 TLS SMTP: 수신자 거부·정책·인증·인증서·연결 실패 분리와 민감정보 없는 기록',
+  async (t) => {
+    const replies = { rcpt: '550 5.1.1 mailbox does not exist' };
+    const smtp = await smtpFixture(replies);
+    t.after(() => smtp.close());
+    const repo = new MemoryRepository();
+    let servername = 'localhost';
+    const settings = new MailSettings({
+      repo,
+      key: Buffer.alloc(32, 9),
+      legacy: {
+        config: {
+          enabled: true,
+          host: '127.0.0.1',
+          port: smtp.port,
+          secure: true,
+          from: 'sender@example.com',
+          authEnabled: true,
+          username: 'fixture',
+        },
+        password: 'test-only-secret',
+      },
+      makeMailer: (config) =>
+        createMailer({
+          ...config,
+          transport: {
+            ...config.transport,
+            tls: { ca: smtp.ca, servername, rejectUnauthorized: true },
+          },
+        }),
+    });
+    const send = () =>
+      settings.sendReset({ to: 'receiver@example.com', url: 'https://example.com/#reset' });
+    await assert.rejects(send());
+    assert.equal((await repo.operationAlerts()).alerts.length, 0);
+    replies.rcpt = '550 5.7.1 relay denied';
+    await assert.rejects(send());
+    settings.legacy.password = 'invalid-fixture-password';
+    await assert.rejects(send());
+    settings.legacy.password = 'test-only-secret';
+    servername = 'invalid.example';
+    await assert.rejects(send());
+    servername = 'localhost';
+    const closed = netServer();
+    closed.listen(0, '127.0.0.1');
+    await once(closed, 'listening');
+    settings.legacy.config.port = closed.address().port;
+    await new Promise((resolve) => closed.close(resolve));
+    await assert.rejects(send());
+    const result = await repo.operationAlerts();
+    assert.deepEqual(result.mailFailures.map((row) => row.category).sort(), [
+      'auth',
+      'connection',
+      'other',
+      'recipient',
+      'tls',
+    ]);
+    assert.equal(result.alerts.find((row) => row.kind === 'mail').occurrences, 4);
+    assert.equal(smtp.messages.length, 0);
+    const events = (await repo.securityEvents()).filter(
+      (row) => row.kind === 'mail.delivery.failed',
+    );
+    assert.equal(events.length, 5);
+    assert.doesNotMatch(
+      JSON.stringify(events),
+      /receiver@|test-only-secret|invalid-fixture-password|relay denied/,
+    );
+  },
+);
+networkTest(
   '운영 실패 알림은 실제 TLS SMTP로 수신자별 전달하고 반복 tick에서 재발송하지 않음',
   async (t) => {
     const smtp = await smtpFixture();

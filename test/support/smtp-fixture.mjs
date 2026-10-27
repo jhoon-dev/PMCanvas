@@ -3,7 +3,7 @@ import { once } from 'node:events';
 import { generate } from 'selfsigned';
 
 // A loopback TLS SMTP receiver for integration tests; never forwards mail.
-export async function smtpFixture() {
+export async function smtpFixture(replies = {}) {
   const cert = await generate([{ name: 'commonName', value: 'localhost' }], {
       days: 1,
       keySize: 2048,
@@ -43,8 +43,8 @@ export async function smtpFixture() {
               ? '235 Authentication successful\r\n'
               : '535 Authentication failed\r\n',
           );
-        else if (['MAIL', 'RCPT', 'RSET', 'NOOP', 'HELO'].includes(command))
-          socket.write('250 OK\r\n');
+        else if (command === 'RCPT') socket.write((replies.rcpt || '250 OK') + '\r\n');
+        else if (['MAIL', 'RSET', 'NOOP', 'HELO'].includes(command)) socket.write('250 OK\r\n');
         else if (command === 'DATA') {
           data = [];
           socket.write('354 Send message\r\n');
