@@ -2,7 +2,25 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { workspaceRequest, syncWorkspace } from '../server/workspace-sync.mjs';
-import { workspaceKnowledge, applyWorkspaceSync } from '../public/workspace-cache.js';
+import {
+  workspaceKnowledge,
+  applyWorkspaceSync,
+  WorkspaceReadGate,
+} from '../public/workspace-cache.js';
+
+test('워크스페이스 조회 순서는 계정 전환·새 저장·최신 동기화 이후의 오래된 응답을 거절', () => {
+  const reads = new WorkspaceReadGate();
+  const oldAccount = reads.begin('alice', 1);
+  assert.equal(reads.accepts(oldAccount, 'bob', 1), false);
+  reads.invalidate();
+  assert.equal(reads.accepts(oldAccount, 'alice', 1), false);
+  const beforeSave = reads.begin('bob', 1);
+  assert.equal(reads.accepts(beforeSave, 'bob', 2), false);
+  const oldMine = reads.begin('bob', 2);
+  const sync = reads.begin('bob', 2);
+  assert.equal(reads.accepts(oldMine, 'bob', 2), false);
+  assert.equal(reads.accepts(sync, 'bob', 2), true);
+});
 import { PgRepository } from '../server/postgres.mjs';
 
 const row = (member_id = null) => ({

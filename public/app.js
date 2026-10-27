@@ -14,7 +14,7 @@ import { createInfoDialog } from './info-dialog.js';
 import { DraftStore } from './draft-store.js';
 import { api } from './api-client.js';
 import { ReportClock } from './report-clock.js';
-import { workspaceKnowledge, applyWorkspaceSync } from './workspace-cache.js';
+import { workspaceKnowledge, applyWorkspaceSync, WorkspaceReadGate } from './workspace-cache.js';
 import { myWorkView } from './my-work-ui.js';
 import { WbsView } from './wbs-view.js';
 import { dashboardView } from './dashboard-view.js';
@@ -23,7 +23,6 @@ import { today, progress, summary } from './engine.js';
 let currentUser = null,
   saveInFlight = false,
   mutationSequence = 0,
-  fetchSequence = 0,
   myProjects = [],
   dailyMode = 'mine';
 let reviewLanding = location.hash === '#registration-approvals';
@@ -41,9 +40,10 @@ let state = { version: 1, projects: [], activeId: null },
   onlyPending = false;
 const project = () => state.projects.find((p) => p.id === state.activeId);
 const savedProjects = new Map();
+const workspaceReads = new WorkspaceReadGate();
 function clearAccountWorkspace() {
   mutationSequence++;
-  fetchSequence++;
+  workspaceReads.invalidate();
   state = { version: 1, projects: [], activeId: null };
   myProjects = [];
   storageError = '';
@@ -84,6 +84,7 @@ async function persist() {
       body: { project: p, ...(p._revision ? { revision: p._revision } : {}) },
     });
     state.projects[state.projects.findIndex((x) => x.id === p.id)] = result.project;
+    wbs.rebaseCreatedProject(result.project);
     savedProjects.set(p.id, structuredClone(result.project));
     storageError = '';
     $('#saveStatus').textContent = ui('서버에 저장됨');
@@ -464,8 +465,7 @@ function showAuth(message = '') {
 }
 async function loadProjects({ force = false, activeId = state.activeId } = {}) {
   if (wbs.dirty || wbs.interacting) return false;
-  const checkpoint = mutationSequence,
-    request = ++fetchSequence;
+  const request = workspaceReads.begin(currentUser?.id, mutationSequence);
   const data = await api('workspace/sync', {
     method: 'POST',
     body: {
@@ -477,8 +477,7 @@ async function loadProjects({ force = false, activeId = state.activeId } = {}) {
   if (
     wbs.dirty ||
     wbs.interacting ||
-    request !== fetchSequence ||
-    checkpoint !== mutationSequence ||
+    !workspaceReads.accepts(request, currentUser?.id, mutationSequence) ||
     (!force && (saveInFlight || storageError || $('#editorDialog').open))
   )
     return false;
@@ -635,8 +634,10 @@ function opsCanChange() {
   return true;
 }
 async function refreshMyWork() {
+  const request = workspaceReads.begin(currentUser?.id, mutationSequence);
   try {
     const r = await api('my-work');
+    if (!workspaceReads.accepts(request, currentUser?.id, mutationSequence)) return;
     myProjects = r.projects;
     if (view === 'daily' && dailyMode === 'mine') render();
   } catch {
@@ -692,6 +693,7 @@ const reports = createReportUi({
   showAuth,
   openInfo,
   currentDate: today,
+  onPendingRestored: () => navigate('tasks'),
   onImport(p) {
     state.projects.push(p);
     state.activeId = p.id;

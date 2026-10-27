@@ -4,6 +4,7 @@ import { escapeHtml as esc } from './html.js';
 import { num } from './view-ui.js';
 import { today, addDays, summary, validateProject } from './engine.js';
 import { csvText, wbsRows, completionRecords, completionRows } from './reports.js';
+import { backupPendingCells } from './wbs-model.js';
 export function historyBody(p, historyQuery, asOf) {
   const rows = completionRecords(p, historyQuery),
     hours = rows.reduce((s, r) => s + r.hours, 0);
@@ -82,7 +83,8 @@ export function historyBody(p, historyQuery, asOf) {
 export function importedProject(data, uid = () => crypto.randomUUID()) {
   if (data.format !== 'pm-canvas-project' || data.version !== 1)
     throw Error(ui('PM Canvas 프로젝트 백업 파일이 아닙니다.'));
-  const p = validateProject(data.project);
+  const p = structuredClone(validateProject(data.project));
+  if (p._wbsPendingCells !== undefined) p._wbsPendingCells = backupPendingCells(p);
   delete p._revision;
   delete p._role;
   p.id = uid();
@@ -106,6 +108,7 @@ export function createReportUi({
   showAuth,
   openInfo,
   onImport,
+  onPendingRestored = () => {},
   currentDate = today,
   document = globalThis.document,
   URL = globalThis.URL,
@@ -157,13 +160,22 @@ export function createReportUi({
       if (file.size > 8 * 1024 * 1024) throw Error(ui('8MB 이하의 백업 파일을 선택해 주세요.'));
       const data = JSON.parse(await file.text());
       const p = importedProject(data, uid);
+      const pending = backupPendingCells(p);
+      delete p._wbsPendingCells;
       onImport(p);
+      if (pending.length) wbs.restoreImported(p, pending);
       const saved = await persist();
+      if (pending.length) {
+        if (saved) wbs.rebaseCreatedProject(project());
+        onPendingRestored();
+      }
       render();
       toast(
-        saved
-          ? ui('기존 프로젝트를 유지하고 백업을 새 프로젝트로 불러왔습니다.')
-          : ui('불러왔지만 저장에 실패했습니다. 백업을 보관해 주세요.'),
+        pending.length
+          ? ui('미확정 입력을 WBS 초안으로 복구했습니다. 확인 후 저장해 주세요.')
+          : saved
+            ? ui('기존 프로젝트를 유지하고 백업을 새 프로젝트로 불러왔습니다.')
+            : ui('불러왔지만 저장에 실패했습니다. 백업을 보관해 주세요.'),
       );
     } catch (error) {
       toast(ui('불러오기 실패: ') + ui(error.message));

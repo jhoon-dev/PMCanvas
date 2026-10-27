@@ -1,5 +1,11 @@
 // UI literals only. User-entered content never passes through this catalog.
 export default {
+  '복구 입력: ': 'Restored input: ',
+  '백업의 미확정 셀 형식을 확인해 주세요.': 'Check the uncommitted cell data in this backup.',
+  '백업의 미확정 입력을 복구했습니다. 내용을 확인한 뒤 저장해 주세요.':
+    'Uncommitted input was restored from the backup. Review it before saving.',
+  '미확정 입력을 WBS 초안으로 복구했습니다. 확인 후 저장해 주세요.':
+    'Uncommitted input was restored as a WBS draft. Review it before saving.',
   '운영 알림': 'Operation alerts',
   '재설정 가능한 계정이라면 이메일을 보내드립니다. 받은 편지함과 스팸함을 확인해 주세요.':
     'If this account can be reset, an email will be sent. Check your inbox and spam folder.',

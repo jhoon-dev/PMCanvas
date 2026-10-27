@@ -136,6 +136,106 @@ async function selectProject(page, p, view = 'tasks') {
   await page.locator('[data-view="' + view + '"]').click();
 }
 
+test('저장 후 늦게 도착한 내 업무 응답은 최신 동기화 화면을 덮어쓰지 않음', async ({ page }) => {
+  const session = await login(page);
+  const p = await createProject(page, session, { name: '지연 응답 이전 프로젝트' });
+  const next = await createProject(page, session, { name: '최신 동기화 프로젝트' });
+  await selectProject(page, p);
+  let release, requested;
+  const waiting = new Promise((resolve) => {
+    requested = resolve;
+  });
+  const held = new Promise((resolve) => {
+    release = resolve;
+  });
+  await page.route('**/api/my-work', async (route) => {
+    requested();
+    await held;
+    await route.fulfill({
+      json: { projects: [{ ...p, name: '이전 응답 노출 금지', _memberId: p.members[0].id }] },
+    });
+  });
+  await page.locator('[data-cell=name]').fill('저장한 변경');
+  await page.locator('[data-cell=name]').press('Control+s');
+  await waiting;
+  await expect(page.locator('.wbs-state')).toHaveText('저장됨');
+  await page.locator('#projectList [data-project="' + next.id + '"]').click();
+  await expect(page.locator('#breadcrumbProject')).toHaveText(next.name);
+  await page.locator('[data-view=daily]').click();
+  const finished = page.waitForEvent('requestfinished', {
+    predicate: (r) => r.url().endsWith('/api/my-work'),
+  });
+  release();
+  await finished;
+  await page.evaluate(
+    () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+  );
+  await expect(page.locator('#main')).not.toContainText('이전 응답 노출 금지');
+});
+
+for (const failedCreation of [false, true]) {
+  test(
+    'JSON 백업 미확정 입력 복구·수정·저장' + (failedCreation ? '·최초 생성 실패 후 재시도' : ''),
+    async ({ page }) => {
+      const session = await login(page);
+      const p = await createProject(page, session, { name: '미확정 입력 백업' });
+      await selectProject(page, p);
+      await page.locator('[data-cell=start]').fill('2026-11-30');
+      await page.locator('[data-cell=start]').press('Tab');
+      await expect(page.locator('.wbs-error')).not.toBeEmpty();
+      await page.locator('.top-file-menu summary').click();
+      const downloading = page.waitForEvent('download');
+      await page.locator('#backupButton').click();
+      const file = await (await downloading).path();
+      const backup = JSON.parse(await readFile(file, 'utf8'));
+      expect(backup.project._wbsPendingCells[0].value).toBe('2026-11-30');
+      await page.reload();
+      await expect(page.locator('#authGate')).toBeHidden();
+      let creationFailures = 0;
+      if (failedCreation) {
+        await page.route('**/api/projects', async (route) => {
+          if (route.request().method() === 'POST' && creationFailures === 0) {
+            creationFailures++;
+            await route.fulfill({
+              status: 503,
+              json: { error: { code: 'UNAVAILABLE', message: 'test failure' } },
+            });
+          } else await route.continue();
+        });
+      }
+      await page.locator('.top-file-menu summary').click();
+      const chooser = page.waitForEvent('filechooser');
+      await page.locator('#importButton').click();
+      await (await chooser).setFiles(file);
+      await expect(page.locator('#breadcrumbProject')).toContainText('(불러옴)');
+      await expect(page.locator('[data-cell=start]')).toHaveValue('2026-11-30');
+      await expect(page.locator('.wbs-state')).toHaveText('저장하지 않은 변경');
+      await page.locator('[data-wbs-action=save]').click();
+      await expect(page.locator('.wbs-error')).not.toBeEmpty();
+      await page.locator('[data-cell=start]').fill(p.tasks[0].start);
+      await page.locator('[data-cell=start]').press('Tab');
+      await page.locator('[data-cell=name]').fill('복구 입력 수정 완료');
+      await page.locator('[data-cell=name]').press('Tab');
+      const saved = page.waitForResponse(
+        (r) =>
+          /\/api\/projects(?:\/[^/]+)?$/.test(r.url()) &&
+          ['POST', 'PUT'].includes(r.request().method()) &&
+          r.ok(),
+      );
+      await page.locator('[data-wbs-action=save]').click();
+      const result = (await (await saved).json()).project;
+      await expect(page.locator('.wbs-state')).toHaveText('저장됨');
+      expect(result.id).not.toBe(p.id);
+      expect(result.tasks[0].start).toBe(p.tasks[0].start);
+      expect(result._wbsPendingCells).toBeUndefined();
+      expect(creationFailures).toBe(failedCreation ? 1 : 0);
+      const original = (await (await page.request.get(api + 'projects/' + p.id)).json()).project;
+      expect(original._revision).toBe(p._revision);
+      expect(original.tasks[0].start).toBe(p.tasks[0].start);
+    },
+  );
+}
+
 test('가입 → 로컬 인증 메일 → 관리자 MFA 승인 → 업무 등록·완료 → 보고서와 실제 Excel', async ({
   page,
   browser,

@@ -58,6 +58,57 @@ test('백업은 격리 DB에서 복원 점검하고 덤프 폴더에 암호화 �
   assert.ok((await fs.readdir(f.directory)).some(automaticBackupFile));
 });
 
+for (const failure of ['pg_dump', 'archive-check']) {
+  test('불완전한 덤프는 공개하지 않고 실패 파일 정리: ' + failure, async (t) => {
+    const f = await fixture(t);
+    f.worker.command = async (command, args) => {
+      if (command === 'pg_dump') {
+        assert.ok(args[2].endsWith('.dump.partial'));
+        await fs.writeFile(args[2], 'incomplete');
+        assert.equal((await fs.readdir(f.directory)).some(automaticBackupFile), false);
+        if (failure === 'pg_dump') throw Error('private failure');
+      }
+      if (command === 'pg_restore') throw Error('bad archive');
+    };
+    await f.worker.execute(f.job);
+    assert.deepEqual(await fs.readdir(f.directory), ['test.key']);
+    const failed = f.queries.find((q) => q.sql.includes("state='failed'"));
+    assert.equal(failed.args[1], null);
+    assert.equal(failed.args[2], 0);
+    assert.ok(!JSON.stringify(failed).includes('private failure'));
+  });
+}
+
+test('중단된 백업은 하루 지난 자동 partial만 지우고 최근 파일·수동 파일·완성 덤프를 보존', async (t) => {
+  const f = await fixture(t);
+  const dump = 'pmcanvas-auto-2026-01-01T00-00-00-000Z-' + randomUUID() + '.dump';
+  for (const name of [dump, dump + '.partial', 'manual.dump.partial']) {
+    await fs.writeFile(path.join(f.directory, name), 'preserve unless expired automatic partial');
+    await fs.utimes(path.join(f.directory, name), new Date(0), new Date(0));
+  }
+  const recent = 'pmcanvas-auto-2026-01-02T00-00-00-000Z-' + randomUUID() + '.dump.partial';
+  await fs.writeFile(path.join(f.directory, recent), 'in progress');
+  await f.worker.cleanupPartials();
+  const names = await fs.readdir(f.directory);
+  assert.ok(!names.includes(dump + '.partial'));
+  assert.ok(
+    [dump, recent, 'manual.dump.partial', 'test.key'].every((name) => names.includes(name)),
+  );
+});
+
+test('완성된 아카이브는 복원 점검 실패 시 보존하고 실행 기록에 파일명을 남김', async (t) => {
+  const f = await fixture(t, { failAt: 'createdb' });
+  await f.worker.execute(f.job);
+  const failed = f.queries.find((q) => q.sql.includes("state='failed'"));
+  assert.ok(automaticBackupFile(failed.args[1]));
+  assert.ok(failed.args[2] > 0);
+  assert.equal(await fs.readFile(path.join(f.directory, failed.args[1]), 'utf8'), 'dump');
+  assert.equal(
+    (await fs.readdir(f.directory)).some((name) => name.endsWith('.partial')),
+    false,
+  );
+});
+
 for (const [name, versions] of [
   ['최신 버전 누락', expectedVersions.slice(0, -1)],
   [

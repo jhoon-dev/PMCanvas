@@ -12,6 +12,7 @@ import {
 import { openExcelImport } from './wbs-import.js';
 import {
   columns,
+  backupPendingCells,
   parseTsv,
   tsvText,
   newTask,
@@ -25,7 +26,7 @@ import {
   reorderTasks,
   alignSuccessors,
 } from './wbs-model.js';
-import { today, addDays, daysBetween, taskHours, progress, summary } from './engine.js';
+import { today, validDate, addDays, daysBetween, taskHours, progress, summary } from './engine.js';
 const esc = (s) =>
   String(s ?? '').replace(
     /[&<>"']/g,
@@ -126,6 +127,22 @@ export class WbsWorkspace {
     const p = clone(this.draft);
     if (this.pending.size) p._wbsPendingCells = [...this.pending.values()];
     return p;
+  }
+  restoreImported(project, cells) {
+    const pending = backupPendingCells({ ...project, _wbsPendingCells: cells });
+    this.reset(project);
+    this.changedFlag = !project._revision;
+    this.pending = new Map(pending.map((cell) => [cell.id + '|' + cell.field, cell]));
+    this.error = ui('백업의 미확정 입력을 복구했습니다. 내용을 확인한 뒤 저장해 주세요.');
+    this.persistDraft();
+  }
+  rebaseCreatedProject(project) {
+    if (this.base?.id !== project.id || this.base._revision || !project._revision) return;
+    this.base = clone(project);
+    this.draft._revision = project._revision;
+    this.draft._role = project._role;
+    this.changedFlag = !equal(this.draft, this.base);
+    this.persistDraft();
   }
   context() {
     if (this.frame?.project !== this.draft || this.frame?.at !== this.at) {
@@ -371,6 +388,13 @@ export class WbsWorkspace {
         '><option value="">' +
         ui(field === 'owner' ? '미지정' : '없음') +
         '</option>' +
+        (pending && value && !rows.some((r) => r.id === value)
+          ? '<option value="' +
+            esc(value) +
+            '" selected>' +
+            esc(ui('복구 입력: ') + value) +
+            '</option>'
+          : '') +
         rows
           .map(
             (r) =>
@@ -390,7 +414,20 @@ export class WbsWorkspace {
     }
     if (field === 'memo')
       return '<textarea rows="1" maxlength="2000"' + common + '>' + esc(value) + '</textarea>';
-    const type = ['start', 'end'].includes(field) ? 'date' : field === 'hours' ? 'number' : 'text',
+    const rawDate = pending && ['start', 'end'].includes(field) && value && !validDate(value),
+      rawNumber =
+        pending &&
+        field === 'hours' &&
+        value &&
+        !/^[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?$/.test(value),
+      type =
+        rawDate || rawNumber
+          ? 'text'
+          : ['start', 'end'].includes(field)
+            ? 'date'
+            : field === 'hours'
+              ? 'number'
+              : 'text',
       locked = field === 'hours' && (task.items.length !== 1 || task.items[0].doneDate);
     return (
       '<input type="' +

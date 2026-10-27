@@ -5,6 +5,59 @@ import { historyBody, importedProject, createReportUi } from '../public/report-u
 import { createSharingUi } from '../public/sharing-ui.js';
 import { createSecurityUi } from '../public/security-ui.js';
 import { screenProject, screenCases } from './support/screen-fixtures.mjs';
+import { WbsWorkspace } from '../public/wbs-workspace.js';
+import { cleanProject } from '../server/project.mjs';
+
+test('JSON 백업의 미확정 입력은 초안으로 복구하고 검증 후 저장하며 실패한 최초 생성도 재시도 가능', () => {
+  const original = screenProject();
+  original._wbsPendingCells = [
+    { id: 't1', field: 'start', value: 'invalid-date' },
+    { id: 't1', field: 'name', value: '<img src=x onerror=alert(1)>' },
+  ];
+  const imported = importedProject(
+    { format: 'pm-canvas-project', version: 1, project: original },
+    () => 'new-project',
+  );
+  const cells = imported._wbsPendingCells;
+  delete imported._wbsPendingCells;
+  const wbs = new WbsWorkspace({});
+  wbs.restoreImported(imported, cells);
+  assert.equal(wbs.dirty, true);
+  const saved = { ...cleanProject(imported), id: imported.id, _revision: 1, _role: 'owner' };
+  assert.equal(saved._wbsPendingCells, undefined);
+  wbs.rebaseCreatedProject(saved);
+  assert.equal(wbs.base._revision, 1);
+  assert.equal(wbs.pending.size, 2);
+  assert.equal(wbs.snapshot()._wbsPendingCells[0].value, 'invalid-date');
+  assert.match(wbs.cell(wbs.draft.tasks[0], 'start', 2, 1), /type="text" value="invalid-date"/);
+  assert.throws(() => wbs.commitAll());
+  assert.equal(wbs.pending.size, 2);
+  wbs.pending.set('t1|start', { id: 't1', field: 'start', value: saved.tasks[0].start });
+  wbs.refresh = () => {};
+  wbs.commitAll();
+  assert.equal(wbs.pending.size, 0);
+  assert.equal(wbs.draft._revision, 1);
+  assert.equal(wbs.draft.tasks[0].name, '<img src=x onerror=alert(1)>');
+  assert.equal(cleanProject(wbs.draft).tasks[0].name, '<img src=x onerror=alert(1)>');
+  assert.equal(original._wbsPendingCells.length, 2);
+});
+
+test('JSON 백업의 미확정 셀은 없는 업무·열·중복·잘못된 값과 과도한 크기를 거절', () => {
+  const cell = { id: 't1', field: 'name', value: 'input' };
+  for (const pending of [
+    null,
+    {},
+    [{ ...cell, id: 'missing' }],
+    [{ ...cell, field: '__proto__' }],
+    [{ ...cell, value: 42 }],
+    [cell, cell],
+    [{ ...cell, value: 'x'.repeat(65537) }],
+    Array(4001).fill(cell),
+  ]) {
+    const project = { ...screenProject(), _wbsPendingCells: pending };
+    assert.throws(() => importedProject({ format: 'pm-canvas-project', version: 1, project }));
+  }
+});
 
 function documentFixture() {
   const nodes = new Map(),

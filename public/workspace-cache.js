@@ -1,3 +1,21 @@
+// Both workspace and My work reads share one order across account changes and writes.
+export class WorkspaceReadGate {
+  sequence = 0;
+  begin(accountId, revision) {
+    return { accountId, revision, sequence: ++this.sequence };
+  }
+  invalidate() {
+    this.sequence++;
+  }
+  accepts(ticket, accountId, revision) {
+    return (
+      ticket.accountId === accountId &&
+      ticket.revision === revision &&
+      ticket.sequence === this.sequence
+    );
+  }
+}
+
 export const workspaceKnowledge = (projects) =>
   projects
     .filter((p) => !p._summary)

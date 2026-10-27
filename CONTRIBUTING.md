@@ -31,6 +31,8 @@ DB 변경은 migrations/에 연속 번호의 `NNN_description.sql` 파일을 추
 
 프로젝트 목록 동기화는 `server/workspace-sync.mjs`와 `public/workspace-cache.js`에서 관리합니다. 요약·선택 상세·변경된 내 업무를 한 스냅샷에서 읽고, 캐시 키에 revision·역할·담당 계정을 포함합니다. 접근이 회수된 프로젝트와 계정 전환 시 이전 캐시를 제거해야 합니다. `report-clock.js`는 오늘 날짜와 과거 조회일을 분리하고, 편집 중에는 자동 조회일 전환을 보류합니다.
 
+비동기 프로젝트·내 업무 응답은 공통 `WorkspaceReadGate`로 요청 순서·계정·쓰기 세대를 확인한 후 반영합니다. 새 조회 경로에도 같은 검사를 적용하세요. JSON 백업의 `_wbsPendingCells`는 업무·열·문자열 값·중복·크기 제한을 확인한 뒤 브라우저 WBS 초안에만 복구합니다. 서버 프로젝트에는 확정된 데이터만 전달하며, 미확정 입력이 있는 초안은 기존 셀 검증을 통과해야 저장할 수 있습니다.
+
 `npm run test:browser`는 고정 버전 Playwright로 가입·메일 인증·MFA 승인·업무·완료·파일 다운로드·운영 알림·충돌·언어·모바일·500개 업무를 검증합니다. 먼저 `npx playwright install chromium --only-shell`을 실행하세요. 전용 서버는 4193/4192 포트에서만 실행되는 MemoryRepository·TLS SMTP 수신함입니다. 실패 리포트는 playwright-report/, trace와 스크린샷은 test-results/에 있으며 운영 인증 정보를 넣지 마세요. [Playwright 서버 설정](https://playwright.dev/docs/test-webserver), [CI 안내](https://playwright.dev/docs/ci)를 따릅니다.
 
 `npm run test:performance`는 500개 업무·20명·50개 상위 업무의 HTML 생성·검색·모델 편집·간트 이동을 각 5회 측정해 중앙값을 출력합니다. 네트워크·DB·브라우저 페인트 시간을 포함하지 않습니다. 숫자에 환경 의존성이 있으므로 동작 검증과 함께 비교하고 CI에 좁은 절대 시간 한도를 두지 않습니다.

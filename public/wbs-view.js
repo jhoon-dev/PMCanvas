@@ -47,10 +47,13 @@ export class WbsView extends WbsWorkspace {
         if (isSaving()) throw Error(ui('저장이 진행 중입니다.'));
         onMutation();
         try {
-          const { project: p } = await request('projects/' + draft.id, {
-            method: 'PUT',
-            body: { project: draft, revision: draft._revision },
-          });
+          const { project: p } = await request(
+            'projects' + (draft._revision ? '/' + draft.id : ''),
+            {
+              method: draft._revision ? 'PUT' : 'POST',
+              body: { project: draft, ...(draft._revision ? { revision: draft._revision } : {}) },
+            },
+          );
           acceptProject(p);
           onSaved();
           return p;

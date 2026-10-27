@@ -29,7 +29,7 @@ npm run release
 이미 만들어진 ZIP만 검사할 수도 있습니다.
 
 ```sh
-npm run public:check -- --zip releases/PMCanvas-Server-v0.20.2.zip
+npm run public:check -- --zip releases/PMCanvas-Server-v0.20.3.zip
 ```
 
 ZIP은 개인 파일뿐 아니라 경로 탈출, Windows 파일명 충돌, 대소문자가 다른 중복 경로, 심볼릭 링크, 암호화, 지원하지 않는 압축 방식, 손상된 체크섬, 파일·전체 크기 초과도 거부합니다. CI는 공개 파일 검사와 ZIP 생성 검사를 모두 실행합니다. 검사한 파일이 커밋·배포되는 파일과 같도록 검사 후 추가 변경이 있으면 다시 검사하세요.

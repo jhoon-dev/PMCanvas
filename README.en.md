@@ -1,4 +1,4 @@
-# PM Canvas 0.20.2
+# PM Canvas 0.20.3
 
 English · [한국어](README.md)
 
@@ -30,6 +30,8 @@ Concurrent changes are compared against the last loaded version. Independent cha
 Administrator settings contain users, email, authentication/security and backups. Under **Authentication & security → Operations status**, configure failure alerts for backup, restore verification and email delivery. Alerts are disabled until configured. Blank recipients use active administrators; custom recipient lists support up to ten addresses. Incidents are grouped by type, delivered at most hourly and attempted up to three times. SMTP failures may also prevent alert delivery, so check the in-app status. Acknowledging a count preserves later failures.
 
 Back up the database before upgrades. Keep the DB dumps and encryption key in separate external locations. JSON export moves individual projects; it does not restore all accounts, permissions or history.
+
+JSON backups also preserve uncommitted WBS input. Importing restores that input as an editable draft; review and correct it before saving. The original project is preserved. If creating the imported project fails, the draft remains available for retry or another JSON backup.
 
 ## Verification
 

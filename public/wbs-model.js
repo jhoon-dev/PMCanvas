@@ -22,6 +22,27 @@ export const columns = [
   ['predecessor', '선행 업무'],
   ['memo', '메모'],
 ];
+export function backupPendingCells(project) {
+  const values = project._wbsPendingCells;
+  if (values === undefined) return [];
+  const tasks = new Set(project.tasks.map((task) => task.id)),
+    seen = new Set();
+  if (!Array.isArray(values) || values.length > 4000)
+    throw Error(ui('백업의 미확정 셀 형식을 확인해 주세요.'));
+  return values.map((cell) => {
+    if (
+      !cell ||
+      !tasks.has(cell.id) ||
+      !columns.some(([field]) => field === cell.field) ||
+      typeof cell.value !== 'string' ||
+      cell.value.length > 65536 ||
+      seen.has(cell.id + '|' + cell.field)
+    )
+      throw Error(ui('백업의 미확정 셀 형식을 확인해 주세요.'));
+    seen.add(cell.id + '|' + cell.field);
+    return { id: cell.id, field: cell.field, value: cell.value };
+  });
+}
 export function tsvText(rows) {
   return rows
     .map((row) =>

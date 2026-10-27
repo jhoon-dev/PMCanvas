@@ -17,6 +17,9 @@ export function runCommand(command, args, env) {
 export function automaticBackupFile(name) {
   return /^pmcanvas-auto-\d{4}-\d{2}-\d{2}T[\d-]+Z-[a-f0-9-]{36}\.dump$/.test(name);
 }
+export function partialBackupFile(name) {
+  return name.endsWith('.partial') && automaticBackupFile(name.slice(0, -8));
+}
 export class BackupWorker {
   constructor({ pool, env = process.env, command = runCommand, connect = createPool }) {
     this.pool = pool;
@@ -76,15 +79,34 @@ export class BackupWorker {
       if (stat.isFile() && stat.mtimeMs < Date.now() - days * 86400000) await fs.unlink(file);
     }
   }
+  async cleanupPartials() {
+    let entries;
+    try {
+      entries = await fs.readdir(this.directory, { withFileTypes: true });
+    } catch (error) {
+      if (error.code === 'ENOENT') return;
+      throw error;
+    }
+    for (const entry of entries) {
+      if (!entry.isFile() || !partialBackupFile(entry.name)) continue;
+      const file = path.join(this.directory, entry.name),
+        stat = await fs.lstat(file);
+      // A command has a ten-minute timeout and a thirty-minute lease. Leave recent work alone.
+      if (stat.isFile() && stat.mtimeMs < Date.now() - 86400000) await fs.unlink(file);
+    }
+  }
   async execute(job) {
     const filename =
         'pmcanvas-auto-' + new Date().toISOString().replace(/[:.]/g, '-') + '-' + job.id + '.dump',
       file = path.join(this.directory, filename),
+      partial = file + '.partial',
       target = 'pmcanvas_verify_' + job.id.replaceAll('-', '');
     let stage = '준비',
       created = false,
       verified = false,
-      bytes = 0;
+      bytes = 0,
+      ownsPartial = false,
+      published = false;
     const heartbeat = setInterval(
       () =>
         this.pool
@@ -106,12 +128,18 @@ export class BackupWorker {
         createHash('sha256').update(key).digest('hex'),
       ]);
       stage = 'DB 백업';
-      await this.command('pg_dump', ['-Fc', '--file', file], this.env);
-      await fs.chmod(file, 0o600);
-      bytes = (await fs.stat(file)).size;
+      const handle = await fs.open(partial, 'wx', 0o600);
+      ownsPartial = true;
+      await handle.close();
+      await this.command('pg_dump', ['-Fc', '--file', partial], this.env);
+      bytes = (await fs.stat(partial)).size;
       if (!bytes) throw Error('Empty dump');
       stage = '백업 파일 확인';
-      await this.command('pg_restore', ['--list', file], this.env);
+      await this.command('pg_restore', ['--list', partial], this.env);
+      // Publish only a complete archive; interrupted files never look like usable dumps.
+      await fs.rename(partial, file);
+      ownsPartial = false;
+      published = true;
       if (job.verify_restore) {
         stage = '복원 점검용 DB 생성';
         if (!/^pmcanvas_verify_[a-f0-9]{32}$/.test(target) || target === this.env.PGDATABASE)
@@ -171,7 +199,16 @@ export class BackupWorker {
         [job.id, filename, bytes, verified],
       );
     } catch {
-      let cleanupFailed = false;
+      let cleanupFailed = false,
+        partialCleanupFailed = false;
+      if (ownsPartial) {
+        try {
+          await fs.unlink(partial);
+          ownsPartial = false;
+        } catch (error) {
+          if (error.code !== 'ENOENT') partialCleanupFailed = true;
+        }
+      }
       if (created)
         try {
           await this.command('dropdb', ['--force', target], this.env);
@@ -182,11 +219,12 @@ export class BackupWorker {
         "UPDATE pm_backup_runs SET state='failed',finished_at=now(),filename=$2,bytes=$3,verified=false,message=$4 WHERE id=$1",
         [
           job.id,
-          bytes ? filename : null,
-          bytes,
+          published ? filename : partialCleanupFailed ? filename + '.partial' : null,
+          published || partialCleanupFailed ? bytes : 0,
           stage +
             ' 단계에서 실패했습니다.' +
-            (cleanupFailed ? ' 점검용 DB 수동 정리가 필요합니다.' : ''),
+            (cleanupFailed ? ' 점검용 DB 수동 정리가 필요합니다.' : '') +
+            (partialCleanupFailed ? ' 불완전한 백업 파일 수동 정리가 필요합니다.' : ''),
         ],
       );
       await recordFailure(this.pool, /복원|점검/.test(stage) ? 'restore' : 'backup').catch(
@@ -201,6 +239,7 @@ export class BackupWorker {
     }
   }
   async tick() {
+    await this.cleanupPartials();
     const job = await this.claim();
     if (job) await this.execute(job);
     return !!job;
