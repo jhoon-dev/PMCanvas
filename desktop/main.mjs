@@ -4,14 +4,13 @@ import {
   Menu,
   dialog,
   ipcMain,
-  net,
   protocol,
   session,
   utilityProcess,
 } from 'electron';
 import path from 'node:path';
 import { unlinkSync, readFileSync } from 'node:fs';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { DesktopDocument, MAX_BYTES, atomicWrite, serializeDocument } from './document.mjs';
 import { APP_URL, assetPath } from './assets.mjs';
 import { buildReport } from './reports.mjs';
@@ -146,13 +145,27 @@ else {
       protocol.handle('pmcanvas', async (request) => {
         const asset = assetPath(request.url);
         if (!asset || request.method !== 'GET') return new Response('Not found', { status: 404 });
-        const response = await net.fetch(pathToFileURL(path.join(root, 'app', asset)).href);
-        const headers = new Headers(response.headers);
+        // Node's Electron-patched fs resolves ASAR paths consistently on Windows and macOS.
+        // The allowlist above is authoritative; no renderer path or file URL is accepted.
+        let bytes;
+        try {
+          bytes = readFileSync(path.join(root, 'app', asset));
+        } catch {
+          return new Response('Not found', { status: 404 });
+        }
+        const headers = new Headers({
+          'Content-Type':
+            (asset.endsWith('.html')
+              ? 'text/html'
+              : asset.endsWith('.css')
+                ? 'text/css'
+                : 'text/javascript') + '; charset=utf-8',
+        });
         headers.set(
           'Content-Security-Policy',
           "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'",
         );
-        return new Response(response.body, { status: response.status, headers });
+        return new Response(bytes, { status: 200, headers });
       });
       session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) =>
         callback(false),
@@ -441,9 +454,13 @@ else {
       }
       app.on('window-all-closed', () => app.quit());
     })
-    .catch((error) => {
+    .catch(async (error) => {
       console.error('Desktop startup failed:', error.message || String(error));
-      dialog.showErrorBox('PM Canvas Desktop', error.message || String(error));
+      await dialog.showMessageBox({
+        type: 'error',
+        title: 'PM Canvas Desktop',
+        message: error.message || String(error),
+      });
       app.quit();
     });
 }
