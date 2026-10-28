@@ -1,5 +1,6 @@
 export const browserFiles = Object.freeze([
   'engine.js',
+  'business-clock.js',
   'planning.js',
   'html.js',
   'i18n.js',

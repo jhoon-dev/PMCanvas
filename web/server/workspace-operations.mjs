@@ -179,6 +179,7 @@ export class WorkspaceOperations extends AlertRepository {
   }
   async restoreTrash(userId, type, id) {
     return this.transaction(async (c) => {
+      await this.activeUser(c, userId, true);
       if (type === 'project') {
         const row = (
           await c.query(

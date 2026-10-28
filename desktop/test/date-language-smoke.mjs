@@ -11,7 +11,7 @@ const { chromium } = createRequire(new URL('../../web/package.json', import.meta
 );
 const root = fileURLToPath(new URL('../app/', import.meta.url));
 
-async function harness(language = 'ko') {
+async function harness(language = 'ko', timeZone = 'Asia/Seoul') {
   let project = screenProject(),
     revision = 1,
     dirty = false;
@@ -21,6 +21,11 @@ async function harness(language = 'ko') {
   page.on('pageerror', (error) => errors.push(error.message));
   await page.clock.install({ time: new Date('2026-10-28T23:59:00+09:00') });
   await page.exposeFunction('fixtureCall', (name, ...args) => {
+    if (name === 'settings') return { timeZone };
+    if (name === 'setTimeZone') {
+      timeZone = new Intl.DateTimeFormat('en', { timeZone: args[0] }).resolvedOptions().timeZone;
+      return { timeZone };
+    }
     if (name === 'replace') {
       project = args[0];
       revision++;
@@ -38,10 +43,9 @@ async function harness(language = 'ko') {
     if (!localStorage.getItem('pmcanvas.language'))
       localStorage.setItem('pmcanvas.language', language);
     window.desktop = Object.fromEntries(
-      ['snapshot', 'replace', 'editing', 'save', 'setLanguage'].map((name) => [
-        name,
-        (...args) => window.fixtureCall(name, ...args),
-      ]),
+      ['snapshot', 'replace', 'editing', 'save', 'setLanguage', 'settings', 'setTimeZone'].map(
+        (name) => [name, (...args) => window.fixtureCall(name, ...args)],
+      ),
     );
     window.desktop.onCommand = () => {};
     window.desktop.onDocument = () => {};
@@ -63,6 +67,27 @@ async function harness(language = 'ko') {
   await page.locator('#reportDate').waitFor();
   return { browser, page, errors, getProject: () => project };
 }
+
+test('business time zone settings survive reload, use the configured day and preserve project records', async () => {
+  const { browser, page, errors, getProject } = await harness('en', 'America/New_York');
+  try {
+    const before = structuredClone(getProject());
+    await page.clock.fastForward(120000);
+    assert.equal(await page.locator('#reportDate').inputValue(), '2026-10-28');
+    await page.getByText('File options', { exact: true }).click();
+    await page.getByRole('button', { name: 'Business time zone', exact: true }).click();
+    await page.locator('#timeZoneInput').fill('Asia/Seoul');
+    await page.locator('#timeZoneForm').getByRole('button', { name: 'Apply', exact: true }).click();
+    await page.waitForFunction(() => document.querySelector('#reportDate')?.value === '2026-10-29');
+    assert.deepEqual(getProject(), before);
+    await page.reload();
+    await page.locator('#reportDate').waitFor();
+    assert.equal(await page.locator('#reportDate').inputValue(), '2026-10-29');
+    assert.deepEqual(errors, []);
+  } finally {
+    await browser.close();
+  }
+});
 test('midnight, wake and timers advance the default reporting date and record the new completion day', async () => {
   const { browser, page, errors, getProject } = await harness();
   try {

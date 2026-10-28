@@ -1,4 +1,5 @@
 import { browserAsset } from '../../shared/assets.mjs';
+import { getBusinessTimeZone } from '../../shared/browser/business-clock.js';
 import { clientAddress, proxyList, requestLimiter } from './request-security.mjs';
 import { readWorkbook } from './excel-import.mjs';
 import { projectWorkbook } from './excel.mjs';
@@ -137,6 +138,7 @@ export function createHandler({
       'api-client.js',
       'styles.css',
       'engine.js',
+      'business-clock.js',
       'reports.js',
       'wbs-model.js',
       'excel-import-model.js',
@@ -179,6 +181,9 @@ export function createHandler({
       if (size > maxBytes) fail(413, 'BODY_TOO_LARGE', '요청 본문이 허용 크기를 초과했습니다.');
       chunks.push(chunk);
     }
+    // Bodies can arrive after logout, a password reset, or administrator revocation.
+    if (req.sessionHash && !(await repo.findSession(req.sessionHash)))
+      fail(401, 'AUTH_REQUIRED', '로그인이 필요합니다.');
     try {
       const value = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
       if (!value || typeof value !== 'object' || Array.isArray(value))
@@ -604,6 +609,7 @@ export function createHandler({
       }
       const session = await authenticate(req),
         user = session.user;
+      req.sessionHash = session.hash;
       req.actorId = user.id;
       if (mutation && !safeEqual(req.headers['x-csrf-token'], session.csrf))
         fail(403, 'CSRF_FAILED', '보안 토큰을 갱신하려면 다시 로그인해 주세요.');
@@ -653,7 +659,7 @@ export function createHandler({
         });
       }
       if (path === '/api/auth/me' && method === 'GET')
-        return json(res, 200, { user, csrf: session.csrf });
+        return json(res, 200, { user, csrf: session.csrf, timeZone: getBusinessTimeZone() });
       if (path === '/api/auth/logout' && method === 'POST') {
         await repo.deleteSession(session.hash);
         await audit(req, 'auth.logout');

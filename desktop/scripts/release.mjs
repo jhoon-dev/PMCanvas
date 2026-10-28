@@ -1,5 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
+import { preparePackage, sourceBytes } from './package-source.mjs';
+import { verifySignatures } from './verify-signatures.mjs';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -9,6 +12,7 @@ import { checkPublicRepository, requirePublicSafety } from '../../web/scripts/pu
 const desktop = fileURLToPath(new URL('../', import.meta.url));
 const root = path.dirname(desktop);
 const [target, ...args] = process.argv.slice(2);
+let staging;
 try {
   if (args.some((arg) => arg !== '--check') || args.length > 1)
     throw Error('Usage: release.mjs win|mac [--check]');
@@ -19,18 +23,28 @@ try {
     console.log('Desktop release prerequisites verified.');
     process.exit(0);
   }
-  const pkg = JSON.parse(fs.readFileSync(path.join(desktop, 'package.json')));
+  const pkg = JSON.parse(sourceBytes(root, 'package.json', commit));
   const output = path.join(desktop, 'dist', 'release-' + pkg.version + '-' + target);
   if (fs.existsSync(output) && fs.readdirSync(output).length)
     throw Error('Release output already exists; preserve it and choose a new version.');
-  execFileSync(process.execPath, [path.join(desktop, 'scripts/prepare.mjs')], {
-    cwd: desktop,
-    stdio: 'inherit',
-  });
+  // Build exclusively from committed inputs in a private, isolated directory.
+  staging = fs.mkdtempSync(path.join(os.tmpdir(), 'pmcanvas-release-'));
+  fs.chmodSync(staging, 0o700);
+  preparePackage(
+    root,
+    staging,
+    pkg,
+    { version: pkg.version, commit, development: false, dirty: false },
+    commit,
+  );
   fs.writeFileSync(
-    path.join(desktop, 'app/build-info.json'),
-    JSON.stringify({ version: pkg.version, commit, development: false, dirty: false }, null, 2) +
-      '\n',
+    path.join(staging, 'package-lock.json'),
+    sourceBytes(root, 'package-lock.json', commit),
+  );
+  fs.symlinkSync(
+    path.join(desktop, 'node_modules'),
+    path.join(staging, 'node_modules'),
+    process.platform === 'win32' ? 'junction' : 'dir',
   );
   fs.mkdirSync(output, { recursive: true });
   const configFile = path.join(output, 'builder.json');
@@ -40,6 +54,7 @@ try {
       {
         ...pkg.build,
         ...configuration,
+        win: { ...pkg.build.win, ...configuration.win },
         mac: { ...pkg.build.mac, ...configuration.mac },
         directories: { ...pkg.build.directories, output },
       },
@@ -54,6 +69,8 @@ try {
       path.join(desktop, 'node_modules/electron-builder/cli.js'),
       '--' + target,
       ...(target === 'win' ? ['nsis', '--x64'] : ['dmg', 'zip', '--arm64', '--x64']),
+      '--projectDir',
+      staging,
       '--config',
       configFile,
       '--publish',
@@ -72,10 +89,20 @@ try {
           path.join(output, dir, 'PM Canvas Desktop.app/Contents/Resources/app.asar'),
         );
   for (const archive of archives)
-    execFileSync(process.execPath, [path.join(desktop, 'test/package-safety.mjs'), archive], {
-      cwd: desktop,
-      stdio: 'inherit',
-    });
+    execFileSync(
+      process.execPath,
+      [path.join(desktop, 'test/package-safety.mjs'), archive, commit],
+      {
+        cwd: desktop,
+        stdio: 'inherit',
+      },
+    );
+  verifySignatures(target, output);
+  execFileSync(process.execPath, [path.join(desktop, 'scripts/check-package.mjs'), '--smoke'], {
+    cwd: desktop,
+    stdio: 'inherit',
+    env: { ...process.env, PM_PACKAGE_DIR: output, PM_SOURCE_COMMIT: commit },
+  });
   if (releaseSource(root) !== commit) throw Error('Source commit changed during the build.');
   const artifacts = fs
     .readdirSync(output)
@@ -90,7 +117,14 @@ try {
   fs.writeFileSync(
     path.join(output, 'release-manifest.json'),
     JSON.stringify(
-      { product: pkg.name, version: pkg.version, commit, platform: target, artifacts },
+      {
+        product: pkg.name,
+        version: pkg.version,
+        commit,
+        platform: target,
+        verification: { signatures: true, nativeSmoke: true },
+        artifacts,
+      },
       null,
       2,
     ) + '\n',
@@ -107,4 +141,11 @@ try {
     error.status ? 'Desktop release command failed. Review the build output.' : error.message,
   );
   process.exitCode = 1;
+} finally {
+  if (
+    staging &&
+    path.dirname(staging) === path.resolve(os.tmpdir()) &&
+    path.basename(staging).startsWith('pmcanvas-release-')
+  )
+    fs.rmSync(staging, { recursive: true, force: true });
 }

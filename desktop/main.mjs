@@ -17,6 +17,9 @@ import { buildReport } from './reports.mjs';
 import { createExcelJobs } from './excel-jobs.mjs';
 import { ExcelImportSession } from './excel-session.mjs';
 import { getLanguage, setLanguage, ui, supportedLanguages } from './app/shared/i18n.js';
+import { getBusinessTimeZone, setBusinessTimeZone } from './app/shared/business-clock.js';
+import { validateProject } from './app/shared/engine.js';
+import { readBounded } from './file-io.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const testing = !app.isPackaged && process.env.PMCANVAS_DESKTOP_TEST === '1';
@@ -140,6 +143,13 @@ else {
   void app
     .whenReady()
     .then(async () => {
+      const preferencesFile = path.join(app.getPath('userData'), 'preferences.json');
+      try {
+        setBusinessTimeZone(JSON.parse(readBounded(preferencesFile, 4096)).timeZone);
+      } catch (error) {
+        if (error.code !== 'ENOENT') throw error;
+      }
+      process.env.PM_TIME_ZONE = getBusinessTimeZone();
       document = new DesktopDocument(path.join(app.getPath('userData'), 'recovery.json'));
       excelImport = new ExcelImportSession(document, excelJob);
       protocol.handle('pmcanvas', async (request) => {
@@ -281,6 +291,22 @@ else {
         installMenu();
         updateHistoryMenu();
         return language;
+      });
+      handle('settings', () => ({ timeZone: getBusinessTimeZone() }), false);
+      handle('timeZone', (value) => {
+        if (editing || document.dirty || excelImport.current)
+          throw Error(ui('변경사항을 저장하거나 취소한 뒤 시간대를 바꿔 주세요.'));
+        const previous = getBusinessTimeZone();
+        try {
+          setBusinessTimeZone(value);
+          if (document.project) validateProject(document.project);
+          atomicWrite(preferencesFile, JSON.stringify({ timeZone: getBusinessTimeZone() }) + '\n');
+        } catch (error) {
+          setBusinessTimeZone(previous);
+          throw error;
+        }
+        process.env.PM_TIME_ZONE = getBusinessTimeZone();
+        return { timeZone: getBusinessTimeZone() };
       });
       handle(
         'info',

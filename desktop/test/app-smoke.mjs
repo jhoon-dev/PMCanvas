@@ -316,6 +316,23 @@ try {
     ),
   );
   await page.evaluate(() => window.desktop.setLanguage('ko'));
+  checkpoint('business-time-zone');
+  await assert.rejects(
+    page.evaluate(() => window.desktop.setTimeZone('Bad/Zone')),
+    /IANA/,
+  );
+  await page.evaluate(() => window.desktop.editing(true));
+  await assert.rejects(
+    page.evaluate(() => window.desktop.setTimeZone('UTC')),
+    /저장|취소/,
+  );
+  await page.evaluate(() => window.desktop.editing(false));
+  const beforeZone = await page.evaluate(() => window.desktop.snapshot());
+  await page.evaluate(() => window.desktop.setTimeZone('Pacific/Kiritimati'));
+  assert.deepEqual(
+    (await page.evaluate(() => window.desktop.snapshot())).project,
+    beforeZone.project,
+  );
   assert.equal(
     parseDocument(readFileSync(path.join(temporary, 'Native.pmcanvas'))).tasks[0].name,
     'Native Excel import',
@@ -331,6 +348,10 @@ try {
   await restored.getByText('Native baseline', { exact: true }).waitFor();
   await restored.getByRole('button', { name: 'Native child', exact: true }).waitFor();
   const afterRestart = await restored.evaluate(() => window.desktop.snapshot());
+  assert.equal(
+    (await restored.evaluate(() => window.desktop.settings())).timeZone,
+    'Pacific/Kiritimati',
+  );
   assert.deepEqual(afterRestart.project, finalProject);
   assert.equal(afterRestart.canUndo, false);
   assert.equal(afterRestart.canRedo, false);

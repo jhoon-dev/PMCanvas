@@ -1,3 +1,4 @@
+import { businessDate } from './business-clock.js';
 export const DAY = 86400000;
 export const dateValue = (s) => Date.parse(s + 'T00:00:00Z');
 export const validDate = (s) =>
@@ -9,8 +10,7 @@ export const validDate = (s) =>
   new Date(dateValue(s)).toISOString().slice(0, 10) === s;
 export const addDays = (s, n) => new Date(dateValue(s) + n * DAY).toISOString().slice(0, 10);
 export const daysBetween = (a, b) => Math.round((dateValue(b) - dateValue(a)) / DAY);
-export const today = () =>
-  new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Seoul' }).format(new Date());
+export const today = () => businessDate();
 export function working(s, h = []) {
   const d = new Date(dateValue(s)).getUTCDay();
   return d !== 0 && d !== 6 && !h.includes(s);

@@ -8,6 +8,7 @@ import { createInterface } from 'node:readline/promises';
 import { emailAddress } from '../server/security.mjs';
 import { runtimeIdentity, prepareRuntimeStorage } from './runtime-storage.mjs';
 import { restoreCleanupSql } from '../server/restore-safety.mjs';
+import { manualBackup } from './manual-backup.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const envPath = path.join(root, '.env');
@@ -32,6 +33,7 @@ export function setupValues({ email, origin = 'http://localhost:3000', port = '3
     BASE_PATH: '/pmcanvas',
     APP_PORT: String(port),
     APP_DATABASE: 'pmcanvas',
+    PM_TIME_ZONE: 'Asia/Seoul',
     AUTH_CONFIG_FILE: '/app/config/auth.json',
     DB_ADMIN_PASSWORD: secret(),
     DB_PASSWORD: secret(),
@@ -146,36 +148,7 @@ async function main() {
     return;
   }
   if (command === 'backup') {
-    const folder = path.join(root, 'backups');
-    fs.mkdirSync(folder, { recursive: true });
-    const name =
-      'pmcanvas-' +
-      new Date().toISOString().replace(/[:.]/g, '-') +
-      '-' +
-      randomBytes(4).toString('hex') +
-      '.dump';
-    const remote = '/tmp/' + name,
-      local = path.join(folder, name);
-    try {
-      compose([
-        'exec',
-        '-T',
-        'db',
-        'pg_dump',
-        '-U',
-        'postgres',
-        '-d',
-        database,
-        '-Fc',
-        '-f',
-        remote,
-      ]);
-      compose(['cp', 'db:' + remote, local]);
-      fs.chmodSync(local, 0o600);
-      console.log('Backup: ' + local);
-    } finally {
-      compose(['exec', '-T', 'db', 'rm', '-f', remote], { capture: true });
-    }
+    console.log('Backup: ' + manualBackup({ root, database, compose }));
     return;
   }
   if (command === 'restore') {

@@ -1,13 +1,14 @@
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { fail } from './errors.mjs';
+import { getBusinessTimeZone } from '../../shared/browser/business-clock.js';
 let active = 0;
 export async function fileJob(kind, input) {
   if (active >= 2) fail(429, 'FILE_BUSY', '파일 작업이 진행 중입니다. 잠시 후 다시 시도해 주세요.');
   active++;
   try {
     return await new Promise((resolve, reject) => {
-      const env = { NODE_ENV: 'production' };
+      const env = { NODE_ENV: 'production', PM_TIME_ZONE: getBusinessTimeZone() };
       for (const k of ['SystemRoot', 'TEMP', 'TMP']) if (process.env[k]) env[k] = process.env[k];
       const child = spawn(
         process.execPath,

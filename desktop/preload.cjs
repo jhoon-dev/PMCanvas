@@ -9,6 +9,8 @@ contextBridge.exposeInMainWorld(
   Object.freeze({
     snapshot: () => call('snapshot'),
     setLanguage: (language) => call('language', language),
+    settings: () => call('settings'),
+    setTimeZone: (value) => call('timeZone', value),
     info: () => call('info'),
     replace: (project, revision) => call('replace', project, revision),
     undo: (revision) => call('undo', revision),

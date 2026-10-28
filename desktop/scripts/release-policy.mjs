@@ -20,11 +20,13 @@ export function signingPolicy(target, env = process.env, platform = process.plat
     throw Error('Build on the target operating system.');
   const has = (key) => Boolean(env[key] && !/^(?:YOUR_|REPLACE_|<)/i.test(env[key]));
   const certificate =
-    target === 'win' ? has('WIN_CSC_LINK') || has('CSC_LINK') : has('CSC_LINK') || has('CSC_NAME');
+    target === 'win'
+      ? has('WIN_CSC_LINK') || has('CSC_LINK') || has('WIN_CSC_SHA1')
+      : has('CSC_LINK') || has('CSC_NAME');
   if (!certificate)
     throw Error(
       'Signing certificate required: set ' +
-        (target === 'win' ? 'WIN_CSC_LINK or CSC_LINK' : 'CSC_LINK or CSC_NAME') +
+        (target === 'win' ? 'WIN_CSC_LINK, CSC_LINK or WIN_CSC_SHA1' : 'CSC_LINK or CSC_NAME') +
         '.',
     );
   if (target === 'mac') {
@@ -40,6 +42,9 @@ export function signingPolicy(target, env = process.env, platform = process.plat
   }
   return {
     forceCodeSigning: true,
+    ...(target === 'win' && has('WIN_CSC_SHA1')
+      ? { win: { signtoolOptions: { certificateSha1: env.WIN_CSC_SHA1 } } }
+      : {}),
     ...(target === 'mac' ? { mac: { notarize: true, hardenedRuntime: true } } : {}),
   };
 }
