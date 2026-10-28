@@ -13,6 +13,7 @@ import { AdminMfa } from '../../server/admin-mfa.mjs';
 import { createApplication } from '../../server/http.mjs';
 import { hashPassword } from '../../server/security.mjs';
 import { escapeHtml } from '../../public/html.js';
+import { cleanProject } from '../../server/project.mjs';
 const walkthrough = process.env.RUN_WALKTHROUGH_PREVIEW === '1';
 const previewPort = Number(process.env.PM_PREVIEW_PORT || 4183),
   mailboxPort = Number(process.env.PM_PREVIEW_MAIL_PORT || 4182);
@@ -86,27 +87,33 @@ if (process.env.RUN_WORKSPACE_PREVIEW === '1') {
       else repo.users.get(u.id).email_verified_at = new Date();
     }
   }
-  const p = await repo.createProject(admin.id, randomUUID(), {
-    name: walkthrough ? '우리 팀 첫 프로젝트' : '운영 기능 검증 프로젝트',
-    description: '일회용 테스트',
-    holidays: [],
-    members: [{ id: 'm1', name: '담당자', role: '개발', grade: '중급', hours: 8, allocation: 100 }],
-    tasks: walkthrough
-      ? []
-      : [
-          {
-            id: 't1',
-            name: '내 담당 업무',
-            phase: '개발',
-            owner: 'm1',
-            start: '2026-10-19',
-            end: '2026-10-30',
-            predecessor: '',
-            memo: '',
-            items: [{ id: 'i1', title: '완료 체크', hours: 8, doneDate: null }],
-          },
-        ],
-  });
+  const p = await repo.createProject(
+    admin.id,
+    randomUUID(),
+    cleanProject({
+      name: walkthrough ? '우리 팀 첫 프로젝트' : '운영 기능 검증 프로젝트',
+      description: '일회용 테스트',
+      holidays: [],
+      members: [
+        { id: 'm1', name: '담당자', role: '개발', grade: '중급', hours: 8, allocation: 100 },
+      ],
+      tasks: walkthrough
+        ? []
+        : [
+            {
+              id: 't1',
+              name: '내 담당 업무',
+              phase: '개발',
+              owner: 'm1',
+              start: '2026-10-19',
+              end: '2026-10-30',
+              predecessor: '',
+              memo: '',
+              items: [{ id: 'i1', title: '완료 체크', hours: 8, doneDate: null }],
+            },
+          ],
+    }),
+  );
   await repo.grantAccess(admin.id, p.id, member.email, 'editor');
   await repo.setMemberAccount(admin.id, p.id, { memberId: 'm1', userId: admin.id });
 }

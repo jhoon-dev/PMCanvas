@@ -284,6 +284,61 @@ try {
   checkpoint('final-save-and-language');
   assert.deepEqual(finalProject, copied.project);
   await page.evaluate(() => window.desktop.save());
+  checkpoint('manual-update-notice');
+  await application.evaluate(({ shell }) => {
+    const https = process.getBuiltinModule('https'),
+      { EventEmitter } = process.getBuiltinModule('events');
+    globalThis.__updateRequest = https.get;
+    globalThis.__updateShell = shell.openExternal;
+    globalThis.__releasePages = [];
+    https.get = (_url, _options, callback) => {
+      const req = new EventEmitter();
+      req.destroy = (error) => {
+        req.emit('error', error);
+        req.emit('close');
+      };
+      queueMicrotask(() => {
+        const res = new EventEmitter();
+        res.statusCode = 200;
+        callback(res);
+        const tag = 'desktop-v0.99.0';
+        res.emit(
+          'data',
+          Buffer.from(
+            JSON.stringify([
+              {
+                tag_name: tag,
+                html_url: 'https://github.com/jhoon-dev/PMCanvas/releases/tag/' + tag,
+                assets: [],
+                draft: false,
+                prerelease: false,
+              },
+            ]),
+          ),
+        );
+        res.emit('end');
+        req.emit('close');
+      });
+      return req;
+    };
+    shell.openExternal = async (url) => {
+      globalThis.__releasePages.push(url);
+    };
+  });
+  await page.getByText('파일 옵션', { exact: true }).click();
+  await page.getByRole('button', { name: '업데이트 확인', exact: true }).click();
+  await page.getByText('새 버전: 0.99.0', { exact: false }).waitFor();
+  assert.equal(await application.evaluate(() => globalThis.__releasePages.length), 0);
+  await page.locator('#openRelease').click();
+  await page.locator('#closeUpdate').click();
+  assert.deepEqual(await application.evaluate(() => globalThis.__releasePages), [
+    'https://github.com/jhoon-dev/PMCanvas/releases/tag/desktop-v0.99.0',
+  ]);
+  assert.deepEqual((await page.evaluate(() => window.desktop.snapshot())).project, finalProject);
+  await application.evaluate(({ shell }) => {
+    process.getBuiltinModule('https').get = globalThis.__updateRequest;
+    shell.openExternal = globalThis.__updateShell;
+  });
   const info = await page.evaluate(() => window.desktop.info());
   assert.equal(info.version, JSON.parse(readFileSync(path.join(root, 'package.json'))).version);
   await assert.rejects(
