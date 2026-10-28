@@ -70,6 +70,7 @@
                 <button class="button" data-command="importExcel">Excel 가져오기</button>
                 <button class="button" data-command="exportTemplate">Excel 입력 양식 저장</button>
                 <button class="button" data-command="about">앱 정보</button>
+                <button class="button" data-command="updates">업데이트 확인</button>
                 <button class="button" data-command="timeZone">업무 기준 시간대</button>
               </div>
             </details>
@@ -101,6 +102,17 @@
       </form>
     </dialog>
     <div id="toast" class="desktop-toast" role="status" hidden></div>
+    <dialog id="updateDialog" class="desktop-dialog" aria-labelledby="updateTitle">
+      <div class="dialog-head"><h2 id="updateTitle">업데이트 확인</h2></div>
+      <div class="dialog-body">
+        <p id="updateStatus" role="status"></p>
+        <p>프로젝트를 저장한 뒤 새 설치 파일을 실행하세요. 프로젝트 파일과 PC 설정은 유지됩니다.</p>
+      </div>
+      <div class="dialog-foot">
+        <button id="closeUpdate" class="button">닫기</button
+        ><button id="openRelease" class="button primary">공식 다운로드 페이지</button>
+      </div>
+    </dialog>
     <dialog id="timeZoneDialog" class="desktop-dialog" aria-labelledby="timeZoneTitle">
       <form id="timeZoneForm">
         <div class="dialog-head"><h2 id="timeZoneTitle">업무 기준 시간대</h2></div>

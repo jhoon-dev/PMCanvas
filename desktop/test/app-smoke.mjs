@@ -165,7 +165,8 @@ try {
   await application.evaluate(({ dialog }, root) => {
     dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [root + '/Input.xlsx'] });
   }, temporary);
-  await page.getByText('파일 옵션', { exact: true }).click();
+  if (!(await page.locator('details.action-menu').evaluate((menu) => menu.open)))
+    await page.getByText('파일 옵션', { exact: true }).click();
   await page.getByRole('button', { name: 'Excel 가져오기', exact: true }).click();
   await page.locator('#excelPreview').click();
   await page.getByText('1개 업무 · 오류 0건', { exact: true }).waitFor();
@@ -284,6 +285,62 @@ try {
   checkpoint('final-save-and-language');
   assert.deepEqual(finalProject, copied.project);
   await page.evaluate(() => window.desktop.save());
+  checkpoint('manual-update-notice');
+  await application.evaluate(({ shell }) => {
+    const https = process.getBuiltinModule('https'),
+      { EventEmitter } = process.getBuiltinModule('events');
+    globalThis.__updateRequest = https.get;
+    globalThis.__updateShell = shell.openExternal;
+    globalThis.__releasePages = [];
+    https.get = (_url, _options, callback) => {
+      const req = new EventEmitter();
+      req.destroy = (error) => {
+        req.emit('error', error);
+        req.emit('close');
+      };
+      queueMicrotask(() => {
+        const res = new EventEmitter();
+        res.statusCode = 200;
+        callback(res);
+        const tag = 'desktop-v0.99.0';
+        res.emit(
+          'data',
+          Buffer.from(
+            JSON.stringify([
+              {
+                tag_name: tag,
+                html_url: 'https://github.com/jhoon-dev/PMCanvas/releases/tag/' + tag,
+                assets: [],
+                draft: false,
+                prerelease: false,
+              },
+            ]),
+          ),
+        );
+        res.emit('end');
+        req.emit('close');
+      });
+      return req;
+    };
+    shell.openExternal = async (url) => {
+      globalThis.__releasePages.push(url);
+    };
+  });
+  if (!(await page.locator('details.action-menu').evaluate((menu) => menu.open)))
+    await page.getByText('파일 옵션', { exact: true }).click();
+  await page.getByRole('button', { name: '업데이트 확인', exact: true }).click();
+  await page.getByText('새 버전: 0.99.0', { exact: false }).waitFor();
+  assert.equal(await application.evaluate(() => globalThis.__releasePages.length), 0);
+  await page.locator('#openRelease').click();
+  await page.locator('#closeUpdate').click();
+  assert.deepEqual(await application.evaluate(() => globalThis.__releasePages), [
+    'https://github.com/jhoon-dev/PMCanvas/releases/tag/desktop-v0.99.0',
+  ]);
+  assert.deepEqual((await page.evaluate(() => window.desktop.snapshot())).project, finalProject);
+  await application.evaluate(({ shell }) => {
+    process.getBuiltinModule('https').get = globalThis.__updateRequest;
+    shell.openExternal = globalThis.__updateShell;
+  });
   const info = await page.evaluate(() => window.desktop.info());
   assert.equal(info.version, JSON.parse(readFileSync(path.join(root, 'package.json'))).version);
   await assert.rejects(
@@ -359,6 +416,9 @@ try {
     'PASS: native isolation, reports, WBS, schedule, history/menu, bulk copy/delete/revision guard, save/restart',
   );
   completed = true;
+} catch (error) {
+  console.error('Native smoke failed at stage: ' + stage, error.stack || error.message);
+  throw error;
 } finally {
   // Failed tests can leave a temporary unsaved editor open; do not hang on its close prompt.
   if (application && !completed) {
@@ -366,9 +426,23 @@ try {
       application.evaluate(({ app }) => app.exit(0)).catch(() => {}),
       new Promise((resolve) => setTimeout(resolve, 3000)),
     ]);
-    application.process().kill('SIGKILL');
+    const child = application.process();
+    if (child.exitCode === null) {
+      const exited = new Promise((resolve) => child.once('exit', resolve));
+      child.kill('SIGKILL');
+      await Promise.race([exited, new Promise((resolve) => setTimeout(resolve, 2000))]);
+    }
   }
   if (completed) await application?.close();
   clearTimeout(watchdog);
-  rmSync(temporary, { recursive: true, force: true });
+  if (
+    path.dirname(temporary) !== path.resolve(os.tmpdir()) ||
+    !path.basename(temporary).startsWith('pmcanvas-electron-')
+  )
+    throw Error('Unsafe temporary cleanup path.');
+  try {
+    rmSync(temporary, { recursive: true, force: true, maxRetries: 5, retryDelay: 300 });
+  } catch {
+    console.warn('Temporary test profile remains locked; original test result preserved.');
+  }
 }

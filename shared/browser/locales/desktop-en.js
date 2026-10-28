@@ -1,5 +1,17 @@
 // Authored interface text only; project names, notes and imported values are never translated.
 export default {
+  '업데이트 확인': 'Check for updates',
+  '새 버전을 확인하고 있습니다.': 'Checking for a new version.',
+  '새 버전: ': 'New version: ',
+  ' · 이 운영체제의 설치 파일을 준비 중입니다.':
+    ' · An installer for this platform is being prepared.',
+  '현재 최신 버전입니다. ': 'You are up to date. ',
+  '공개된 데스크톱 버전이 아직 없습니다.': 'No desktop release has been published yet.',
+  '업데이트를 확인하지 못했습니다. 네트워크 연결을 확인하거나 나중에 다시 시도해 주세요.':
+    'Could not check for updates. Check your connection or try again later.',
+  '공식 다운로드 페이지': 'Official download page',
+  '프로젝트를 저장한 뒤 새 설치 파일을 실행하세요. 프로젝트 파일과 PC 설정은 유지됩니다.':
+    'Save your project before running the new installer. Project files and PC settings are preserved.',
   '업무 기준 시간대': 'Business time zone',
   '오늘의 날짜와 보고서 기준에 적용됩니다. 저장된 일정은 바뀌지 않습니다.':
     'Used for today and reporting. Saved schedule dates are preserved.',

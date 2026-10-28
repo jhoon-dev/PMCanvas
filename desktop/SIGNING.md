@@ -59,6 +59,12 @@ P8 원본은 `APPLE_API_KEY_BASE64`에 base64로 넣습니다. 워크플로가 m
 
 인증서 없는 설치 파일은 수동 실행의 `unsigned=true`를 선택합니다. 이 작업은 서명용 Environment·Secrets를 사용하지 않으며 Windows 설치 파일과 Mac ARM64·x64 DMG/ZIP을 별도 artifact로 보관합니다.
 
+같은 실행의 `install` 작업은 새 Windows·Apple Silicon Mac·Intel Mac 환경에서 공개된 0.7.1 설치 파일의 고정 SHA-256을 검증하고 실제 설치 → 현재 버전 업데이트 → 제거 → 재설치를 수행합니다. Mac은 DMG를 마운트해 앱을 복사하며 Windows는 per-user NSIS를 실행합니다. 각 단계에서 설치 폴더 밖의 프로젝트·복구·시간대 설정 해시를 비교하고 설치된 앱을 실행해 한글 데이터·완료 기록·계층·기준 계획·언어와 시간대를 확인합니다. 결과는 `install-lifecycle-*` artifact입니다. 이 테스트는 CI 전용이며 기존 PC의 앱과 프로필을 제거하지 않습니다.
+
+이 검사는 설치·업데이트·제거의 데이터 보존을 확인합니다. 서명 없는 파일에 대한 SmartScreen·Gatekeeper 신뢰 획득이나 사용자별 보안 정책 승인을 대신하지 않습니다. Release 공개 전 세 설치 작업의 성공과 체크섬을 확인하세요.
+
+`unsigned=true`와 `publish=true`를 함께 선택하면 세 설치 작업이 모두 성공한 뒤 공개합니다. `release` 작업만 Release 쓰기 권한을 갖고, 동일 실행의 원본 커밋·다섯 설치 패키지·체크섬·세 설치 결과를 재검사합니다. 파일을 초안에 올린 뒤 GitHub의 크기·SHA-256을 확인하고 `desktop-v버전` 태그로 공개합니다. 공개된 동일 버전은 덮어쓰지 않으며 웹 릴리스와 태그를 분리합니다. 검증 실패 시 새 버전은 공개하지 않습니다. 수동 빌드의 기본값은 공개하지 않는 설정입니다.
+
 서명된 실제 설치 파일로 기존 사용자 데이터 보존·설치·업데이트·제거와 OS 신뢰 확인까지 검증한 후 배포하세요. 자동 CI의 패키지 실행 검사는 시스템 설치·제거를 대체하지 않습니다.
 
 참고: [electron-builder v26 서명 설정](https://www.electron.build/v26/docs/features/code-signing/), [macOS 공증](https://www.electron.build/v26/docs/notarization/).

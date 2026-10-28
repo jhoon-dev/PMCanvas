@@ -620,6 +620,25 @@ async function command(name) {
     return;
   }
   const result = await run(async () => {
+    if (name === 'updates') {
+      $('#updateStatus').textContent = ui('새 버전을 확인하고 있습니다.');
+      $('#updateDialog').showModal();
+      try {
+        const update = await api.checkUpdates();
+        $('#updateStatus').textContent = update.available
+          ? ui('새 버전: ') +
+            update.version +
+            (update.downloadAvailable ? '' : ui(' · 이 운영체제의 설치 파일을 준비 중입니다.'))
+          : update.version
+            ? ui('현재 최신 버전입니다. ') + update.currentVersion
+            : ui('공개된 데스크톱 버전이 아직 없습니다.');
+      } catch {
+        $('#updateStatus').textContent = ui(
+          '업데이트를 확인하지 못했습니다. 네트워크 연결을 확인하거나 나중에 다시 시도해 주세요.',
+        );
+      }
+      return;
+    }
     if (name === 'undo' || name === 'redo') {
       const next = await api[name](state.revision);
       accept(next);
@@ -755,6 +774,7 @@ document.addEventListener('click', (event) => {
     return;
   }
   if (target.dataset.command) {
+    target.closest('details.action-menu')?.removeAttribute('open');
     void command(target.dataset.command);
     return;
   }
@@ -990,6 +1010,10 @@ api.onCommand((name) => {
   void command(name);
 });
 api.onDocument(accept);
+$('#closeUpdate').onclick = () => $('#updateDialog').close();
+$('#openRelease').onclick = () => {
+  void api.openRelease().catch((error) => toast(ui(error.message)));
+};
 $('#cancelTimeZone').onclick = () => $('#timeZoneDialog').close();
 $('#timeZoneForm').onsubmit = async (event) => {
   event.preventDefault();

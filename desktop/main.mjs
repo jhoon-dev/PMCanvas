@@ -7,6 +7,7 @@ import {
   protocol,
   session,
   utilityProcess,
+  shell,
 } from 'electron';
 import path from 'node:path';
 import { unlinkSync, readFileSync } from 'node:fs';
@@ -20,6 +21,7 @@ import { getLanguage, setLanguage, ui, supportedLanguages } from './app/shared/i
 import { getBusinessTimeZone, setBusinessTimeZone } from './app/shared/business-clock.js';
 import { validateProject } from './app/shared/engine.js';
 import { readBounded } from './file-io.mjs';
+import { UpdateService } from './updates.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const testing = !app.isPackaged && process.env.PMCANVAS_DESKTOP_TEST === '1';
@@ -41,6 +43,7 @@ else {
     closing = false;
   const excelJob = createExcelJobs((...args) => utilityProcess.fork(...args));
   let excelImport;
+  const updates = new UpdateService();
   const updateHistoryMenu = (snapshot = document?.snapshot()) => {
     for (const [id, available] of [
       ['project-undo', snapshot?.canUndo],
@@ -250,6 +253,7 @@ else {
                 { label: ui('Excel 내보내기…'), click: () => command('exportExcel') },
                 { label: ui('Excel 가져오기…'), click: () => command('importExcel') },
                 { label: ui('Excel 입력 양식 저장…'), click: () => command('exportTemplate') },
+                { label: ui('업데이트 확인'), click: () => command('updates') },
                 { type: 'separator' },
                 { role: process.platform === 'darwin' ? 'close' : 'quit' },
               ],
@@ -293,6 +297,8 @@ else {
         return language;
       });
       handle('settings', () => ({ timeZone: getBusinessTimeZone() }), false);
+      handle('updates', () => updates.check(app.getVersion()), false);
+      handle('openRelease', () => shell.openExternal(updates.url), false);
       handle('timeZone', (value) => {
         if (editing || document.dirty || excelImport.current)
           throw Error(ui('변경사항을 저장하거나 취소한 뒤 시간대를 바꿔 주세요.'));
