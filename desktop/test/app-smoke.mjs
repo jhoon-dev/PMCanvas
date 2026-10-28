@@ -2,7 +2,7 @@
 
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import ExcelJS from 'exceljs';
 import os from 'node:os';
 import path from 'node:path';
@@ -50,8 +50,8 @@ try {
     userData: app.getPath('userData'),
   }));
   assert.equal(
-    path.resolve(runtime.userData),
-    temporary,
+    realpathSync(runtime.userData),
+    realpathSync(temporary),
     'Tests must use an isolated user profile.',
   );
   if (installed)
