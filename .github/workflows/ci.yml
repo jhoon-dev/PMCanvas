@@ -4,6 +4,9 @@ on:
   pull_request:
 permissions:
   contents: read
+defaults:
+  run:
+    working-directory: web
 jobs:
   browser:
     runs-on: ubuntu-24.04
@@ -16,6 +19,7 @@ jobs:
         with:
           node-version: '24'
           cache: npm
+          cache-dependency-path: web/package-lock.json
       - run: npm ci --ignore-scripts
       - run: google-chrome --version
       - run: npm run test:browser
@@ -24,8 +28,8 @@ jobs:
         with:
           name: browser-test-results
           path: |
-            playwright-report/
-            test-results/
+            web/playwright-report/
+            web/test-results/
           retention-days: 7
   test:
     runs-on: ubuntu-latest
@@ -52,6 +56,7 @@ jobs:
         with:
           node-version: '24'
           cache: npm
+          cache-dependency-path: web/package-lock.json
       - run: npm ci --ignore-scripts
       - run: npm run format:check
       - run: npm run public:check
@@ -70,10 +75,10 @@ jobs:
         run: docker run --rm --user 0:0 --read-only --tmpfs /tmp -v "$PWD/scripts/runtime-storage.mjs:/workspace/scripts/runtime-storage.mjs:ro" -v "$PWD/test/support/linux-storage-check.mjs:/workspace/test/support/linux-storage-check.mjs:ro" node:24-bookworm-slim node /workspace/test/support/linux-storage-check.mjs
       - name: Build backup sidecar and verify an actual isolated restore
         run: |
-          docker build -f Dockerfile.backup -t pmcanvas-backup:ci .
+          docker build -f Dockerfile.backup -t pmcanvas-backup:ci ..
           node -e "require('node:fs').writeFileSync(process.env.RUNNER_TEMP+'/pmcanvas-backup-key',Buffer.alloc(32,7),{mode:0o644})"
           node --input-type=module -e "import {createPool} from './server/pg-pool.mjs';const p=await createPool();await p.query('UPDATE pm_backup_settings SET enabled=true,next_run_at=now(),verify_restore=true,requested=false,lease_until=NULL');await p.end();"
           docker run --rm --network host --read-only --tmpfs /tmp -v "$RUNNER_TEMP/pmcanvas-backup-key:/run/secrets/mfa.key:ro" -e PGHOST -e PGUSER -e PGPASSWORD -e PGDATABASE -e BACKUP_DIR=/tmp/backups -e BACKUP_RESTORE_OWNER=pmcanvas pmcanvas-backup:ci node server/backup-worker.mjs --once
           node scripts/check-backup.mjs
       - name: Rehearse application recovery with isolated fixture data
-        run: docker run --rm --network host --read-only --tmpfs /tmp -v "$PWD/test:/app/test:ro" -v "$PWD/public:/app/public:ro" -v "$PWD/node_modules:/app/node_modules:ro" -e PGHOST -e PGUSER -e PGPASSWORD -e PGDATABASE -e RUN_RESTORE_TESTS=1 pmcanvas-backup:ci node --test test/restore.integration.mjs
+        run: docker run --rm --network host --read-only --tmpfs /tmp -v "$PWD/test:/app/web/test:ro" -v "$PWD/public:/app/web/public:ro" -v "$PWD/node_modules:/app/web/node_modules:ro" -e PGHOST -e PGUSER -e PGPASSWORD -e PGDATABASE -e RUN_RESTORE_TESTS=1 pmcanvas-backup:ci node --test test/restore.integration.mjs

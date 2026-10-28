@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>PM Canvas Desktop</title>
+    <link rel="stylesheet" href="./shared/styles.css" />
+    <link rel="stylesheet" href="./desktop.css" />
+    <script type="module" src="./renderer.js"></script>
+  </head>
+  <body>
+    <div class="desktop-shell">
+      <aside class="desktop-sidebar">
+        <div class="desktop-brand">
+          <span class="brand-symbol">P</span>
+          <div>PM Canvas<small>DESKTOP</small></div>
+        </div>
+        <div class="desktop-file">
+          <span class="eyebrow">PROJECT FILE</span>
+          <strong id="projectName">프로젝트를 열어 주세요</strong>
+          <small id="fileName">이 PC에서 편하게 관리하세요</small>
+        </div>
+        <nav aria-label="주 메뉴">
+          <button data-view="overview">프로젝트 현황</button>
+          <button data-view="tasks">업무 · 일정</button>
+          <button data-view="daily">완료 체크</button>
+          <button data-view="people">참여인력</button>
+          <button data-view="reports">보고서</button>
+        </nav>
+        <div class="desktop-sidebar-foot">
+          <span class="offline-dot"></span> 오프라인 · 내 PC에 저장<small>PM Canvas Desktop</small>
+        </div>
+      </aside>
+      <div class="desktop-workspace">
+        <header class="desktop-toolbar">
+          <div class="desktop-file-actions">
+            <button class="button small" data-command="new">새 프로젝트</button>
+            <button class="button small" data-command="open">열기</button>
+            <button class="button small primary" data-command="save">저장</button>
+            <details class="action-menu">
+              <summary class="button small">파일 옵션</summary>
+              <div class="menu-popover">
+                <button class="button" data-command="saveAs">다른 이름으로 저장</button>
+                <button class="button" data-command="exportWeb">웹 JSON 내보내기</button>
+                <button class="button" data-command="exportExcel">Excel 내보내기</button>
+                <button class="button" data-command="importExcel">Excel 가져오기</button>
+                <button class="button" data-command="exportTemplate">Excel 입력 양식 저장</button>
+              </div>
+            </details>
+          </div>
+          <span id="saveStatus" role="status">프로젝트 파일을 열거나 새로 만드세요</span>
+        </header>
+        <main id="content" tabindex="-1"></main>
+        <footer class="desktop-footer">
+          완료한 작업을 체크하면 진척률과 예상 완료일이 함께 바뀝니다.
+        </footer>
+      </div>
+    </div>
+    <dialog id="editorDialog" class="desktop-dialog" aria-labelledby="dialogTitle">
+      <form id="editorForm">
+        <div class="dialog-head">
+          <h2 id="dialogTitle"></h2>
+          <button type="button" class="icon-button" id="closeEditor" aria-label="입력 취소">
+            ×
+          </button>
+        </div>
+        <div id="dialogBody" class="dialog-body"></div>
+        <p id="formError" class="error" role="alert"></p>
+        <div class="dialog-foot">
+          <button type="button" class="button danger" id="deleteButton">삭제</button
+          ><span class="spacer"></span
+          ><button type="button" class="button" id="cancelEditor">취소</button
+          ><button class="button primary" id="submitButton" type="submit">적용</button>
+        </div>
+      </form>
+    </dialog>
+    <div id="toast" class="desktop-toast" role="status" hidden></div>
+  </body>
+</html>

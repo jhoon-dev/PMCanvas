@@ -1,54 +1,22 @@
 {
-  "name": "pmcanvas-server",
-  "version": "0.20.4",
+  "name": "pmcanvas",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
+  "description": "PM Canvas web and desktop repository",
   "engines": {
     "node": ">=22.18.0"
   },
   "scripts": {
-    "start": "node --env-file-if-exists=.env server/main.mjs",
-    "demo": "node scripts/demo.mjs",
-    "test": "node --test test/*.test.mjs",
-    "test:postgres": "node --env-file-if-exists=.env --test test/postgres.integration.mjs",
-    "test:restore": "node --test test/restore.integration.mjs",
-    "migrate": "node --env-file-if-exists=.env scripts/migrate.mjs",
-    "test:http": "node --test test/http.network.integration.mjs",
-    "test:browser": "playwright test",
-    "test:performance": "node scripts/benchmark.mjs",
-    "public:check": "node scripts/public-safety.mjs",
-    "release": "node scripts/release.mjs",
-    "setup": "node scripts/manage.mjs setup",
-    "service:up": "node scripts/manage.mjs up",
-    "service:status": "node scripts/manage.mjs status",
-    "service:stop": "node scripts/manage.mjs stop",
-    "service:logs": "node scripts/manage.mjs logs",
-    "backup": "node scripts/manage.mjs backup",
-    "restore": "node scripts/manage.mjs restore",
-    "auth:check": "node --env-file-if-exists=.env scripts/check-auth.mjs",
-    "mail:check": "node --env-file-if-exists=.env scripts/check-mail.mjs",
-    "format": "prettier --write public server scripts test package.json playwright.config.mjs .prettierrc.json",
-    "format:check": "prettier --check public server scripts test package.json playwright.config.mjs .prettierrc.json"
-  },
-  "dependencies": {
-    "@node-saml/node-saml": "5.1.0",
-    "@xmldom/xmldom": "0.9.12",
-    "exceljs": "4.4.0",
-    "ldapts": "9.2.0",
-    "nodemailer": "10.2.1",
-    "openid-client": "6.8.8",
-    "pg": "8.23.1",
-    "yauzl": "3.4.0"
-  },
-  "devDependencies": {
-    "@playwright/test": "1.64.1",
-    "prettier": "3.9.10",
-    "selfsigned": "5.5.0",
-    "xml-crypto": "6.4.0"
-  },
-  "overrides": {
-    "exceljs": {
-      "uuid": "11.1.1"
-    }
+    "start": "npm --prefix web start",
+    "web:start": "npm --prefix web start",
+    "web:demo": "npm --prefix web run demo",
+    "desktop:start": "npm --prefix desktop start",
+    "test:web": "npm --prefix web test",
+    "test:desktop": "npm --prefix desktop test",
+    "test": "npm run test:web && npm run test:desktop",
+    "format:check": "npm --prefix web run format:check && node web/node_modules/prettier/bin/prettier.cjs --check desktop shared package.json .github/workflows",
+    "public:check": "npm --prefix web run public:check",
+    "release:web": "npm --prefix web run release"
   }
 }

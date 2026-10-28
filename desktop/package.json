@@ -1,0 +1,100 @@
+{
+  "name": "pmcanvas-desktop",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Offline project planning for Windows and macOS",
+  "author": "PM Canvas",
+  "type": "module",
+  "main": "main.mjs",
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "prepare:app": "node scripts/prepare.mjs",
+    "start": "npm run prepare:app && electron .",
+    "test": "node --test test/*.test.mjs",
+    "test:app": "node test/app-smoke.mjs",
+    "pack": "npm run prepare:app && electron-builder --dir",
+    "dist:win": "npm run prepare:app && electron-builder --win nsis --x64",
+    "dist:win:dev": "npm run prepare:app && electron-builder --win nsis --x64 --config.win.signAndEditExecutable=false",
+    "dist:mac": "npm run prepare:app && electron-builder --mac dmg zip --arm64 --x64",
+    "pretest": "npm run prepare:app",
+    "pretest:app": "npm run prepare:app",
+    "pretest:renderer": "npm run prepare:app",
+    "test:renderer": "node test/renderer-smoke.mjs"
+  },
+  "devDependencies": {
+    "electron": "45.0.0",
+    "electron-builder": "26.18.0"
+  },
+  "build": {
+    "appId": "app.pmcanvas.desktop",
+    "productName": "PM Canvas Desktop",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.mjs",
+      "preload.cjs",
+      "document.mjs",
+      "assets.mjs",
+      "reports.mjs",
+      "file-io.mjs",
+      "excel-worker.mjs",
+      "excel-jobs.mjs",
+      "excel-session.mjs",
+      "app/index.html",
+      "app/renderer.js",
+      "app/excel-ui.js",
+      "app/desktop.css",
+      "app/shared/engine.js",
+      "app/shared/planning.js",
+      "app/shared/html.js",
+      "app/shared/i18n.js",
+      "app/shared/locales/en.js",
+      "app/shared/view-ui.js",
+      "app/shared/people-view.js",
+      "app/shared/project-editor.js",
+      "app/shared/reports.js",
+      "app/shared/wbs-model.js",
+      "app/shared/excel-import-model.js",
+      "app/shared/styles.css",
+      "app/model/project.mjs",
+      "app/model/errors.mjs",
+      "app/node/excel.mjs",
+      "app/node/excel-import.mjs",
+      "package.json"
+    ],
+    "asar": true,
+    "win": {
+      "target": "nsis",
+      "artifactName": "PMCanvas-Desktop-${version}-Windows-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "deleteAppDataOnUninstall": false,
+      "include": "build/installer.nsh"
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.productivity",
+      "artifactName": "PMCanvas-Desktop-${version}-macOS-${arch}.${ext}",
+      "hardenedRuntime": true
+    }
+  },
+  "dependencies": {
+    "@xmldom/xmldom": "0.9.12",
+    "exceljs": "4.4.0",
+    "yauzl": "3.4.0"
+  },
+  "overrides": {
+    "exceljs": {
+      "uuid": "11.1.1"
+    }
+  }
+}
