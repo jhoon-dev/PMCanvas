@@ -1,7 +1,7 @@
 import { ui, locale } from './i18n.js';
 import { escapeHtml as esc } from './html.js';
 import { today, progress } from './engine.js';
-const TODAY = today();
+import { getBusinessTimeZone } from './business-clock.js';
 const palette = ['#416be8', '#27a498', '#ae7ad8', '#df9a40', '#de718c', '#66849e'];
 const icons = {
   dashboard: 'M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z',
@@ -77,6 +77,7 @@ function pageHead(eyebrow, title, subtitle, buttons) {
   );
 }
 function dateToolbar(asOf, extra = '') {
+  const TODAY = today();
   return (
     '<div class="view-toolbar"><div class="date-control">' +
     icon('calendar') +
@@ -86,6 +87,8 @@ function dateToolbar(asOf, extra = '') {
     TODAY +
     ui('" aria-label="보고 기준일"><span class="date-tag">') +
     (asOf === TODAY ? ui('오늘') : ui('과거 조회')) +
+    ' · ' +
+    esc(getBusinessTimeZone()) +
     '</span></div>' +
     extra +
     '</div>'

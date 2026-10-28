@@ -1,4 +1,5 @@
 import { ui } from './i18n.js';
+import { setBusinessTimeZone } from './business-clock.js';
 import { installLanguage } from './i18n.js';
 import { createProjectEditor } from './project-editor.js';
 import { openConflict } from './conflict-ui.js';
@@ -500,6 +501,10 @@ async function loadProjects({ force = false, activeId = state.activeId } = {}) {
 async function boot() {
   try {
     const session = await api('auth/me');
+    setBusinessTimeZone(session.timeZone || 'Asia/Seoul');
+    reportClock.refresh();
+    TODAY = reportClock.today;
+    asOf = reportClock.reportDate;
     if (currentUser?.id !== session.user.id) {
       wbs.persistDraft();
       wbs.draft = null;

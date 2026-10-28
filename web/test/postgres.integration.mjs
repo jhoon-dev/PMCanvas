@@ -12,6 +12,137 @@ import { hashPassword, token, digest } from '../server/security.mjs';
 import { screenProject } from './support/screen-fixtures.mjs';
 import { workspaceRequest } from '../server/workspace-sync.mjs';
 import { workspaceKnowledge } from '../public/workspace-cache.js';
+import http from 'node:http';
+import { createApplication } from '../server/http.mjs';
+
+test(
+  '실제 PostgreSQL: 본문 수신 중 비활성화·로그아웃·비밀번호 변경 시 저장 거절',
+  { skip: process.env.RUN_POSTGRES_TESTS !== '1' },
+  async () => {
+    if (!/_test$/.test(process.env.PGDATABASE || ''))
+      throw Error('Dedicated _test database required.');
+    const pool = await createPool(),
+      repo = new PgRepository(pool);
+    let server, request;
+    const users = [],
+      projects = [];
+    try {
+      await migrate(pool);
+      const passwordHash = await hashPassword('session-revocation-fixture-1234');
+      const admin = await repo.createUser({
+        email: randomUUID() + '@example.com',
+        name: 'Fixture admin',
+        passwordHash,
+        isAdmin: true,
+      });
+      users.push(admin.id);
+      server = createApplication({ repo, origin: 'http://localhost' });
+      await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+      for (const kind of ['disable', 'logout', 'password']) {
+        const user = await repo.createUser({
+          email: randomUUID() + '@example.com',
+          name: 'Fixture member',
+          passwordHash,
+        });
+        users.push(user.id);
+        const id = randomUUID(),
+          project = cleanProject({ name: 'Before', members: [], tasks: [] });
+        await repo.createProject(user.id, id, project);
+        projects.push(id);
+        const cookie = token(),
+          csrf = token(),
+          hash = digest(cookie);
+        await repo.createSession({
+          hash,
+          userId: user.id,
+          csrf,
+          expires: new Date(Date.now() + 60000),
+          passwordHash,
+        });
+        let authenticated;
+        const barrier = new Promise((resolve) => {
+          authenticated = resolve;
+        });
+        const find = repo.findSession.bind(repo);
+        repo.findSession = async (value) => {
+          const result = await find(value);
+          if (result && value === hash) authenticated();
+          return result;
+        };
+        const body = JSON.stringify({
+          revision: 1,
+          project: { ...project, name: 'After revocation' },
+        });
+        const response = new Promise((resolve, reject) => {
+          request = http.request(
+            {
+              host: '127.0.0.1',
+              port: server.address().port,
+              path: '/api/projects/' + id,
+              method: 'PUT',
+              headers: {
+                Origin: 'http://localhost',
+                'Content-Type': 'application/json',
+                Cookie: 'pmcanvas_session=' + cookie,
+                'X-CSRF-Token': csrf,
+                'Transfer-Encoding': 'chunked',
+                Connection: 'close',
+              },
+            },
+            (res) => {
+              res.resume();
+              res.on('end', () => resolve(res.statusCode));
+            },
+          );
+          request.on('error', reject);
+        });
+        request.write(body.slice(0, 1));
+        let timer;
+        try {
+          await Promise.race([
+            barrier,
+            new Promise((_, reject) => {
+              timer = setTimeout(() => reject(Error('Authentication timeout')), 10000);
+            }),
+          ]);
+        } finally {
+          clearTimeout(timer);
+        }
+        if (kind === 'logout') await repo.deleteSession(hash);
+        else
+          await repo.manageUser(
+            admin.id,
+            user.id,
+            kind === 'disable' ? { isActive: false } : { passwordHash },
+          );
+        request.end(body.slice(1));
+        assert.equal(await response, 401, kind);
+        repo.findSession = find;
+        const saved = (await pool.query('SELECT name,revision FROM pm_projects WHERE id=$1', [id]))
+          .rows[0];
+        assert.equal(saved.name, 'Before');
+        assert.equal(saved.revision, 1);
+        if (kind === 'disable') {
+          await assert.rejects(repo.updateProject(user.id, id, { ...project, name: 'direct' }, 1), {
+            code: 'AUTH_REQUIRED',
+          });
+          await assert.rejects(repo.createProject(user.id, randomUUID(), project), {
+            code: 'AUTH_REQUIRED',
+          });
+          await assert.rejects(repo.restoreTrash(user.id, 'project', id), {
+            code: 'AUTH_REQUIRED',
+          });
+        }
+      }
+    } finally {
+      request?.destroy();
+      if (server) await new Promise((resolve) => server.close(resolve));
+      await pool.query('DELETE FROM pm_projects WHERE id=ANY($1::uuid[])', [projects]);
+      await pool.query('DELETE FROM pm_users WHERE id=ANY($1::uuid[])', [users]);
+      await pool.end();
+    }
+  },
+);
 
 test(
   '실제 PostgreSQL: 메일 오류 집계·운영 알림 원자 증가·수신자 제외·검증과 민감정보 없는 이력',

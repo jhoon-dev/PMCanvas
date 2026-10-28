@@ -41,6 +41,7 @@ services:
       PORT: 3000
       PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-http://localhost:3000}
       BASE_PATH: ${BASE_PATH:-/pmcanvas}
+      PM_TIME_ZONE: ${PM_TIME_ZONE:-Asia/Seoul}
       MFA_KEY_FILE: ${MFA_KEY_FILE:-/app/config/secrets/mfa.key}
       TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
       REGISTRATION_MODE: ${REGISTRATION_MODE:-approval}

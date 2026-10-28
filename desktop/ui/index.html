@@ -70,6 +70,7 @@
                 <button class="button" data-command="importExcel">Excel 가져오기</button>
                 <button class="button" data-command="exportTemplate">Excel 입력 양식 저장</button>
                 <button class="button" data-command="about">앱 정보</button>
+                <button class="button" data-command="timeZone">업무 기준 시간대</button>
               </div>
             </details>
           </div>
@@ -100,5 +101,29 @@
       </form>
     </dialog>
     <div id="toast" class="desktop-toast" role="status" hidden></div>
+    <dialog id="timeZoneDialog" class="desktop-dialog" aria-labelledby="timeZoneTitle">
+      <form id="timeZoneForm">
+        <div class="dialog-head"><h2 id="timeZoneTitle">업무 기준 시간대</h2></div>
+        <div class="dialog-body">
+          <label class="field"
+            >IANA Time Zone<input id="timeZoneInput" required maxlength="100" list="timeZones"
+          /></label>
+          <datalist id="timeZones">
+            <option value="Asia/Seoul"></option>
+            <option value="Asia/Tokyo"></option>
+            <option value="America/New_York"></option>
+            <option value="America/Los_Angeles"></option>
+            <option value="Europe/London"></option>
+            <option value="UTC"></option>
+          </datalist>
+          <p>오늘의 날짜와 보고서 기준에 적용됩니다. 저장된 일정은 바뀌지 않습니다.</p>
+          <p id="timeZoneError" class="error" role="alert"></p>
+        </div>
+        <div class="dialog-foot">
+          <button type="button" class="button" id="cancelTimeZone">취소</button
+          ><button class="button primary">적용</button>
+        </div>
+      </form>
+    </dialog>
   </body>
 </html>

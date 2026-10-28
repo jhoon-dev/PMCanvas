@@ -10,6 +10,7 @@ import {
 import { escapeHtml as esc } from './shared/html.js';
 import { getLanguage, ui, localizeStatic } from './shared/i18n.js';
 import { ReportClock } from './shared/report-clock.js';
+import { getBusinessTimeZone, setBusinessTimeZone } from './shared/business-clock.js';
 import { editorForm, itemEditor, applyEditor } from './shared/project-editor.js';
 import { peopleView } from './shared/people-view.js';
 import { completionRecords } from './shared/reports.js';
@@ -26,6 +27,7 @@ import { bulkProposal, bulkPreviewHtml } from './bulk-ui.js';
 import { pct, num, person, meter, badge, pageHead, btn, empty } from './shared/view-ui.js';
 
 const api = window.desktop;
+setBusinessTimeZone((await api.settings?.())?.timeZone || 'Asia/Seoul');
 const $ = (selector) => document.querySelector(selector);
 const reportClock = new ReportClock();
 let state = { project: null, revision: -1, dirty: false, filename: '' };
@@ -603,6 +605,16 @@ async function commit(project) {
   accept(next);
 }
 async function command(name) {
+  if (name === 'timeZone') {
+    if (busy || editor || importing || state.dirty) {
+      toast(ui('변경사항을 저장하거나 취소한 뒤 시간대를 바꿔 주세요.'));
+      return;
+    }
+    $('#timeZoneInput').value = getBusinessTimeZone();
+    $('#timeZoneError').textContent = '';
+    $('#timeZoneDialog').showModal();
+    return;
+  }
   if (editor || importing) {
     toast(ui('입력창의 변경사항을 먼저 적용하거나 취소해 주세요.'));
     return;
@@ -978,6 +990,16 @@ api.onCommand((name) => {
   void command(name);
 });
 api.onDocument(accept);
+$('#cancelTimeZone').onclick = () => $('#timeZoneDialog').close();
+$('#timeZoneForm').onsubmit = async (event) => {
+  event.preventDefault();
+  try {
+    await api.setTimeZone($('#timeZoneInput').value);
+    location.reload();
+  } catch (error) {
+    $('#timeZoneError').textContent = ui(error.message);
+  }
+};
 document.documentElement.lang = getLanguage();
 localizeStatic(document.documentElement);
 $('#languageSelect').value = getLanguage();

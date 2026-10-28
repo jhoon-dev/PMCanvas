@@ -1,5 +1,11 @@
 // Authored interface text only; project names, notes and imported values are never translated.
 export default {
+  '업무 기준 시간대': 'Business time zone',
+  '오늘의 날짜와 보고서 기준에 적용됩니다. 저장된 일정은 바뀌지 않습니다.':
+    'Used for today and reporting. Saved schedule dates are preserved.',
+  '변경사항을 저장하거나 취소한 뒤 시간대를 바꿔 주세요.':
+    'Save or discard changes before changing the time zone.',
+  '올바른 IANA 시간대를 입력해 주세요.': 'Enter a valid IANA time zone.',
   '프로젝트 현황': 'Project overview',
   '파일 옵션': 'File options',
   '하위 포함 일정': 'Group dates',

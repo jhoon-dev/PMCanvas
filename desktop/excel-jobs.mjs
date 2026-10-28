@@ -1,4 +1,5 @@
 import { fileURLToPath } from 'node:url';
+import { getBusinessTimeZone } from './app/shared/business-clock.js';
 
 export function createExcelJobs(fork, { timeout = 15000 } = {}) {
   let active = false;
@@ -12,7 +13,7 @@ export function createExcelJobs(fork, { timeout = 15000 } = {}) {
     active = true;
     try {
       return await new Promise((resolve, reject) => {
-        const env = { NODE_ENV: 'production' };
+        const env = { NODE_ENV: 'production', PM_TIME_ZONE: getBusinessTimeZone() };
         for (const key of ['SystemRoot', 'TEMP', 'TMP'])
           if (process.env[key]) env[key] = process.env[key];
         const child = fork(fileURLToPath(new URL('./excel-worker.mjs', import.meta.url)), [], {

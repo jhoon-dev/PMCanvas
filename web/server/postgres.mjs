@@ -635,7 +635,18 @@ export class PgRepository extends WorkspaceOperations {
       return { ok: true };
     });
   }
+  async activeUser(c, userId, lock = false) {
+    const user = (
+      await c.query(
+        'SELECT is_active FROM pm_users WHERE id=$1' + (lock ? ' FOR NO KEY UPDATE' : ''),
+        [userId],
+      )
+    ).rows[0];
+    if (!user?.is_active) fail(401, 'AUTH_REQUIRED', '로그인이 필요합니다.');
+  }
   async access(c, userId, id, required = 'viewer', lock = false) {
+    // Serialize writes with account deactivation, before taking project locks.
+    await this.activeUser(c, userId, lock);
     if (lock) await c.query('SELECT id FROM pm_projects WHERE id=$1 FOR UPDATE', [id]);
     const { rows } = await c.query(
       'SELECT p.*,a.role FROM pm_projects p JOIN pm_project_access a ON a.project_id=p.id WHERE p.id=$1 AND a.user_id=$2 AND p.deleted_at IS NULL',
@@ -816,7 +827,7 @@ export class PgRepository extends WorkspaceOperations {
   }
   async createProject(userId, id, p) {
     return this.transaction(async (c) => {
-      await c.query('SELECT id FROM pm_users WHERE id=$1 FOR UPDATE', [userId]);
+      await this.activeUser(c, userId, true);
       const existing = (await c.query('SELECT * FROM pm_projects WHERE id=$1 FOR UPDATE', [id]))
         .rows[0];
       if (existing) {

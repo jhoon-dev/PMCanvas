@@ -22,7 +22,11 @@ for (const [directory, archive, executable] of options) {
     throw Error('Build the package for this operating system first.');
   execFileSync(
     process.execPath,
-    [path.join(root, 'test/package-safety.mjs'), path.join(base, archive)],
+    [
+      path.join(root, 'test/package-safety.mjs'),
+      path.join(base, archive),
+      ...(process.env.PM_SOURCE_COMMIT ? [process.env.PM_SOURCE_COMMIT] : []),
+    ],
     { cwd: root, stdio: 'inherit' },
   );
   if (args.includes('--smoke'))
