@@ -68,3 +68,5 @@ P8 원본은 `APPLE_API_KEY_BASE64`에 base64로 넣습니다. 워크플로가 m
 서명된 실제 설치 파일로 기존 사용자 데이터 보존·설치·업데이트·제거와 OS 신뢰 확인까지 검증한 후 배포하세요. 자동 CI의 패키지 실행 검사는 시스템 설치·제거를 대체하지 않습니다.
 
 참고: [electron-builder v26 서명 설정](https://www.electron.build/v26/docs/features/code-signing/), [macOS 공증](https://www.electron.build/v26/docs/notarization/).
+
+공개 단계만 실패한 경우 `unsigned=false`, `publish=true`, `release_run=검증된_실행_ID`로 재시도합니다. 원본 실행의 소스 커밋과 일곱 빌드·설치 작업의 성공을 API로 다시 확인하며 원본 패키지·검증 기록을 사용합니다. 초안은 Release 목록에서 ID를 찾아 검증하므로 미공개 태그 조회 API의 404에 의존하지 않습니다. 이미 공개했거나 원본 커밋이 다른 릴리스는 덮어쓰지 않습니다.

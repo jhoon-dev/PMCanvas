@@ -2,6 +2,37 @@ import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 
+export const releaseJobs = Object.freeze([
+  'verify (windows-latest)',
+  'verify (macos-latest)',
+  'unsigned (windows-latest, win)',
+  'unsigned (macos-latest, mac)',
+  'install (windows-latest)',
+  'install (macos-latest)',
+  'install (macos-15-intel)',
+]);
+export function verifiedReleaseSource(run, jobs) {
+  if (
+    run.repository?.full_name?.toLowerCase() !== 'jhoon-dev/pmcanvas' ||
+    run.event !== 'workflow_dispatch' ||
+    run.path !== '.github/workflows/desktop.yml' ||
+    !/^[a-f0-9]{40}$/.test(run.head_sha || '')
+  )
+    throw Error('Release source must be a verified desktop build run in this repository.');
+  for (const name of releaseJobs)
+    if (!jobs.some((job) => job.name === name && job.conclusion === 'success'))
+      throw Error('Missing successful source job: ' + name);
+  return run.head_sha;
+}
+export function editableReleaseDraft(releases, tag, commit) {
+  const matches = releases.filter((release) => release.tag_name === tag);
+  if (matches.length > 1) throw Error('Ambiguous release tag.');
+  const release = matches[0];
+  if (release && (!release.draft || release.target_commitish !== commit))
+    throw Error('Only an unpublished draft with the same source commit can be resumed.');
+  return release;
+}
+
 export function releaseSource(root, run = execFileSync) {
   if (
     run('git', ['status', '--porcelain', '--untracked-files=normal'], {

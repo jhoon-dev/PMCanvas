@@ -4,15 +4,12 @@ import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
+import { verifiedReleaseSource, editableReleaseDraft } from './release-policy.mjs';
 
 // Publishing is explicitly dispatched and gated by all three real installation jobs.
 if (process.env.GITHUB_ACTIONS !== 'true' || !/^\d+$/.test(process.env.GITHUB_RUN_ID || ''))
   throw Error('An explicitly dispatched GitHub run is required.');
 const root = fileURLToPath(new URL('../../', import.meta.url));
-const pkg = JSON.parse(fs.readFileSync(path.join(root, 'desktop/package.json')));
-const version = pkg.version;
-assert.match(version, /^\d+\.\d+\.\d+$/);
-const tag = 'desktop-v' + version;
 const gh = (args) =>
   execFileSync('gh', args, {
     cwd: root,
@@ -20,7 +17,26 @@ const gh = (args) =>
     stdio: ['ignore', 'pipe', 'pipe'],
     maxBuffer: 4 * 1024 * 1024,
   });
-const commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
+const runId = process.env.PM_RELEASE_RUN_ID || process.env.GITHUB_RUN_ID;
+assert.match(runId, /^\d+$/);
+const sourceRun = JSON.parse(gh(['api', 'repos/jhoon-dev/PMCanvas/actions/runs/' + runId]));
+const jobs = JSON.parse(
+  gh(['api', 'repos/jhoon-dev/PMCanvas/actions/runs/' + runId + '/jobs?per_page=100']),
+).jobs;
+const commit = verifiedReleaseSource(sourceRun, jobs);
+const sourcePackage = JSON.parse(
+  gh(['api', 'repos/jhoon-dev/PMCanvas/contents/desktop/package.json?ref=' + commit]),
+);
+const pkg = JSON.parse(Buffer.from(sourcePackage.content, 'base64'));
+const version = pkg.version;
+assert.match(version, /^\d+\.\d+\.\d+$/);
+const tag = 'desktop-v' + version;
+const findRelease = () =>
+  editableReleaseDraft(
+    JSON.parse(gh(['api', 'repos/jhoon-dev/PMCanvas/releases?per_page=100'])),
+    tag,
+    commit,
+  );
 const work = fs.mkdtempSync(path.join(process.env.RUNNER_TEMP, 'pmcanvas-release-'));
 const downloads = path.join(work, 'artifacts'),
   stage = path.join(work, 'verified');
@@ -28,7 +44,7 @@ fs.mkdirSync(stage);
 gh([
   'run',
   'download',
-  process.env.GITHUB_RUN_ID,
+  runId,
   '--pattern',
   'PMCanvas-unsigned-*',
   '--pattern',
@@ -114,7 +130,7 @@ const validation = path.join(stage, 'desktop-' + version + '-install-validation.
 fs.writeFileSync(
   validation,
   JSON.stringify(
-    { version, commit, runId: process.env.GITHUB_RUN_ID, results: evidence },
+    { version, commit, runId, publicationRunId: process.env.GITHUB_RUN_ID, results: evidence },
     null,
     2,
   ) + '\n',
@@ -129,10 +145,7 @@ fs.writeFileSync(
     version +
     ' 업데이트 → 제거 → 재설치를 실제 수행하고 프로젝트·복구·언어·시간대·완료 기록·계층·기준 계획 보존을 확인했습니다. 상세 결과는 install-validation JSON을 확인하세요. 프로젝트를 설치 폴더 밖에 저장하고 앱을 종료한 뒤 설치하세요.\n',
 );
-let existing;
-try {
-  existing = JSON.parse(gh(['api', 'repos/jhoon-dev/PMCanvas/releases/tags/' + tag]));
-} catch {}
+const existing = findRelease();
 if (existing) {
   assert.equal(existing.draft, true, 'Published releases are never overwritten.');
   assert.equal(existing.target_commitish, commit);
@@ -151,7 +164,10 @@ if (existing) {
     '--latest=false',
   ]);
 gh(['release', 'upload', tag, ...uploads, '--clobber']);
-const uploaded = JSON.parse(gh(['api', 'repos/jhoon-dev/PMCanvas/releases/tags/' + tag]));
+const release = findRelease();
+assert.ok(release?.id);
+assert.equal(release.draft, true);
+const uploaded = JSON.parse(gh(['api', 'repos/jhoon-dev/PMCanvas/releases/' + release.id]));
 for (const file of uploads) {
   const asset = uploaded.assets.find((a) => a.name === path.basename(file));
   assert.ok(asset);

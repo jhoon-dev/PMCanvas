@@ -34,10 +34,15 @@ on:
         description: Publish unsigned installers only after all installation checks pass
         type: boolean
         default: false
+      release_run:
+        description: Optional verified build run ID to retry publication without rebuilding
+        type: string
+        default: ''
 permissions:
   contents: read
 jobs:
   verify:
+    if: github.event_name != 'workflow_dispatch' || inputs.release_run == ''
     strategy:
       fail-fast: false
       matrix:
@@ -152,13 +157,16 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
   release:
-    if: github.event_name == 'workflow_dispatch' && inputs.unsigned && inputs.publish
+    if: always() && github.event_name == 'workflow_dispatch' && inputs.publish && (needs.install.result == 'success' || (inputs.release_run != '' && !inputs.unsigned))
     needs: install
     runs-on: ubuntu-latest
     timeout-minutes: 25
     permissions:
       contents: write
       actions: read
+    concurrency:
+      group: desktop-release-publication
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -167,6 +175,7 @@ jobs:
       - run: node desktop/scripts/publish-release.mjs
         env:
           GH_TOKEN: ${{ github.token }}
+          PM_RELEASE_RUN_ID: ${{ inputs.release_run }}
   signed:
     if: github.event_name == 'workflow_dispatch' && inputs.signed
     needs: verify

@@ -4,7 +4,70 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { signingPolicy, releaseSource } from '../scripts/release-policy.mjs';
+import {
+  signingPolicy,
+  releaseSource,
+  verifiedReleaseSource,
+  editableReleaseDraft,
+  releaseJobs,
+} from '../scripts/release-policy.mjs';
+
+test('publication recovery requires all source checks and rejects another repository, workflow or event', () => {
+  const run = {
+    repository: { full_name: 'jhoon-dev/PMCanvas' },
+    event: 'workflow_dispatch',
+    path: '.github/workflows/desktop.yml',
+    head_sha: 'a'.repeat(40),
+  };
+  const jobs = releaseJobs.map((name) => ({ name, conclusion: 'success' }));
+  assert.equal(verifiedReleaseSource(run, jobs), run.head_sha);
+  assert.throws(
+    () =>
+      verifiedReleaseSource(
+        run,
+        jobs.filter((job) => job.name !== 'install (macos-15-intel)'),
+      ),
+    /Missing successful/,
+  );
+  assert.throws(
+    () => verifiedReleaseSource({ ...run, event: 'pull_request' }, jobs),
+    /verified desktop/,
+  );
+  assert.throws(
+    () => verifiedReleaseSource({ ...run, repository: { full_name: 'other/project' } }, jobs),
+    /verified desktop/,
+  );
+  assert.throws(
+    () => verifiedReleaseSource({ ...run, path: '.github/workflows/other.yml' }, jobs),
+    /verified desktop/,
+  );
+});
+test('draft recovery resolves IDs from the release list and never overwrites a published or different source release', () => {
+  const release = {
+    id: 42,
+    tag_name: 'desktop-v0.7.2',
+    draft: true,
+    target_commitish: 'a'.repeat(40),
+  };
+  assert.equal(editableReleaseDraft([release], 'desktop-v0.7.2', release.target_commitish).id, 42);
+  assert.equal(
+    editableReleaseDraft([release], 'desktop-v0.7.3', release.target_commitish),
+    undefined,
+  );
+  assert.throws(
+    () =>
+      editableReleaseDraft(
+        [{ ...release, draft: false }],
+        release.tag_name,
+        release.target_commitish,
+      ),
+    /unpublished/,
+  );
+  assert.throws(
+    () => editableReleaseDraft([release], release.tag_name, 'b'.repeat(40)),
+    /same source/,
+  );
+});
 import { verifySignatures } from '../scripts/verify-signatures.mjs';
 
 test('release verification checks timestamped Authenticode and both macOS signatures, Gatekeeper and stapled tickets', (t) => {
