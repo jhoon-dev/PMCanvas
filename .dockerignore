@@ -19,3 +19,11 @@
 **/test-results
 **/*.png
 desktop
+# Private signing and TLS material must never enter the build context.
+**/*.p8
+**/*.p12
+**/*.pfx
+**/*.pem
+**/*.key
+**/*.cer
+**/*.mobileprovision
