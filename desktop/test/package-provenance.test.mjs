@@ -57,4 +57,5 @@ test('release packaging rejects ignored generated tampering and verifies the exa
   archive = path.join(root, 'wrong-provenance.asar');
   await asar.createPackage(payload, archive);
   assert.throws(() => verifyPackage(archive, { root, commit }));
+  assert.equal(verifyPackage(archive, { root, commit, development: true }).development, true);
 });

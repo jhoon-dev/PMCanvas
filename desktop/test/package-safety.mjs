@@ -9,7 +9,11 @@ const require = createRequire(import.meta.url),
   asar = require('@electron/asar');
 export function verifyPackage(
   archive,
-  { root = path.resolve(fileURLToPath(new URL('../../', import.meta.url))), commit = null } = {},
+  {
+    root = path.resolve(fileURLToPath(new URL('../../', import.meta.url))),
+    commit = null,
+    development = false,
+  } = {},
 ) {
   if (commit && !/^[a-f0-9]{40}$/.test(commit)) throw Error('Invalid expected source commit.');
   const pkg = JSON.parse(sourceBytes(root, 'package.json', commit));
@@ -43,7 +47,7 @@ export function verifyPackage(
   assert.equal(shipped.main, pkg.main);
   if (commit) {
     assert.equal(provenance.commit, commit);
-    assert.equal(provenance.development, false);
+    assert.equal(provenance.development, development);
     assert.equal(provenance.dirty, false);
   }
   const digest = (bytes) => createHash('sha256').update(bytes).digest('hex');
@@ -60,6 +64,7 @@ export function verifyPackage(
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   verifyPackage(path.resolve(process.argv[2] || 'dist/win-unpacked/resources/app.asar'), {
     commit: process.argv[3] || null,
+    development: process.argv[4] === '--development',
   });
   console.log('PASS: package matches canonical source, provenance, allowlist and runtime metadata');
 }

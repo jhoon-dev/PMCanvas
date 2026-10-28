@@ -17,6 +17,8 @@
     "pack": "npm run prepare:app && electron-builder --dir",
     "dist:win": "node --env-file-if-exists=.env.signing scripts/release.mjs win",
     "dist:win:dev": "npm run prepare:app && electron-builder --win nsis --x64 --config.win.signAndEditExecutable=false",
+    "dist:unsigned:win": "node scripts/unsigned.mjs win",
+    "dist:unsigned:mac": "node scripts/unsigned.mjs mac",
     "dist:mac": "node --env-file-if-exists=.env.signing scripts/release.mjs mac",
     "pretest": "npm run prepare:app",
     "pretest:app": "npm run prepare:app",

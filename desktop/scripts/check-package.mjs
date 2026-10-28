@@ -26,6 +26,7 @@ for (const [directory, archive, executable] of options) {
       path.join(root, 'test/package-safety.mjs'),
       path.join(base, archive),
       ...(process.env.PM_SOURCE_COMMIT ? [process.env.PM_SOURCE_COMMIT] : []),
+      ...(process.env.PM_DEVELOPMENT_BUILD === 'true' ? ['--development'] : []),
     ],
     { cwd: root, stdio: 'inherit' },
   );

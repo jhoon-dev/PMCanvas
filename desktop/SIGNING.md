@@ -39,6 +39,12 @@ npm run dist:mac
 
 인증서 없는 로컬 기능 검증은 `npm run pack` 또는 `npm run dist:win:dev`를 사용합니다. 이는 정식 서명 배포가 아닙니다. 앱의 **파일 옵션 → 앱 정보**에서 버전·기준 커밋·개발 빌드 여부를 확인할 수 있습니다. 개발 빌드가 미커밋 소스를 사용하면 기준 커밋과 코드가 다를 수 있습니다.
 
+## 인증서 없는 설치 파일
+
+커밋된 소스의 임시 배포에는 Windows에서 `npm run dist:unsigned:win`, Mac에서 `npm run dist:unsigned:mac`을 실행합니다. 서명 인증 정보를 빌드 환경에서 제거하고 출력 폴더를 덮어쓰지 않습니다. 패키지 원본 검사와 실제 앱 실행을 통과하면 `dist/unsigned-버전-win/` 또는 `dist/unsigned-버전-mac/`에 설치 파일·SHA-256·`unsigned-manifest.json`을 기록합니다. 목록에 서명·공증이 없음을 명시합니다.
+
+Mac은 실행에 필요한 임시 ad-hoc 서명만 적용합니다. 이는 Developer ID 서명이나 Apple 공증이 아니며 Gatekeeper의 신뢰를 제공하지 않습니다. 실제 실행 검사는 빌드 머신의 아키텍처를 대상으로 하며 다른 Mac 아키텍처의 실행·설치·업데이트·제거 검증은 별도입니다. Windows 역시 발급자 서명이 없으므로 배포 파일의 출처와 SHA-256을 확인하세요.
+
 ## GitHub Actions
 
 `desktop-release` Environment를 만들고 필요하면 승인 규칙을 지정하세요. 다음 Secrets를 등록합니다.
@@ -50,6 +56,8 @@ npm run dist:mac
 P8 원본은 `APPLE_API_KEY_BASE64`에 base64로 넣습니다. 워크플로가 macOS 임시 디렉터리에 현재 사용자 전용 파일로 준비합니다. 로컬 `APPLE_API_KEY`는 파일 경로를 사용합니다.
 
 **Desktop verification and builds**는 푸시·PR에서 Windows·macOS 테스트·감사·화면·날짜/언어·개발 실행·패키징 후 실제 실행을 검사합니다. 수동 실행에서 `signed=true`를 선택하면 자동 검증 후 `desktop-release`의 서명 설정으로 양쪽 정식 배포 파일을 만듭니다. 서명 단계는 PR에서 실행하지 않습니다. 결과는 Actions artifact이며 GitHub Release 자동 공개는 하지 않습니다.
+
+인증서 없는 설치 파일은 수동 실행의 `unsigned=true`를 선택합니다. 이 작업은 서명용 Environment·Secrets를 사용하지 않으며 Windows 설치 파일과 Mac ARM64·x64 DMG/ZIP을 별도 artifact로 보관합니다.
 
 서명된 실제 설치 파일로 기존 사용자 데이터 보존·설치·업데이트·제거와 OS 신뢰 확인까지 검증한 후 배포하세요. 자동 CI의 패키지 실행 검사는 시스템 설치·제거를 대체하지 않습니다.
 
