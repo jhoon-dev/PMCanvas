@@ -31,6 +31,24 @@ const project = () => ({
     },
   ],
 });
+
+test('English Excel jobs translate sheets and headers while retaining user content', async () => {
+  const p = project();
+  p.name = '저장';
+  const book = new ExcelJS.Workbook();
+  await book.xlsx.load(
+    await performExcelJob('export', {
+      project: p,
+      options: { kind: 'wbs', at: '2026-10-26', language: 'en' },
+    }),
+  );
+  assert.ok(book.getWorksheet('Gantt'));
+  assert.equal(book.getWorksheet('Guide').getCell('B2').value, '저장');
+  assert.equal(book.getWorksheet('WBS').getCell('C2').value, '기존 업무');
+  await book.xlsx.load(await performExcelJob('template', { project: p, language: 'en' }));
+  assert.equal(book.getWorksheet('WBS').getCell('A1').value, 'Task name');
+  assert.equal(book.getWorksheet('Team').getCell('A2').value, '담당자');
+});
 function fixture(t) {
   const folder = mkdtempSync(path.join(os.tmpdir(), 'pmcanvas-excel-'));
   t.after(() => rmSync(folder, { recursive: true, force: true }));

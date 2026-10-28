@@ -156,6 +156,7 @@ export function createHandler({
       'backup-settings-ui.js',
       'i18n.js',
       'locales/en.js',
+      'locales/desktop-en.js',
       'project-merge.js',
       'conflict-ui.js',
       'alerts-ui.js',

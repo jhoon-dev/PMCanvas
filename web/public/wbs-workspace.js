@@ -203,6 +203,7 @@ export class WbsWorkspace {
     this.options.onStatus?.();
   }
   commitAll() {
+    if (this.saving) throw Error(ui('저장이 진행 중입니다.'));
     if (!this.pending.size) return;
     const p = this.pendingProject();
     if (this.cascade)
@@ -215,6 +216,7 @@ export class WbsWorkspace {
     this.changed(p, { paint: false });
   }
   commitCell(el) {
+    if (this.saving) return false;
     const id = el.dataset.row,
       field = el.dataset.cell,
       key = id + '|' + field;
@@ -367,7 +369,7 @@ export class WbsWorkspace {
   cell(task, field, index, row) {
     const pending = this.pending.get(task.id + '|' + field),
       value = pending ? pending.value : this.value(task, field),
-      disabled = this.readOnly ? 'disabled' : '',
+      disabled = this.readOnly || this.saving ? 'disabled' : '',
       common =
         ' data-row="' +
         esc(task.id) +
@@ -668,7 +670,7 @@ export class WbsWorkspace {
             ui('부터 ') +
             t.end +
             '" aria-disabled="' +
-            this.readOnly +
+            (this.readOnly || this.saving) +
             '" data-gantt-task="' +
             esc(t.id) +
             '" data-drag="move" class="wbs-plan ' +
@@ -884,6 +886,13 @@ export class WbsWorkspace {
   }
   refresh(chart = true) {
     if (!this.root?.isConnected) return;
+    this.root.setAttribute('aria-busy', String(this.saving));
+    this.root.querySelectorAll('[data-cell], .wbs-paste').forEach((cell) => {
+      cell.disabled = this.saving || this.readOnly;
+    });
+    this.root.querySelectorAll('[data-gantt-task]').forEach((bar) => {
+      bar.setAttribute('aria-disabled', String(this.saving || this.readOnly));
+    });
     const history = this.root.querySelector('.wbs-history');
     if (history)
       history.hidden = !(this.undoStack.length || this.redoStack.length || this.pending.size);
@@ -918,7 +927,7 @@ export class WbsWorkspace {
         (a === 'undo' && !this.undoStack.length && !this.pending.size) ||
         (a === 'redo' && !this.redoStack.length);
     });
-    this.root.querySelector('#wbsCascade').disabled = this.readOnly;
+    this.root.querySelector('#wbsCascade').disabled = this.readOnly || this.saving;
     if (chart) {
       const host = this.root.querySelector('.wbs-chart-host'),
         old = host.querySelector('.wbs-gantt-scroll')?.scrollLeft || 0;
@@ -976,6 +985,7 @@ export class WbsWorkspace {
       true,
     );
     this.root.addEventListener('input', (e) => {
+      if (this.saving) return;
       const el = e.target;
       if (el.dataset.cell) {
         if (this.readOnly) return;
@@ -997,6 +1007,7 @@ export class WbsWorkspace {
       }
     });
     this.root.addEventListener('change', (e) => {
+      if (this.saving) return;
       const el = e.target;
       if (el.id === 'wbsAnalysis') {
         this.analysis = el.checked;
@@ -1040,6 +1051,10 @@ export class WbsWorkspace {
       if (el.id === 'wbsCascade') this.cascade = el.checked;
     });
     this.root.addEventListener('paste', (e) => {
+      if (this.saving) {
+        e.preventDefault();
+        return;
+      }
       const cell = e.target.closest('[data-cell]'),
         area = e.target.closest('.wbs-paste');
       if ((!cell && !area) || this.readOnly) return;
@@ -1108,6 +1123,7 @@ export class WbsWorkspace {
     });
   }
   async action(action) {
+    if (this.saving) return;
     try {
       if (action === 'unselect') {
         this.selected.clear();
@@ -1309,6 +1325,14 @@ export class WbsWorkspace {
   }
   keydown(e) {
     if (e.isComposing) return;
+    if (this.saving) {
+      if (
+        ((e.ctrlKey || e.metaKey) && ['s', 'z', 'y'].includes(e.key.toLowerCase())) ||
+        (['ArrowLeft', 'ArrowRight'].includes(e.key) && e.target.closest('[data-gantt-task]'))
+      )
+        e.preventDefault();
+      return;
+    }
     if ((e.ctrlKey || e.metaKey) && ['s', 'z', 'y'].includes(e.key.toLowerCase())) {
       if (e.key.toLowerCase() === 'z' && this.pending.size) return;
       e.preventDefault();
@@ -1401,6 +1425,7 @@ export class WbsWorkspace {
     if (tasks[r]) this.repaint({ id: tasks[r].id, field: layout[c][0] });
   }
   startDrag(e) {
+    if (this.saving) return;
     const original = e.target.closest('[data-gantt-task]');
     if (!original || this.readOnly || e.button !== 0) return;
     e.preventDefault();
@@ -1429,6 +1454,7 @@ export class WbsWorkspace {
     };
   }
   moveDrag(e) {
+    if (this.saving) return;
     const d = this.drag;
     if (!d) return;
     let delta = Math.max(-3652, Math.min(3652, Math.round((e.clientX - d.x) / d.geometry.day)));
@@ -1460,6 +1486,10 @@ export class WbsWorkspace {
       ui('개 업무');
   }
   endDrag(e) {
+    if (this.saving) {
+      this.drag = null;
+      return;
+    }
     const d = this.drag;
     if (!d) return;
     this.drag = null;

@@ -21,6 +21,8 @@ const documentationHosts = new Set([
   'nodemailer.com',
   'playwright.dev',
   'prettier.io',
+  'www.electron.build',
+  'www.electronjs.org',
   'nodejs.org',
   'registry.npmjs.org',
 ]);
@@ -57,6 +59,14 @@ const fileExtensions = new Set([
   'nsh',
   'nsi',
   'pmcanvas',
+  'p8',
+  'p12',
+  'pfx',
+  'pem',
+  'cer',
+  'plist',
+  'sha256',
+  'signing',
 ]);
 
 export function exampleHost(host) {
@@ -132,7 +142,8 @@ export function publicPathProblem(file) {
     parts.slice(certIndex).join('/') !== 'certs/.gitkeep'
   )
     return 'PRIVATE_CERTIFICATE';
-  if (/\.(?:key|pem|p12|pfx|crt|dump|bak|zip)$/i.test(file)) return 'PRIVATE_OR_ARCHIVE_FILE';
+  if (/\.(?:key|pem|p8|p12|pfx|cer|mobileprovision|crt|dump|bak|zip)$/i.test(file))
+    return 'PRIVATE_OR_ARCHIVE_FILE';
   return null;
 }
 
@@ -172,7 +183,9 @@ export function inspectPublicFile(file, bytes) {
     add('ACCESS_TOKEN', match.index);
   const configIndex = file.split('/').indexOf('config');
   const examplePath =
-    configIndex >= 0 ? file.split('/').slice(configIndex).join('/') : file.replace(/^web\//, '');
+    configIndex >= 0
+      ? file.split('/').slice(configIndex).join('/')
+      : file.replace(/^(?:web|desktop)\//, '');
   if (!publicExample(examplePath)) return [...findings.values()];
 
   for (const match of content.matchAll(
@@ -214,7 +227,7 @@ export function inspectPublicFile(file, bytes) {
     if (!placeholder(value) && !exampleHost(value)) add('NON_EXAMPLE_ENDPOINT', match.index);
   }
   for (const match of content.matchAll(
-    /(?<!\$\{)\b(?:[A-Z_]*(?:PASSWORD|SECRET|TOKEN))[ \t]*[:=][ \t]*(?:"([^"\r\n]*)"|'([^'\r\n]*)'|((?:\$\{[^}\r\n]*\}|[^\s`"'])+))/g,
+    /(?<!\$\{)\b(?:[A-Z_]*(?:PASSWORD|SECRET|TOKEN)|CSC_LINK|WIN_CSC_LINK|APPLE_API_KEY|APPLE_API_KEY_BASE64)[ \t]*[:=][ \t]*(?:"([^"\r\n]*)"|'([^'\r\n]*)'|((?:\$\{[^}\r\n]*\}|[^\s`"'])+))/g,
   )) {
     if (!placeholder(match[1] ?? match[2] ?? match[3])) add('INLINE_PRIVATE_SETTING', match.index);
   }

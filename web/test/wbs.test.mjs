@@ -14,6 +14,7 @@ import {
   alignSuccessors,
 } from '../public/wbs-model.js';
 import { WbsWorkspace } from '../public/wbs-workspace.js';
+import { ordered } from '../public/planning.js';
 const fixture = () => ({
   id: 'p',
   name: 'WBS',
@@ -118,6 +119,50 @@ test('삭제는 후속 참조를 정리하고, 행 이동은 ID와 선행 관계
   assert.equal(reordered.tasks[0].id, 'b');
   assert.equal(reordered.tasks[0].predecessor, 'a');
 });
+
+function treeFixture() {
+  const p = fixture(),
+    base = p.tasks[0];
+  p.tasks = ['a', 'a1', 'a2', 'b', 'b1', 'c'].map((id) => ({
+    ...structuredClone(base),
+    id,
+    name: id,
+    parentId: id.startsWith('a') && id !== 'a' ? 'a' : id === 'b1' ? 'b' : '',
+    predecessor: id === 'b' ? 'a2' : '',
+    items: [{ id: id + '-item', title: id, hours: 8, doneDate: '2026-10-20' }],
+  }));
+  return p;
+}
+test('계층 WBS 순서 이동은 상위 업무와 하위 묶음을 함께 옮기며 다른 상위로 이동하지 않음', () => {
+  const p = treeFixture(),
+    before = structuredClone(p),
+    moved = reorderTasks(p, ['b'], -1);
+  assert.deepEqual(
+    ordered(moved).map((task) => task.id),
+    ['b', 'b1', 'a', 'a1', 'a2', 'c'],
+  );
+  assert.equal(moved.tasks.find((task) => task.id === 'b1').parentId, 'b');
+  assert.equal(moved.tasks[0].predecessor, 'a2');
+  assert.equal(moved.tasks[1].items[0].doneDate, '2026-10-20');
+  assert.deepEqual(reorderTasks(p, ['a1'], -1), p);
+  assert.deepEqual(
+    ordered(reorderTasks(p, ['a2'], -1)).map((task) => task.id),
+    ['a', 'a2', 'a1', 'b', 'b1', 'c'],
+  );
+  assert.deepEqual(p, before);
+});
+test('상위와 하위가 함께 선택됐으면 하위 순서를 보존하고 선택한 형제 묶음 순서를 유지', () => {
+  const p = treeFixture();
+  assert.deepEqual(
+    ordered(reorderTasks(p, ['a', 'a2'], 1)).map((task) => task.id),
+    ['b', 'b1', 'a', 'a1', 'a2', 'c'],
+  );
+  assert.deepEqual(
+    ordered(reorderTasks(p, ['b', 'c'], -1)).map((task) => task.id),
+    ['b', 'b1', 'c', 'a', 'a1', 'a2'],
+  );
+  assert.deepEqual(reorderTasks(p, ['c'], 1), p);
+});
 test('선행 업무명은 모든 붙여넣기 행이 만들어진 뒤 해석', () => {
   const p = fixture();
   const n = pasteCells(
@@ -183,6 +228,75 @@ test('WBS 초안의 실행 취소·다시 실행은 원본과 분리되고 저�
   assert.equal(w.dirty, false);
   assert.equal(w.base._revision, 2);
   assert.equal(w.undoStack.length, 0);
+});
+
+test('WBS 저장 응답 대기 중 실행 취소·재저장·새 행·초안 취소가 저장 중인 초안을 바꾸지 않음', async () => {
+  let finish,
+    calls = 0;
+  const w = new WbsWorkspace({
+    toast() {},
+    onRender() {},
+    onSave: (p) => {
+      calls++;
+      return new Promise((resolve) => {
+        finish = () => resolve({ ...p, _revision: 2 });
+      });
+    },
+  });
+  w.ensure({ ...fixture(), _revision: 1, _role: 'editor' }, '2026-10-28');
+  w.changed(editCell(w.draft, 'a', 'name', '저장할 이름'), { paint: false });
+  const before = structuredClone(w.draft),
+    saving = w.action('save');
+  assert.equal(w.saving, true);
+  let prevented = false;
+  w.keydown({
+    key: 'z',
+    ctrlKey: true,
+    preventDefault() {
+      prevented = true;
+    },
+  });
+  assert.equal(prevented, true);
+  assert.throws(() => w.commitAll(), /저장/);
+  assert.equal(w.commitCell({}), false);
+  assert.doesNotThrow(() => w.startDrag({}));
+  assert.doesNotThrow(() => w.moveDrag({}));
+  w.drag = { delta: 2 };
+  w.endDrag({});
+  assert.equal(w.drag, null);
+  for (const action of ['undo', 'redo', 'save', 'add', 'discard', 'baseline', 'forget'])
+    await w.action(action);
+  assert.deepEqual(w.draft, before);
+  assert.equal(w.undoStack.length, 1);
+  assert.equal(calls, 1);
+  finish();
+  await saving;
+  assert.equal(w.draft.tasks[0].name, '저장할 이름');
+  assert.equal(w.dirty, false);
+  assert.equal(w.saving, false);
+});
+
+test('WBS 저장 실패 후에는 잠금이 해제되고 실행 취소를 다시 사용할 수 있음', async () => {
+  let fail;
+  const w = new WbsWorkspace({
+    toast() {},
+    onRender() {},
+    onSave: () =>
+      new Promise((_resolve, reject) => {
+        fail = reject;
+      }),
+  });
+  w.ensure({ ...fixture(), _revision: 1, _role: 'editor' }, '2026-10-28');
+  w.changed(editCell(w.draft, 'a', 'name', '보존할 이름'), { paint: false });
+  const saving = w.action('save');
+  await w.action('undo');
+  assert.equal(w.draft.tasks[0].name, '보존할 이름');
+  fail(Error('save failed'));
+  await saving;
+  assert.equal(w.saving, false);
+  assert.equal(w.dirty, true);
+  await w.action('undo');
+  assert.equal(w.draft.tasks[0].name, '기획');
 });
 test('WBS 저장 충돌은 초안을 유지하고, 명시적 취소·조회자 권한 변경도 반영', async (t) => {
   const base = { ...fixture(), _revision: 1, _role: 'editor' },

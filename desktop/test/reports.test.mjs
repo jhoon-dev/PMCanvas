@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildReport } from '../reports.mjs';
 import { addDays, today } from '../app/shared/engine.js';
+import { getLanguage, setLanguage } from '../app/shared/i18n.js';
 
 const fixture = () => ({
   name: 'PC / 출시',
@@ -31,6 +32,20 @@ const fixture = () => ({
       items: [{ title: '문구 "검토"\n두 번째 줄', hours: 8, doneDate: '2020-01-03' }],
     },
   ],
+});
+
+test('English report headers preserve Korean user data and restore the process language', () => {
+  setLanguage('ko');
+  const project = fixture();
+  project.name = '저장';
+  const csv = buildReport(project, { kind: 'wbs', at: '2020-01-03', language: 'en' }).csv;
+  assert.ok(csv.startsWith('\uFEFF"Project","Reporting date"'));
+  assert.ok(csv.includes('"저장"'));
+  assert.ok(csv.includes('"김담당"'));
+  assert.equal(getLanguage(), 'ko');
+  assert.throws(() => buildReport(project, { kind: 'wbs', at: 'bad', language: 'en' }));
+  assert.equal(getLanguage(), 'ko');
+  assert.throws(() => buildReport(project, { kind: 'wbs', at: '2020-01-03', language: 'invalid' }));
 });
 
 test('WBS CSV uses the selected historical date, all tasks, BOM and Excel-safe text', () => {

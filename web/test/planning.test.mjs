@@ -103,6 +103,27 @@ test('과부하는 인력 투입률·휴무일·계획 공수와 선행 충돌�
   p.holidays = ['2026-10-20'];
   assert.equal(scheduleWarnings(p).overloads[0].load, 8);
 });
+
+test('과부하 표시 기간의 양끝에서 주말·휴무일을 제외하고 근무일 없는 구간은 만들지 않음', () => {
+  const p = project();
+  p.tasks = [task('weekend', 16, '2026-10-24', '2026-10-28')];
+  p.holidays = ['2026-10-26', '2026-10-28'];
+  const before = structuredClone(p);
+  const warnings = scheduleWarnings(p);
+  assert.deepEqual(
+    warnings.overloads.map(({ from, to, load }) => ({ from, to, load })),
+    [{ from: '2026-10-27', to: '2026-10-27', load: 16 }],
+  );
+  assert.deepEqual(p, before);
+  p.tasks = [task('a', 16, '2026-10-23', '2026-10-26'), task('b', 16, '2026-10-24', '2026-10-27')];
+  p.holidays = [];
+  assert.ok(
+    scheduleWarnings(p).overloads.every(
+      ({ from, to }) =>
+        !['2026-10-24', '2026-10-25'].includes(from) && !['2026-10-24', '2026-10-25'].includes(to),
+    ),
+  );
+});
 test('초안은 계정·프로젝트별 분리, 미입력 셀과 원래 revision을 복구', async () => {
   const data = new Map(),
     storage = {

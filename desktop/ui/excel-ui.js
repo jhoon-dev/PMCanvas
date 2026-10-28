@@ -1,11 +1,13 @@
 import { importFields, suggestMapping } from './shared/excel-import-model.js';
 import { escapeHtml as esc } from './shared/html.js';
+import { ui } from './shared/i18n.js';
 
 export function openExcelDialog({ api, loaded, revision, onApply, onClose }) {
   const dialog = document.createElement('dialog');
   dialog.className = 'desktop-dialog';
-  dialog.innerHTML =
-    '<div class="dialog-head"><h2>Excel 가져오기</h2><button type="button" class="button" id="excelClose">닫기</button></div><div class="dialog-body"><p>열을 연결하고 미리보기를 확인한 뒤 적용하세요. 파일 저장은 따로 진행합니다.</p><label class="field">시트<select id="excelSheet"></select></label><label class="field">가져오기 방식<select id="excelMode"><option value="append">새 업무 추가</option><option value="update">기존 업무 갱신 (업무 ID)</option></select></label><div id="excelMapping" class="form-grid"></div><p id="excelResult" role="status"></p><div id="excelRows" class="desktop-table-wrap"></div></div><div class="dialog-foot"><button type="button" class="button" id="excelPreview">미리보기</button><button type="button" class="button primary" id="excelApply" disabled>프로젝트에 적용</button></div>';
+  dialog.innerHTML = ui(
+    '<div class="dialog-head"><h2>Excel 가져오기</h2><button type="button" class="button" id="excelClose">닫기</button></div><div class="dialog-body"><p>열을 연결하고 미리보기를 확인한 뒤 적용하세요. 파일 저장은 따로 진행합니다.</p><label class="field">시트<select id="excelSheet"></select></label><label class="field">가져오기 방식<select id="excelMode"><option value="append">새 업무 추가</option><option value="update">기존 업무 갱신 (업무 ID)</option></select></label><div id="excelMapping" class="form-grid"></div><p id="excelResult" role="status"></p><div id="excelRows" class="desktop-table-wrap"></div></div><div class="dialog-foot"><button type="button" class="button" id="excelPreview">미리보기</button><button type="button" class="button primary" id="excelApply" disabled>프로젝트에 적용</button></div>',
+  );
   document.body.append(dialog);
   const $ = (id) => dialog.querySelector('#' + id);
   let version = 0,
@@ -15,7 +17,7 @@ export function openExcelDialog({ api, loaded, revision, onApply, onClose }) {
     version++;
     $('excelApply').disabled = true;
     $('excelRows').innerHTML = '';
-    $('excelResult').textContent = '열 연결을 확인한 뒤 미리보기를 눌러 주세요.';
+    $('excelResult').textContent = ui('열 연결을 확인한 뒤 미리보기를 눌러 주세요.');
   };
   const setSheet = () => {
     invalidate();
@@ -25,10 +27,10 @@ export function openExcelDialog({ api, loaded, revision, onApply, onClose }) {
       .map(
         ([field, label]) =>
           '<label class="field">' +
-          esc(label) +
+          esc(ui(label)) +
           '<select data-map="' +
           field +
-          '"><option value="-1">가져오지 않음</option>' +
+          ui('"><option value="-1">가져오지 않음</option>') +
           headers
             .map(
               (h, n) =>
@@ -37,7 +39,7 @@ export function openExcelDialog({ api, loaded, revision, onApply, onClose }) {
                 '" ' +
                 (suggested[field] === n ? 'selected' : '') +
                 '>' +
-                esc(h || '열 ' + (n + 1)) +
+                esc(h || ui('열 ') + (n + 1)) +
                 '</option>',
             )
             .join('') +
@@ -83,12 +85,14 @@ export function openExcelDialog({ api, loaded, revision, onApply, onClose }) {
       });
       if (request !== version || !dialog.isConnected) return;
       $('excelResult').textContent =
-        result.changes.length + '개 업무 · 오류 ' + result.errors.length + '건';
+        result.changes.length + ui('개 업무 · 오류 ') + result.errors.length + ui('건');
       $('excelRows').innerHTML =
         result.errors
-          .map((e) => '<p class="error">' + esc(e.row) + '행: ' + esc(e.message) + '</p>')
+          .map((e) => '<p class="error">' + esc(e.row) + ui('행: ') + esc(e.message) + '</p>')
           .join('') +
-        '<table class="desktop-table"><thead><tr><th>Excel 행</th><th>업무</th><th>시작일</th><th>종료일</th></tr></thead><tbody>' +
+        ui(
+          '<table class="desktop-table"><thead><tr><th>Excel 행</th><th>업무</th><th>시작일</th><th>종료일</th></tr></thead><tbody>',
+        ) +
         result.changes
           .map(
             (c) =>

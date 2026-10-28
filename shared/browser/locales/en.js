@@ -1,5 +1,7 @@
+import desktop from './desktop-en.js';
 // UI literals only. User-entered content never passes through this catalog.
 export default {
+  ...desktop,
   '날짜와 숫자는 Excel 데이터 형식입니다. Excel 수정 사항은 가져오기에서 미리보기를 확인하고 저장해야 반영됩니다.':
     'Dates and numbers use Excel data types. To apply edits, review the import preview and save the project.',
   'Excel 내보내기': 'Export Excel',

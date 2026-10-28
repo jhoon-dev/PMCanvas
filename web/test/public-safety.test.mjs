@@ -15,6 +15,17 @@ import {
 
 const inspect = (file, text) => inspectPublicFile(file, Buffer.from(text));
 
+test('Apple signing keys and provisioning files are private; desktop signing examples receive secret checks', () => {
+  for (const file of ['signing/key.p8', 'signing/app.mobileprovision', 'signing/app.pfx']) {
+    assert.equal(inspect(file, 'synthetic')[0].rule, 'PRIVATE_OR_ARCHIVE_FILE');
+  }
+  assert.equal(
+    inspect('desktop/.env.example', 'CSC_KEY_PASSWORD=visible-fixture')[0].rule,
+    'INLINE_PRIVATE_SETTING',
+  );
+  assert.deepEqual(inspect('desktop/.env.example', 'CSC_KEY_PASSWORD=\nAPPLE_API_KEY=\n'), []);
+});
+
 // Stored ZIP fixture with correct directory, sizes and checksums; no production files.
 function archive(entries) {
   const local = [],

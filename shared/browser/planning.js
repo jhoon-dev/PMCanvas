@@ -8,6 +8,7 @@ import {
   orderTasks,
   today,
   validDate,
+  nextWorkday,
 } from './engine.js';
 
 export function hierarchy(project) {
@@ -185,8 +186,19 @@ export function scheduleWarnings(project) {
       load += events.get(dates[i]);
       const from = dates[i],
         to = addDays(dates[i + 1], -1);
-      if (load > capacity + 0.0001 && workdays(from, to, project.holidays) > 0)
-        overloads.push({ memberId: member.id, name: member.name, from, to, load, capacity });
+      if (load > capacity + 0.0001 && workdays(from, to, project.holidays) > 0) {
+        const first = nextWorkday(from, project.holidays);
+        let last = to;
+        while (!working(last, project.holidays)) last = addDays(last, -1);
+        overloads.push({
+          memberId: member.id,
+          name: member.name,
+          from: first,
+          to: last,
+          load,
+          capacity,
+        });
+      }
     }
   }
   return { dependencies, overloads };

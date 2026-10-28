@@ -119,6 +119,7 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 #saveStatus {
   font-size: 11px;
@@ -398,4 +399,133 @@ button:disabled {
   color: #69758b;
   font-size: 12px;
   line-height: 1.8;
+}
+.desktop-planning-tools,
+.desktop-tree-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.desktop-planning-tools {
+  margin: 0 0 16px;
+  color: #69758b;
+  font-size: 12px;
+}
+.desktop-wbs-table {
+  min-width: 880px;
+}
+.desktop-wbs-table td:first-child {
+  width: 44px;
+  min-width: 44px;
+  max-width: 44px;
+  padding: 12px;
+  white-space: nowrap;
+}
+.desktop-wbs-table td:nth-child(2) {
+  min-width: 230px;
+  white-space: normal;
+}
+.desktop-selected {
+  background: #edf2ff;
+}
+.desktop-bulk-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 16px;
+  font-size: 12px;
+  color: #69758b;
+}
+.desktop-bulk-tools[hidden] {
+  display: none;
+}
+.language-control {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 16px;
+  font-size: 12px;
+}
+.language-control select {
+  max-width: 110px;
+}
+@media (max-width: 1150px) {
+  .desktop-wbs-table th:first-child,
+  .desktop-wbs-table td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background: #fff;
+  }
+  .desktop-wbs-table th:nth-child(2),
+  .desktop-wbs-table td:nth-child(2) {
+    position: sticky;
+    left: 44px;
+    z-index: 1;
+    background: #fff;
+  }
+  .desktop-wbs-table td:nth-child(2) {
+    min-width: 180px;
+    max-width: 240px;
+  }
+  .desktop-selected td:nth-child(-n + 2) {
+    background: #edf2ff;
+  }
+}
+.desktop-bulk-tools button:disabled {
+  cursor: default;
+}
+.desktop-tree-name {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding-left: calc(var(--depth) * 16px);
+}
+.desktop-tree-toggle,
+.desktop-tree-spacer {
+  width: 20px;
+  flex: 0 0 20px;
+}
+.desktop-tree-toggle {
+  border: 0;
+  background: none;
+  cursor: pointer;
+  padding: 0;
+  color: #416be8;
+}
+.desktop-tree-actions button:disabled,
+.desktop-tree-toggle:disabled {
+  cursor: default;
+}
+.desktop-wbs-number {
+  color: #78849b;
+  font-size: 11px;
+}
+.desktop-baseline {
+  margin-top: 28px;
+}
+.desktop-baseline .desktop-report-summary {
+  padding-top: 16px;
+  margin: 0;
+}
+.desktop-critical {
+  color: #a42f44;
+  background: #fff0f2;
+  border-radius: 4px;
+  padding: 2px 5px;
+  font-size: 10px;
+  white-space: nowrap;
+}
+.desktop-schedule-issues {
+  padding: 0 20px;
+  font-size: 12px;
+  color: #69758b;
+}
+.desktop-schedule-cascade {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  margin: 16px 0;
 }

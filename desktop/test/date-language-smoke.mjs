@@ -1,0 +1,153 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+import { assetPath } from '../assets.mjs';
+import { screenProject } from '../../web/test/support/screen-fixtures.mjs';
+const { chromium } = createRequire(new URL('../../web/package.json', import.meta.url))(
+  '@playwright/test',
+);
+const root = fileURLToPath(new URL('../app/', import.meta.url));
+
+async function harness(language = 'ko') {
+  let project = screenProject(),
+    revision = 1,
+    dirty = false;
+  const browser = await chromium.launch({ headless: true });
+  const page = await browser.newPage({ locale: 'ko-KR', timezoneId: 'Asia/Seoul' });
+  const errors = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.clock.install({ time: new Date('2026-10-28T23:59:00+09:00') });
+  await page.exposeFunction('fixtureCall', (name, ...args) => {
+    if (name === 'replace') {
+      project = args[0];
+      revision++;
+      dirty = true;
+    }
+    if (name === 'save') {
+      dirty = false;
+      revision++;
+    }
+    if (name === 'setLanguage') return args[0];
+    if (name === 'editing') return;
+    return { project, revision, dirty, filename: 'synthetic.pmcanvas' };
+  });
+  await page.addInitScript((language) => {
+    if (!localStorage.getItem('pmcanvas.language'))
+      localStorage.setItem('pmcanvas.language', language);
+    window.desktop = Object.fromEntries(
+      ['snapshot', 'replace', 'editing', 'save', 'setLanguage'].map((name) => [
+        name,
+        (...args) => window.fixtureCall(name, ...args),
+      ]),
+    );
+    window.desktop.onCommand = () => {};
+    window.desktop.onDocument = () => {};
+  }, language);
+  await page.route('https://desktop.test/**', (route) => {
+    const asset = assetPath('pmcanvas://desktop' + new URL(route.request().url()).pathname);
+    return asset
+      ? route.fulfill({
+          contentType: asset.endsWith('.html')
+            ? 'text/html'
+            : asset.endsWith('.css')
+              ? 'text/css'
+              : 'text/javascript',
+          body: fs.readFileSync(path.join(root, asset)),
+        })
+      : route.fulfill({ status: 404, body: 'Not found' });
+  });
+  await page.goto('https://desktop.test/index.html');
+  await page.locator('#reportDate').waitFor();
+  return { browser, page, errors, getProject: () => project };
+}
+test('midnight, wake and timers advance the default reporting date and record the new completion day', async () => {
+  const { browser, page, errors, getProject } = await harness();
+  try {
+    await page.clock.fastForward(120000);
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await page.getByRole('button', { name: '완료 체크', exact: true }).click();
+    assert.equal(await page.locator('#reportDate').inputValue(), '2026-10-29');
+    await page.locator('[data-check="t1"][data-item="i2"]').check();
+    await page.waitForFunction(async () => (await window.desktop.snapshot()).revision > 1);
+    assert.equal(getProject().tasks[0].items[1].doneDate, '2026-10-29');
+    assert.deepEqual(errors, []);
+  } finally {
+    await browser.close();
+  }
+});
+test('historical dates stay fixed; midnight never replaces an open editor and default report range catches up after cancel', async () => {
+  const { browser, page, errors } = await harness();
+  try {
+    await page.locator('#reportDate').fill('2026-10-21');
+    await page.getByRole('button', { name: '업무 · 일정', exact: true }).click();
+    await page.getByRole('button', { name: '화면 설계', exact: true }).click();
+    await page.locator('[name="name"]').fill('보존할 입력');
+    await page.clock.fastForward(120000);
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    assert.equal(await page.locator('[name="name"]').inputValue(), '보존할 입력');
+    await page.getByRole('button', { name: '취소', exact: true }).click();
+    assert.equal(await page.locator('#reportDate').inputValue(), '2026-10-21');
+    await page.getByRole('button', { name: '보고서', exact: true }).click();
+    assert.equal(await page.locator('#reportTo').inputValue(), '2026-10-29');
+    await page.locator('#reportFrom').fill('2026-10-19');
+    await page.locator('#reportTo').fill('2026-10-21');
+    await page.locator('#reportDate').click();
+    await page.clock.fastForward(86400000);
+    await page.getByRole('button', { name: '프로젝트 현황', exact: true }).click();
+    await page.getByRole('button', { name: '보고서', exact: true }).click();
+    assert.equal(await page.locator('#reportTo').inputValue(), '2026-10-21');
+    assert.deepEqual(errors, []);
+  } finally {
+    await browser.close();
+  }
+});
+test('English screens persist selection, protect open or unsaved edits, preserve Korean project data and hide unselected bulk actions', async () => {
+  const { browser, page, errors, getProject } = await harness('en');
+  try {
+    await page.getByRole('button', { name: 'Project overview', exact: true }).waitFor();
+    await page.getByText('화면 회귀 검증', { exact: true }).first().waitFor();
+    await page.getByRole('button', { name: 'WBS · Baseline', exact: true }).click();
+    assert.equal(await page.locator('.desktop-bulk-tools').isHidden(), true);
+    await page.getByRole('button', { name: '화면 설계', exact: true }).click();
+    await page.locator('[name="name"]').fill('저장');
+    await page.locator('#languageSelect').selectOption('ko');
+    assert.equal(await page.locator('#languageSelect').inputValue(), 'en');
+    assert.equal(await page.locator('[name="name"]').inputValue(), '저장');
+    await page.getByRole('button', { name: 'Apply', exact: true }).click();
+    await page.waitForFunction(() => !document.querySelector('#editorDialog').open);
+    assert.equal(getProject().tasks[0].name, '저장');
+    await page.locator('#languageSelect').selectOption('ko');
+    assert.equal(await page.locator('#languageSelect').inputValue(), 'en');
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await page.getByText('Saved to file', { exact: true }).waitFor();
+    await page.locator('#languageSelect').selectOption('ko');
+    await page.getByRole('button', { name: '프로젝트 현황', exact: true }).waitFor();
+    assert.equal(getProject().tasks[0].name, '저장');
+    await page.reload();
+    await page.getByRole('button', { name: '프로젝트 현황', exact: true }).waitFor();
+    assert.deepEqual(errors, []);
+  } finally {
+    await browser.close();
+  }
+});
+
+test('the default date waits for an open editor, then advances after cancel without losing input', async () => {
+  const { browser, page, errors } = await harness();
+  try {
+    await page.getByRole('button', { name: '업무 · 일정', exact: true }).click();
+    await page.getByRole('button', { name: '화면 설계', exact: true }).click();
+    await page.locator('[name="name"]').fill('자정 입력');
+    await page.clock.fastForward(120000);
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    assert.equal(await page.locator('#reportDate').inputValue(), '2026-10-28');
+    assert.equal(await page.locator('[name="name"]').inputValue(), '자정 입력');
+    await page.getByRole('button', { name: '취소', exact: true }).click();
+    await page.waitForFunction(() => document.querySelector('#reportDate').value === '2026-10-29');
+    assert.deepEqual(errors, []);
+  } finally {
+    await browser.close();
+  }
+});

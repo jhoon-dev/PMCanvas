@@ -15,7 +15,10 @@ import { cleanProject } from './app/model/project.mjs';
 import { readBounded } from './file-io.mjs';
 
 export const MAX_BYTES = 8 * 1024 * 1024;
+export const MAX_HISTORY_STEPS = 20;
+const MAX_HISTORY_BYTES = 16 * 1024 * 1024;
 const fingerprint = (bytes) => createHash('sha256').update(bytes).digest('hex');
+const projectHash = (project) => fingerprint(JSON.stringify(project));
 export function normalizeProject(value) {
   if (
     value?._wbsPendingCells !== undefined &&
@@ -80,8 +83,11 @@ export class DesktopDocument {
     this.project = null;
     this.file = null;
     this.savedHash = null;
+    this.savedProjectHash = null;
     this.dirty = false;
     this.revision = 0;
+    this.undoStack = [];
+    this.redoStack = [];
   }
   snapshot() {
     return {
@@ -89,11 +95,16 @@ export class DesktopDocument {
       revision: this.revision,
       filename: this.file ? path.basename(this.file) : '',
       dirty: this.dirty,
+      canUndo: this.undoStack.length > 0,
+      canRedo: this.redoStack.length > 0,
     };
   }
   writeRecovery(next) {
     mkdirSync(path.dirname(this.recoveryFile), { recursive: true });
-    atomicWrite(this.recoveryFile, JSON.stringify({ version: 1, ...next }));
+    atomicWrite(
+      this.recoveryFile,
+      JSON.stringify({ version: 1, savedProjectHash: this.savedProjectHash, ...next }),
+    );
   }
   update(next) {
     this.writeRecovery(next);
@@ -106,23 +117,73 @@ export class DesktopDocument {
     const project = normalizeProject(input);
     serializeDocument(project);
     project.id = this.project?.id || project.id;
-    return this.update({ project, file: this.file, savedHash: this.savedHash, dirty: true });
+    const previous = this.project;
+    this.update({
+      project,
+      file: this.file,
+      savedHash: this.savedHash,
+      dirty: !this.file || projectHash(project) !== this.savedProjectHash,
+    });
+    if (previous && JSON.stringify(previous) !== JSON.stringify(project)) {
+      this.pushHistory(this.undoStack, previous);
+      this.redoStack = [];
+    }
+    return this.snapshot();
+  }
+  pushHistory(stack, project) {
+    const json = JSON.stringify(project);
+    stack.push({ json, bytes: Buffer.byteLength(json) });
+    let size = stack.reduce((sum, entry) => sum + entry.bytes, 0);
+    while (stack.length > MAX_HISTORY_STEPS || size > MAX_HISTORY_BYTES)
+      size -= stack.shift().bytes;
+  }
+  resetHistory() {
+    this.undoStack = [];
+    this.redoStack = [];
+    return this.snapshot();
+  }
+  changeHistory(direction, revision) {
+    if (revision !== this.revision) throw Error('문서가 변경되었습니다. 다시 시도해 주세요.');
+    const from = direction === 'undo' ? this.undoStack : this.redoStack;
+    const to = direction === 'undo' ? this.redoStack : this.undoStack;
+    if (!from.length) throw Error('되돌리거나 다시 실행할 변경이 없습니다.');
+    const project = JSON.parse(from.at(-1).json),
+      previous = this.project;
+    // Write recovery first, so a failed write cannot consume history or accept a change.
+    this.update({
+      project,
+      file: this.file,
+      savedHash: this.savedHash,
+      dirty: !this.file || projectHash(project) !== this.savedProjectHash,
+    });
+    from.pop();
+    this.pushHistory(to, previous);
+    return this.snapshot();
+  }
+  undo(revision) {
+    return this.changeHistory('undo', revision);
+  }
+  redo(revision) {
+    return this.changeHistory('redo', revision);
   }
   create(input) {
     const project = normalizeProject(input);
-    return this.update({ project, file: null, savedHash: null, dirty: true });
+    this.update({ project, file: null, savedHash: null, savedProjectHash: null, dirty: true });
+    return this.resetHistory();
   }
   open(file) {
     const bytes = readLimited(file);
     const project = parseDocument(bytes);
     // JSON is an import; Save always asks for a new .pmcanvas file.
     const native = path.extname(file).toLowerCase() === '.pmcanvas';
-    return this.update({
+    this.update({
       project,
       file: native ? file : null,
       savedHash: native ? fingerprint(bytes) : null,
+      savedProjectHash: native ? projectHash(project) : null,
       dirty: !native,
     });
+    return this.resetHistory();
   }
   save(file = this.file) {
     if (!this.project || !file) throw Error('저장할 프로젝트와 파일 이름을 확인해 주세요.');
@@ -141,6 +202,7 @@ export class DesktopDocument {
     // A recovery failure must not turn a successful save into an overwrite hazard.
     this.file = file;
     this.savedHash = fingerprint(bytes);
+    this.savedProjectHash = projectHash(this.project);
     this.dirty = false;
     this.revision++;
     this.writeRecovery({ project: this.project, file, savedHash: this.savedHash, dirty: false });
@@ -162,9 +224,22 @@ export class DesktopDocument {
       throw Error('복구 파일 경로가 올바르지 않습니다.');
     if (value.savedHash !== null && !/^[a-f0-9]{64}$/.test(value.savedHash))
       throw Error('복구 파일의 저장 정보를 확인해 주세요.');
-    return { project, file: value.file, savedHash: value.savedHash, dirty: value.dirty };
+    if (
+      value.savedProjectHash != null &&
+      (typeof value.savedProjectHash !== 'string' || !/^[a-f0-9]{64}$/.test(value.savedProjectHash))
+    )
+      throw Error('복구 파일의 저장 기준을 확인해 주세요.');
+    return {
+      project,
+      file: value.file,
+      savedHash: value.savedHash,
+      dirty: value.dirty,
+      savedProjectHash:
+        value.savedProjectHash ?? (!value.dirty && value.file ? projectHash(project) : null),
+    };
   }
   restore(value) {
-    return this.update(value);
+    this.update(value);
+    return this.resetHistory();
   }
 }

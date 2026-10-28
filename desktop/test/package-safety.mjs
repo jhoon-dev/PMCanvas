@@ -2,10 +2,11 @@ import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 
 const require = createRequire(import.meta.url),
   asar = require('@electron/asar');
-const archive = path.resolve(process.argv[2] || 'dist/excel-0.2.0/win-unpacked/resources/app.asar');
+const archive = path.resolve(process.argv[2] || 'dist/bulk-0.6.0/win-unpacked/resources/app.asar');
 const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 const allowed = new Set(pkg.build.files);
 assert.ok(
@@ -29,5 +30,20 @@ for (const dependency of ['electron-builder', 'app-builder-lib', 'electron'])
   );
 const shipped = JSON.parse(asar.extractFile(archive, 'package.json'));
 assert.equal(shipped.version, pkg.version);
+const provenance = JSON.parse(asar.extractFile(archive, path.normalize('app/build-info.json')));
+assert.equal(provenance.version, pkg.version);
+assert.equal(typeof provenance.development, 'boolean');
+assert.ok(provenance.commit === null || /^[a-f0-9]{40}$/.test(provenance.commit));
 assert.deepEqual(Object.keys(shipped.dependencies).sort(), ['@xmldom/xmldom', 'exceljs', 'yauzl']);
-console.log('PASS: packaged file allowlist, required modules, production dependencies and version');
+const digest = (bytes) => createHash('sha256').update(bytes).digest('hex');
+for (const file of allowed) {
+  if (file === 'package.json') continue;
+  assert.equal(
+    digest(asar.extractFile(archive, path.normalize(file))),
+    digest(readFileSync(new URL('../' + file, import.meta.url))),
+    'Packaged source differs: ' + file,
+  );
+}
+console.log(
+  'PASS: packaged allowlist, modules, production dependencies, version and all source checksums',
+);

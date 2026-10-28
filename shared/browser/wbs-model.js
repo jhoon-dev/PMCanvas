@@ -283,14 +283,47 @@ export function removeTasks(project, ids) {
 }
 export function reorderTasks(project, ids, direction) {
   const p = structuredClone(project),
-    selected = new Set(ids),
-    a = p.tasks;
-  if (direction < 0) {
-    for (let i = 1; i < a.length; i++)
-      if (selected.has(a[i].id) && !selected.has(a[i - 1].id)) [a[i - 1], a[i]] = [a[i], a[i - 1]];
-  } else {
-    for (let i = a.length - 2; i >= 0; i--)
-      if (selected.has(a[i].id) && !selected.has(a[i + 1].id)) [a[i], a[i + 1]] = [a[i + 1], a[i]];
+    tree = hierarchy(p),
+    requested = new Set(ids),
+    selected = new Set(
+      p.tasks
+        .filter(
+          (task) =>
+            requested.has(task.id) && !tree.get(task.id).ancestors.some((id) => requested.has(id)),
+        )
+        .map((task) => task.id),
+    ),
+    siblings = new Map();
+  for (const task of p.tasks) {
+    const parent = task.parentId || '';
+    if (!siblings.has(parent)) siblings.set(parent, []);
+    siblings.get(parent).push(task);
+  }
+  let changed = false;
+  for (const a of siblings.values()) {
+    if (direction < 0) {
+      for (let i = 1; i < a.length; i++)
+        if (selected.has(a[i].id) && !selected.has(a[i - 1].id)) {
+          [a[i - 1], a[i]] = [a[i], a[i - 1]];
+          changed = true;
+        }
+    } else {
+      for (let i = a.length - 2; i >= 0; i--)
+        if (selected.has(a[i].id) && !selected.has(a[i + 1].id)) {
+          [a[i], a[i + 1]] = [a[i + 1], a[i]];
+          changed = true;
+        }
+    }
+  }
+  if (changed) {
+    p.tasks = [];
+    const visit = (parent) => {
+      for (const task of siblings.get(parent) || []) {
+        p.tasks.push(task);
+        visit(task.id);
+      }
+    };
+    visit('');
   }
   return checkDraft(p);
 }

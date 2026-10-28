@@ -11,11 +11,15 @@ export async function performExcelJob(kind, input) {
         await parseWorkbook(ExcelJS, yauzl, DOMParser, Buffer.from(input.file, 'base64')),
       ),
     );
-  if (kind === 'template') return buildTemplate(ExcelJS, input.project);
+  if (kind === 'template')
+    return buildTemplate(ExcelJS, input.project, { language: input.language });
   if (kind === 'export')
     return input.options.kind === 'completion'
       ? buildCompletionWorkbook(ExcelJS, input.project, input.options)
-      : buildWorkbook(ExcelJS, input.project, input.options.at, undefined, { draft: input.dirty });
+      : buildWorkbook(ExcelJS, input.project, input.options.at, undefined, {
+          draft: input.dirty,
+          language: input.options.language,
+        });
   throw Error('지원하지 않는 Excel 작업입니다.');
 }
 async function execute({ kind, input }) {

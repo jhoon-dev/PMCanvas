@@ -136,6 +136,110 @@ async function selectProject(page, p, view = 'tasks') {
   await page.locator('[data-view="' + view + '"]').click();
 }
 
+test('계층 WBS 위로 이동은 하위 묶음과 함께 표시 순서를 바꾸고 서버에 보존', async ({ page }) => {
+  const session = await login(page),
+    source = largeProject(),
+    base = source.tasks[0];
+  const tasks = ['a', 'a1', 'b', 'b1'].map((id) => ({
+    ...structuredClone(base),
+    id,
+    name: id,
+    parentId: id === 'a1' ? 'a' : id === 'b1' ? 'b' : '',
+    predecessor: id === 'b' ? 'a1' : '',
+    items: [{ id: id + '-item', title: id, hours: 8, doneDate: '2026-10-20' }],
+  }));
+  const p = await createProject(page, session, { name: '계층 순서 검증', tasks });
+  await selectProject(page, p);
+  await page.locator('[data-wbs-select="b"]').check();
+  const up = page.locator('[data-wbs-action=up]');
+  await up.locator('xpath=ancestor::details[1]').locator('summary').click();
+  await up.click();
+  await expect(page.locator('[data-grid-row]').first()).toHaveAttribute('data-grid-row', 'b');
+  await expect(page.locator('[data-grid-row]').nth(1)).toHaveAttribute('data-grid-row', 'b1');
+  await page.locator('[data-wbs-action=save]').click();
+  await expect(page.locator('.wbs-state')).toHaveText('저장됨');
+  const after = (await (await page.request.get(api + 'projects/' + p.id)).json()).project;
+  expect(after.tasks.map((task) => task.id)).toEqual(['b', 'b1', 'a', 'a1']);
+  expect(after.tasks[0].predecessor).toBe('a1');
+  expect(after.tasks[1].parentId).toBe('b');
+  expect(after.tasks.every((task) => task.items[0].doneDate === '2026-10-20')).toBe(true);
+  await selectProject(page, p);
+  await expect(page.locator('[data-grid-row]').first()).toHaveAttribute('data-grid-row', 'b');
+});
+
+test('WBS 저장 응답 대기 중 키보드 실행 취소와 재저장을 차단하고 저장 결과를 보존', async ({
+  page,
+}) => {
+  const session = await login(page),
+    p = await createProject(page, session, { name: '저장 중 실행 취소 검증' });
+  await selectProject(page, p);
+  await page.locator('[data-cell=name]').fill('저장 중 유지할 업무명');
+  await page.locator('[data-cell=name]').press('Tab');
+  let release, intercepted;
+  const hold = new Promise((resolve) => {
+    release = resolve;
+  });
+  const started = new Promise((resolve) => {
+    intercepted = resolve;
+  });
+  let saves = 0;
+  await page.route('**/api/projects/' + p.id, async (route) => {
+    if (route.request().method() !== 'PUT') return route.continue();
+    saves++;
+    intercepted();
+    await hold;
+    await route.continue();
+  });
+  await page.locator('[data-wbs-action=save]').click();
+  await started;
+  try {
+    await expect(page.locator('[data-cell=name]')).toBeDisabled();
+    await expect(page.locator('#wbsCascade')).toBeDisabled();
+    await page.locator('#wbsWorkspace').focus();
+    await page.keyboard.press('Control+z');
+    await page.keyboard.press('Control+s');
+    await expect(page.locator('[data-cell=name]')).toHaveValue('저장 중 유지할 업무명');
+    expect(saves).toBe(1);
+  } finally {
+    release();
+  }
+  await expect(page.locator('.wbs-state')).toHaveText('저장됨');
+  await expect(page.locator('[data-cell=name]')).toBeEnabled();
+  const saved = (await (await page.request.get(api + 'projects/' + p.id)).json()).project;
+  expect(saved.tasks[0].name).toBe('저장 중 유지할 업무명');
+});
+
+test('과부하 점검 화면은 주말·휴무일 경계를 제외하고 원래 업무 일정을 보존', async ({ page }) => {
+  const session = await login(page),
+    source = largeProject();
+  const member = { ...source.members[0], name: '과부하 담당자' };
+  const task = {
+    ...source.tasks[0],
+    start: '2026-10-24',
+    end: '2026-10-28',
+    items: [{ id: 'overload-item', title: '계획 작업', hours: 16, doneDate: null }],
+  };
+  const p = await createProject(page, session, {
+    name: '과부하 경계 검증',
+    members: [member],
+    tasks: [task],
+    holidays: ['2026-10-26', '2026-10-28'],
+  });
+  await selectProject(page, p);
+  const review = page.locator('[data-panel="review"]');
+  await review.locator('summary').first().click();
+  await expect(review.locator('.wbs-review-content')).toContainText(
+    '과부하 담당자 · 2026-10-27 ~ 2026-10-27 · 16.0 / 8.0h/일',
+  );
+  await expect(review).not.toContainText('2026-10-24 ~');
+  const response = await page.request.get(api + 'projects/' + p.id);
+  expect(response.status()).toBe(200);
+  const after = (await response.json()).project;
+  expect(after.tasks[0].start).toBe('2026-10-24');
+  expect(after.tasks[0].end).toBe('2026-10-28');
+  expect(after.holidays).toEqual(['2026-10-26', '2026-10-28']);
+});
+
 test('파일 메뉴 Excel 양식 다운로드·작성·미리보기·추가·저장은 원본 업무를 보존', async ({
   page,
 }) => {

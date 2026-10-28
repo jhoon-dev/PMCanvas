@@ -1,6 +1,6 @@
 {
   "name": "pmcanvas-desktop",
-  "version": "0.2.0",
+  "version": "0.7.0",
   "private": true,
   "description": "Offline project planning for Windows and macOS",
   "author": "PM Canvas",
@@ -15,13 +15,17 @@
     "test": "node --test test/*.test.mjs",
     "test:app": "node test/app-smoke.mjs",
     "pack": "npm run prepare:app && electron-builder --dir",
-    "dist:win": "npm run prepare:app && electron-builder --win nsis --x64",
+    "dist:win": "node --env-file-if-exists=.env.signing scripts/release.mjs win",
     "dist:win:dev": "npm run prepare:app && electron-builder --win nsis --x64 --config.win.signAndEditExecutable=false",
-    "dist:mac": "npm run prepare:app && electron-builder --mac dmg zip --arm64 --x64",
+    "dist:mac": "node --env-file-if-exists=.env.signing scripts/release.mjs mac",
     "pretest": "npm run prepare:app",
     "pretest:app": "npm run prepare:app",
     "pretest:renderer": "npm run prepare:app",
-    "test:renderer": "node test/renderer-smoke.mjs"
+    "test:renderer": "node test/renderer-smoke.mjs",
+    "release:check:win": "node --env-file-if-exists=.env.signing scripts/release.mjs win --check",
+    "release:check:mac": "node --env-file-if-exists=.env.signing scripts/release.mjs mac --check",
+    "test:dates-language": "node --test test/date-language-smoke.mjs",
+    "test:package": "node test/package-safety.mjs"
   },
   "devDependencies": {
     "electron": "45.0.0",
@@ -46,6 +50,8 @@
       "app/index.html",
       "app/renderer.js",
       "app/excel-ui.js",
+      "app/planning-ui.js",
+      "app/bulk-ui.js",
       "app/desktop.css",
       "app/shared/engine.js",
       "app/shared/planning.js",
@@ -63,7 +69,10 @@
       "app/model/errors.mjs",
       "app/node/excel.mjs",
       "app/node/excel-import.mjs",
-      "package.json"
+      "package.json",
+      "app/shared/report-clock.js",
+      "app/shared/locales/desktop-en.js",
+      "app/build-info.json"
     ],
     "asar": true,
     "win": {

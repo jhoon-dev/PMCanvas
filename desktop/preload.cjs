@@ -8,7 +8,11 @@ contextBridge.exposeInMainWorld(
   'desktop',
   Object.freeze({
     snapshot: () => call('snapshot'),
+    setLanguage: (language) => call('language', language),
+    info: () => call('info'),
     replace: (project, revision) => call('replace', project, revision),
+    undo: (revision) => call('undo', revision),
+    redo: (revision) => call('redo', revision),
     newProject: () => call('new'),
     open: () => call('open'),
     save: () => call('save', false),

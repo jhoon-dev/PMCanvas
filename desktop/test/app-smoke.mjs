@@ -21,6 +21,7 @@ if (installed && !process.argv[3])
 const appPath = !installed && process.argv[2] ? path.resolve(process.argv[2]) : root;
 const temporary = mkdtempSync(path.join(os.tmpdir(), 'pmcanvas-electron-'));
 let application;
+let completed = false;
 const launch = () =>
   electron.launch({
     executablePath: installed ? path.resolve(process.argv[3]) : require('electron'),
@@ -29,7 +30,10 @@ const launch = () =>
     env: { ...process.env, PMCANVAS_DESKTOP_TEST: '1', PMCANVAS_DESKTOP_DATA: temporary },
   });
 try {
+  console.log('Native smoke: launch');
   application = await launch();
+  console.log('Native smoke: connected');
+  application.process().stderr?.on('data', (data) => process.stderr.write(data));
   const runtime = await application.evaluate(({ app }) => ({
     packaged: app.isPackaged,
     userData: app.getPath('userData'),
@@ -42,7 +46,13 @@ try {
   if (installed)
     assert.equal(runtime.packaged, true, 'Installed executable must run as a packaged app.');
   const page = await application.firstWindow({ timeout: 15000 });
+  console.log('Native smoke: window');
   page.setDefaultTimeout(15000);
+  await page.waitForLoadState('load');
+  console.log('Native smoke: loaded');
+  await page.locator('#content [data-command="new"]').waitFor();
+  await page.evaluate(() => localStorage.setItem('pmcanvas.language', 'ko'));
+  await page.reload();
   await page.getByRole('button', { name: '새 프로젝트 만들기', exact: true }).waitFor();
   assert.deepEqual(await page.evaluate(() => [typeof window.require, typeof window.process]), [
     'undefined',
@@ -155,7 +165,141 @@ try {
     0,
   );
   assert.deepEqual(readFileSync(path.join(temporary, 'Input.xlsx')), input);
+  await page.getByRole('button', { name: 'WBS · 기준 계획', exact: true }).click();
+  await page.getByRole('button', { name: '＋ 업무 추가', exact: true }).click();
+  await page.locator('[name="name"]').fill('Native child');
+  await page.locator('[name="parentId"]').selectOption(imported.project.tasks[0].id);
+  await page.locator('[name="itemTitle"]').fill('Native WBS work');
+  await page.getByRole('button', { name: '적용', exact: true }).click();
+  await page.getByRole('button', { name: '기준 계획 저장', exact: true }).click();
+  await page.locator('[name="baselineName"]').fill('Native baseline');
+  await page.getByRole('button', { name: '적용', exact: true }).click();
+  await page.getByText('Native baseline', { exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Native child 일정 조정', exact: true }).click();
+  await page.locator('#previewSchedule').click();
+  await page.getByText('변경할 일정 1개 · 아직 적용하지 않았습니다.', { exact: true }).waitFor();
+  const beforeSchedule = await page.evaluate(() => window.desktop.snapshot());
+  // Simulate a native document update while the schedule preview is open.
+  await page.evaluate(
+    (snapshot) => window.desktop.replace(snapshot.project, snapshot.revision),
+    beforeSchedule,
+  );
+  await page.getByRole('button', { name: '적용', exact: true }).click();
+  await page.locator('#formError').filter({ hasText: '미리보기' }).waitFor();
+  assert.deepEqual(
+    (await page.evaluate(() => window.desktop.snapshot())).project,
+    beforeSchedule.project,
+  );
+  await page.locator('#previewSchedule').click();
+  await page.getByRole('button', { name: '적용', exact: true }).click();
+  await page.waitForFunction(() => !document.querySelector('#editorDialog').open);
+  const planned = await page.evaluate(() => window.desktop.snapshot());
+  assert.notEqual(planned.project.tasks[1].start, beforeSchedule.project.tasks[1].start);
+  assert.deepEqual(planned.project.baseline, beforeSchedule.project.baseline);
+  assert.equal(planned.project.tasks[1].parentId, planned.project.tasks[0].id);
+  assert.equal(planned.project.baseline.tasks.length, 2);
+  await assert.rejects(
+    page.evaluate((revision) => window.desktop.undo(revision - 1), planned.revision),
+    /문서가 변경/,
+  );
+  await page.getByRole('button', { name: '실행 취소', exact: true }).click();
+  await page.getByText('프로젝트 변경을 되돌렸습니다.', { exact: true }).waitFor();
+  assert.deepEqual(
+    (await page.evaluate(() => window.desktop.snapshot())).project,
+    beforeSchedule.project,
+  );
+  assert.equal(
+    await application.evaluate(
+      ({ Menu }) => Menu.getApplicationMenu().getMenuItemById('project-redo').enabled,
+    ),
+    true,
+  );
+  await application.evaluate(({ Menu }) =>
+    Menu.getApplicationMenu().getMenuItemById('project-redo').click(),
+  );
+  await page.getByText('프로젝트 변경을 다시 실행했습니다.', { exact: true }).waitFor();
+  assert.deepEqual((await page.evaluate(() => window.desktop.snapshot())).project, planned.project);
+  await page.getByRole('button', { name: 'Native child', exact: true }).click();
+  await assert.rejects(
+    page.evaluate(async () => {
+      const current = await window.desktop.snapshot();
+      return window.desktop.undo(current.revision);
+    }),
+    /입력창/,
+  );
+  assert.equal(
+    await application.evaluate(
+      ({ Menu }) => Menu.getApplicationMenu().getMenuItemById('project-undo').enabled,
+    ),
+    false,
+  );
+  await page.getByRole('button', { name: '취소', exact: true }).click();
+  await page.locator('[data-select-visible]').check();
+  await page.getByRole('button', { name: '선택 복제', exact: true }).click();
+  await page.evaluate(async () => {
+    const snapshot = await window.desktop.snapshot();
+    await window.desktop.replace(snapshot.project, snapshot.revision);
+  });
+  await page.getByRole('button', { name: '적용', exact: true }).click();
+  await page.locator('#formError').filter({ hasText: '문서가 변경' }).waitFor();
+  assert.deepEqual((await page.evaluate(() => window.desktop.snapshot())).project, planned.project);
+  await page.getByRole('button', { name: '취소', exact: true }).click();
+  await page.getByRole('button', { name: '선택 복제', exact: true }).click();
+  await page.getByRole('button', { name: '적용', exact: true }).click();
+  await page.waitForFunction(() => !document.querySelector('#editorDialog').open);
+  const copied = await page.evaluate(() => window.desktop.snapshot());
+  assert.equal(copied.project.tasks.length, 4);
+  const copiedTasks = copied.project.tasks.filter(
+    (task) => !planned.project.tasks.some((old) => old.id === task.id),
+  );
+  assert.equal(copiedTasks[1].parentId, copiedTasks[0].id);
+  await page.getByRole('button', { name: '실행 취소', exact: true }).click();
+  await page.getByText('프로젝트 변경을 되돌렸습니다.', { exact: true }).waitFor();
+  assert.deepEqual((await page.evaluate(() => window.desktop.snapshot())).project, planned.project);
+  await page.getByRole('button', { name: '다시 실행', exact: true }).click();
+  await page.getByText('프로젝트 변경을 다시 실행했습니다.', { exact: true }).waitFor();
+  await page.locator('[data-select-task="' + copiedTasks[0].id + '"]').check();
+  await page.getByRole('button', { name: '선택 삭제', exact: true }).click();
+  await page.getByRole('button', { name: '선택 업무 삭제', exact: true }).click();
+  await page.waitForFunction(() => !document.querySelector('#editorDialog').open);
+  assert.equal((await page.evaluate(() => window.desktop.snapshot())).project.tasks.length, 3);
+  await page.getByRole('button', { name: '실행 취소', exact: true }).click();
+  await page.getByText('프로젝트 변경을 되돌렸습니다.', { exact: true }).waitFor();
+  const finalProject = (await page.evaluate(() => window.desktop.snapshot())).project;
+  assert.deepEqual(finalProject, copied.project);
   await page.evaluate(() => window.desktop.save());
+  const info = await page.evaluate(() => window.desktop.info());
+  assert.equal(info.version, JSON.parse(readFileSync(path.join(root, 'package.json'))).version);
+  await assert.rejects(
+    page.evaluate(() => window.desktop.setLanguage('invalid')),
+    /언어/,
+  );
+  await page.evaluate(() => window.desktop.editing(true));
+  await assert.rejects(
+    page.evaluate(() => window.desktop.setLanguage('en')),
+    /언어/,
+  );
+  await page.evaluate(() => window.desktop.editing(false));
+  await page.evaluate(() => window.desktop.setLanguage('en'));
+  assert.equal(
+    await application.evaluate(
+      ({ Menu }) => Menu.getApplicationMenu().getMenuItemById('project-undo').label,
+    ),
+    'Undo project change',
+  );
+  await application.evaluate(({ dialog }, root) => {
+    dialog.showSaveDialog = async () => ({ canceled: false, filePath: root + '/English.csv' });
+  }, temporary);
+  await page.evaluate(async (at) => {
+    const snapshot = await window.desktop.snapshot();
+    await window.desktop.exportReport({ kind: 'wbs', at, format: 'csv' }, snapshot.revision);
+  }, today());
+  assert.ok(
+    readFileSync(path.join(temporary, 'English.csv'), 'utf8').startsWith(
+      '\uFEFF"Project","Reporting date"',
+    ),
+  );
+  await page.evaluate(() => window.desktop.setLanguage('ko'));
   assert.equal(
     parseDocument(readFileSync(path.join(temporary, 'Native.pmcanvas'))).tasks[0].name,
     'Native Excel import',
@@ -166,10 +310,21 @@ try {
   restored.setDefaultTimeout(15000);
   await restored.getByText('Native desktop', { exact: true }).first().waitFor();
   await restored.getByText('파일에 저장됨', { exact: true }).waitFor();
+  await restored.getByRole('button', { name: 'WBS · 기준 계획', exact: true }).click();
+  await restored.getByText('Native baseline', { exact: true }).waitFor();
+  await restored.getByRole('button', { name: 'Native child', exact: true }).waitFor();
+  const afterRestart = await restored.evaluate(() => window.desktop.snapshot());
+  assert.deepEqual(afterRestart.project, finalProject);
+  assert.equal(afterRestart.canUndo, false);
+  assert.equal(afterRestart.canRedo, false);
   console.log(
-    'PASS: native isolation, file save, protocol boundary, CSV/XLSX save, template, preview/import, source preservation, restart',
+    'PASS: native isolation, reports, WBS, schedule, history/menu, bulk copy/delete/revision guard, save/restart',
   );
+  completed = true;
 } finally {
+  // Failed tests can leave a temporary unsaved editor open; do not hang on its close prompt.
+  if (application && !completed)
+    await application.evaluate(({ app }) => app.exit(0)).catch(() => {});
   await application?.close();
   rmSync(temporary, { recursive: true, force: true });
 }

@@ -30,7 +30,7 @@ npm ci
 npm start
 ```
 
-Windows와 macOS는 동일한 소스를 사용하며 각 OS에서 설치 파일을 만듭니다. Windows에서 실제 앱의 저장·재시작·CSV 및 XLSX 입출력과 패키징된 EXE를 검증했습니다. 설치 파일 명령과 운영체제별 검증 범위는 [데스크톱 README](desktop/README.md)를 확인하세요.
+Windows와 macOS는 동일한 소스를 사용하며 각 OS에서 설치 파일을 만듭니다. 데스크톱은 WBS 계층·일괄 작업·하위 집계·기준 계획 비교, 일정 점검·조정 미리보기와 프로젝트 실행 취소·다시 실행을 지원하며, Windows에서 실제 앱의 저장·재시작·CSV 및 XLSX 입출력을 검증했습니다. 설치 파일 명령과 운영체제별 검증 범위는 [데스크톱 README](desktop/README.md)를 확인하세요.
 
 ## 개발
 
