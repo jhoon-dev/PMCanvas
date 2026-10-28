@@ -253,6 +253,7 @@ try {
   await close();
   checks.push('Reinstalled ' + version + ' and reopened the same project and settings.');
   const result = {
+    commit: run('git', ['rev-parse', 'HEAD'], { cwd: desktop }).trim(),
     platform: process.platform,
     arch: process.arch,
     baseline: '0.7.1',

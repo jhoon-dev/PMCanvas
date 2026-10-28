@@ -165,7 +165,8 @@ try {
   await application.evaluate(({ dialog }, root) => {
     dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [root + '/Input.xlsx'] });
   }, temporary);
-  await page.getByText('파일 옵션', { exact: true }).click();
+  if (!(await page.locator('details.action-menu').evaluate((menu) => menu.open)))
+    await page.getByText('파일 옵션', { exact: true }).click();
   await page.getByRole('button', { name: 'Excel 가져오기', exact: true }).click();
   await page.locator('#excelPreview').click();
   await page.getByText('1개 업무 · 오류 0건', { exact: true }).waitFor();
@@ -325,7 +326,8 @@ try {
       globalThis.__releasePages.push(url);
     };
   });
-  await page.getByText('파일 옵션', { exact: true }).click();
+  if (!(await page.locator('details.action-menu').evaluate((menu) => menu.open)))
+    await page.getByText('파일 옵션', { exact: true }).click();
   await page.getByRole('button', { name: '업데이트 확인', exact: true }).click();
   await page.getByText('새 버전: 0.99.0', { exact: false }).waitFor();
   assert.equal(await application.evaluate(() => globalThis.__releasePages.length), 0);
@@ -414,6 +416,9 @@ try {
     'PASS: native isolation, reports, WBS, schedule, history/menu, bulk copy/delete/revision guard, save/restart',
   );
   completed = true;
+} catch (error) {
+  console.error('Native smoke failed at stage: ' + stage, error.stack || error.message);
+  throw error;
 } finally {
   // Failed tests can leave a temporary unsaved editor open; do not hang on its close prompt.
   if (application && !completed) {
@@ -421,9 +426,23 @@ try {
       application.evaluate(({ app }) => app.exit(0)).catch(() => {}),
       new Promise((resolve) => setTimeout(resolve, 3000)),
     ]);
-    application.process().kill('SIGKILL');
+    const child = application.process();
+    if (child.exitCode === null) {
+      const exited = new Promise((resolve) => child.once('exit', resolve));
+      child.kill('SIGKILL');
+      await Promise.race([exited, new Promise((resolve) => setTimeout(resolve, 2000))]);
+    }
   }
   if (completed) await application?.close();
   clearTimeout(watchdog);
-  rmSync(temporary, { recursive: true, force: true });
+  if (
+    path.dirname(temporary) !== path.resolve(os.tmpdir()) ||
+    !path.basename(temporary).startsWith('pmcanvas-electron-')
+  )
+    throw Error('Unsafe temporary cleanup path.');
+  try {
+    rmSync(temporary, { recursive: true, force: true, maxRetries: 5, retryDelay: 300 });
+  } catch {
+    console.warn('Temporary test profile remains locked; original test result preserved.');
+  }
 }

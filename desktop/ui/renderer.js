@@ -774,6 +774,7 @@ document.addEventListener('click', (event) => {
     return;
   }
   if (target.dataset.command) {
+    target.closest('details.action-menu')?.removeAttribute('open');
     void command(target.dataset.command);
     return;
   }
