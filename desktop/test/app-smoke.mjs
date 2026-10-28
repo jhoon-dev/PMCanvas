@@ -22,6 +22,17 @@ const appPath = !installed && process.argv[2] ? path.resolve(process.argv[2]) : 
 const temporary = mkdtempSync(path.join(os.tmpdir(), 'pmcanvas-electron-'));
 let application;
 let completed = false;
+let stage = 'launch';
+const watchdog = setTimeout(() => {
+  console.error('Native smoke timed out at stage: ' + stage);
+  application?.process().kill('SIGKILL');
+  setTimeout(() => process.exit(1), 2000);
+}, 240000);
+watchdog.unref();
+const checkpoint = (name) => {
+  stage = name;
+  console.log('Native smoke: ' + name);
+};
 const launch = () =>
   electron.launch({
     executablePath: installed ? path.resolve(process.argv[3]) : require('electron'),
@@ -50,10 +61,13 @@ try {
   page.setDefaultTimeout(15000);
   await page.waitForLoadState('load');
   console.log('Native smoke: loaded');
+  checkpoint('initial-content');
   await page.locator('#content [data-command="new"]').waitFor();
   await page.evaluate(() => localStorage.setItem('pmcanvas.language', 'ko'));
   await page.reload();
+  checkpoint('language-reload');
   await page.getByRole('button', { name: '새 프로젝트 만들기', exact: true }).waitFor();
+  checkpoint('project-and-reports');
   assert.deepEqual(await page.evaluate(() => [typeof window.require, typeof window.process]), [
     'undefined',
     'undefined',
@@ -127,6 +141,7 @@ try {
     true,
   );
   const workbook = new ExcelJS.Workbook();
+  checkpoint('excel');
   await workbook.xlsx.readFile(path.join(temporary, 'Workbook.xlsx'));
   assert.ok(workbook.getWorksheet('WBS'));
   assert.deepEqual(await page.evaluate(() => window.desktop.snapshot()), before);
@@ -266,6 +281,7 @@ try {
   await page.getByRole('button', { name: '실행 취소', exact: true }).click();
   await page.getByText('프로젝트 변경을 되돌렸습니다.', { exact: true }).waitFor();
   const finalProject = (await page.evaluate(() => window.desktop.snapshot())).project;
+  checkpoint('final-save-and-language');
   assert.deepEqual(finalProject, copied.project);
   await page.evaluate(() => window.desktop.save());
   const info = await page.evaluate(() => window.desktop.info());
@@ -305,6 +321,7 @@ try {
     'Native Excel import',
   );
   await application.close();
+  checkpoint('restart');
   application = await launch();
   const restored = await application.firstWindow({ timeout: 15000 });
   restored.setDefaultTimeout(15000);
@@ -323,8 +340,14 @@ try {
   completed = true;
 } finally {
   // Failed tests can leave a temporary unsaved editor open; do not hang on its close prompt.
-  if (application && !completed)
-    await application.evaluate(({ app }) => app.exit(0)).catch(() => {});
-  await application?.close();
+  if (application && !completed) {
+    await Promise.race([
+      application.evaluate(({ app }) => app.exit(0)).catch(() => {}),
+      new Promise((resolve) => setTimeout(resolve, 3000)),
+    ]);
+    application.process().kill('SIGKILL');
+  }
+  if (completed) await application?.close();
+  clearTimeout(watchdog);
   rmSync(temporary, { recursive: true, force: true });
 }
