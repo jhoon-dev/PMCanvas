@@ -11,7 +11,8 @@ const { chromium } = createRequire(new URL('../../web/package.json', import.meta
 );
 const root = fileURLToPath(new URL('../app/', import.meta.url));
 
-async function harness(language = 'ko', timeZone = 'Asia/Seoul') {
+async function harness(language = 'ko', timeZone = 'Asia/Seoul', offline = false) {
+  let openedReleases = 0;
   let project = screenProject(),
     revision = 1,
     dirty = false;
@@ -21,6 +22,19 @@ async function harness(language = 'ko', timeZone = 'Asia/Seoul') {
   page.on('pageerror', (error) => errors.push(error.message));
   await page.clock.install({ time: new Date('2026-10-28T23:59:00+09:00') });
   await page.exposeFunction('fixtureCall', (name, ...args) => {
+    if (name === 'checkUpdates') {
+      if (offline) throw Error('offline');
+      return {
+        currentVersion: '0.7.2',
+        version: '0.8.0',
+        available: true,
+        downloadAvailable: true,
+      };
+    }
+    if (name === 'openRelease') {
+      openedReleases++;
+      return;
+    }
     if (name === 'settings') return { timeZone };
     if (name === 'setTimeZone') {
       timeZone = new Intl.DateTimeFormat('en', { timeZone: args[0] }).resolvedOptions().timeZone;
@@ -43,9 +57,17 @@ async function harness(language = 'ko', timeZone = 'Asia/Seoul') {
     if (!localStorage.getItem('pmcanvas.language'))
       localStorage.setItem('pmcanvas.language', language);
     window.desktop = Object.fromEntries(
-      ['snapshot', 'replace', 'editing', 'save', 'setLanguage', 'settings', 'setTimeZone'].map(
-        (name) => [name, (...args) => window.fixtureCall(name, ...args)],
-      ),
+      [
+        'snapshot',
+        'replace',
+        'editing',
+        'save',
+        'setLanguage',
+        'settings',
+        'setTimeZone',
+        'checkUpdates',
+        'openRelease',
+      ].map((name) => [name, (...args) => window.fixtureCall(name, ...args)]),
     );
     window.desktop.onCommand = () => {};
     window.desktop.onDocument = () => {};
@@ -65,8 +87,32 @@ async function harness(language = 'ko', timeZone = 'Asia/Seoul') {
   });
   await page.goto('https://desktop.test/index.html');
   await page.locator('#reportDate').waitFor();
-  return { browser, page, errors, getProject: () => project };
+  return { browser, page, errors, getProject: () => project, openedReleases: () => openedReleases };
 }
+
+test('manual update notices preserve projects, open links only on request and handle offline mode', async () => {
+  for (const offline of [false, true]) {
+    const h = await harness('en', 'Asia/Seoul', offline);
+    try {
+      const before = structuredClone(h.getProject());
+      await h.page.getByText('File options', { exact: true }).click();
+      await h.page.getByRole('button', { name: 'Check for updates', exact: true }).click();
+      await h.page.waitForFunction(() => !document.querySelector('#openRelease').disabled);
+      assert.match(
+        await h.page.locator('#updateStatus').textContent(),
+        offline ? /Could not check/ : /0.8.0/,
+      );
+      assert.equal(h.openedReleases(), 0);
+      await h.page.locator('#openRelease').click();
+      await h.page.locator('#closeUpdate').click();
+      assert.equal(h.openedReleases(), 1);
+      assert.deepEqual(h.getProject(), before);
+      assert.deepEqual(h.errors, []);
+    } finally {
+      await h.browser.close();
+    }
+  }
+});
 
 test('business time zone settings survive reload, use the configured day and preserve project records', async () => {
   const { browser, page, errors, getProject } = await harness('en', 'America/New_York');

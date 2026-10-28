@@ -3,6 +3,7 @@ if (process.env.RUN_MAIL_ADMIN_PREVIEW !== '1') throw Error('Set RUN_MAIL_ADMIN_
 import http from 'node:http';
 import { randomUUID } from 'node:crypto';
 import { MemoryRepository } from './memory-repository.mjs';
+import { createPool, migrate, PgRepository } from '../../server/postgres.mjs';
 import { smtpFixture, verificationLink, mailText } from './smtp-fixture.mjs';
 import { createMailer } from '../../server/mailer.mjs';
 import { MailSettings } from '../../server/mail-settings.mjs';
@@ -18,7 +19,7 @@ const previewPort = Number(process.env.PM_PREVIEW_PORT || 4183),
 const smtp = await smtpFixture(),
   key = Buffer.alloc(32, 7),
   hash = await hashPassword('preview-admin-password'),
-  repo = new MemoryRepository([
+  users = [
     {
       id: randomUUID(),
       email: 'admin@example.com',
@@ -35,7 +36,28 @@ const smtp = await smtpFixture(),
       is_admin: false,
       is_active: true,
     },
-  ]);
+  ];
+let pool, repo;
+if (process.env.RUN_E2E_POSTGRES === '1') {
+  if (
+    process.env.PGDATABASE !== 'pmcanvas_e2e_test' ||
+    !['localhost', '127.0.0.1'].includes(process.env.PGHOST)
+  )
+    throw Error('A local, dedicated pmcanvas_e2e_test database is required.');
+  pool = await createPool();
+  await migrate(pool);
+  repo = new PgRepository(pool);
+  if (await repo.countUsers()) throw Error('The browser fixture database must be empty.');
+  for (const u of users)
+    await repo.createUser({
+      email: u.email,
+      name: u.name,
+      passwordHash: u.password_hash,
+      isAdmin: u.is_admin,
+    });
+} else repo = new MemoryRepository(users);
+const adminUser = await repo.findUserByEmail('admin@example.com');
+const memberUser = await repo.findUserByEmail('member@example.com');
 const makeMailer = (config) =>
   createMailer({
     ...config,
@@ -45,8 +67,8 @@ const makeMailer = (config) =>
     },
   });
 if (process.env.RUN_WORKSPACE_PREVIEW === '1') {
-  const admin = [...repo.users.values()].find((u) => u.is_admin),
-    member = [...repo.users.values()].find((u) => !u.is_admin);
+  const admin = adminUser,
+    member = memberUser;
   for (const [name, verified] of walkthrough
     ? []
     : [
@@ -59,7 +81,10 @@ if (process.env.RUN_WORKSPACE_PREVIEW === '1') {
       passwordHash: hash,
       registrationPending: true,
     });
-    if (verified) repo.users.get(u.id).email_verified_at = new Date();
+    if (verified) {
+      if (pool) await pool.query('UPDATE pm_users SET email_verified_at=now() WHERE id=$1', [u.id]);
+      else repo.users.get(u.id).email_verified_at = new Date();
+    }
   }
   const p = await repo.createProject(admin.id, randomUUID(), {
     name: walkthrough ? '우리 팀 첫 프로젝트' : '운영 기능 검증 프로젝트',
@@ -90,7 +115,7 @@ const mailSettings = new MailSettings({ repo, key, makeMailer }),
   basePath = '/pmcanvas',
   passwordReset = new PasswordReset({ repo, mailer: mailSettings, origin, basePath });
 if (process.env.RUN_REGISTRATION_REVIEW_PREVIEW === '1')
-  await mailSettings.save([...repo.users.values()].find((u) => u.is_admin).id, {
+  await mailSettings.save(adminUser.id, {
     revision: 0,
     enabled: true,
     host: '127.0.0.1',
@@ -211,6 +236,7 @@ async function stop() {
   await registrationEmail.close();
   await passwordReset.idle();
   await smtp.close();
+  await pool?.end();
   process.exit(0);
 }
 process.once('SIGINT', stop);

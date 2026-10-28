@@ -12,6 +12,8 @@ contextBridge.exposeInMainWorld(
     settings: () => call('settings'),
     setTimeZone: (value) => call('timeZone', value),
     info: () => call('info'),
+    checkUpdates: () => call('updates'),
+    openRelease: () => call('openRelease'),
     replace: (project, revision) => call('replace', project, revision),
     undo: (revision) => call('undo', revision),
     redo: (revision) => call('redo', revision),

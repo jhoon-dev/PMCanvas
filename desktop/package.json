@@ -1,6 +1,6 @@
 {
   "name": "pmcanvas-desktop",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "private": true,
   "description": "Offline project planning for Windows and macOS",
   "author": "PM Canvas",
@@ -41,6 +41,7 @@
     },
     "files": [
       "main.mjs",
+      "updates.mjs",
       "preload.cjs",
       "document.mjs",
       "assets.mjs",
