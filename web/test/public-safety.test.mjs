@@ -19,6 +19,11 @@ test('Apple signing keys and provisioning files are private; desktop signing exa
   for (const file of ['signing/key.p8', 'signing/app.mobileprovision', 'signing/app.pfx']) {
     assert.equal(inspect(file, 'synthetic')[0].rule, 'PRIVATE_OR_ARCHIVE_FILE');
   }
+  assert.equal(inspect('PMCanvas-MacSigning-test/state.json', '{}')[0].rule, 'PRIVATE_PATH');
+  assert.equal(
+    inspect('desktop/PMCanvas.certSigningRequest', 'synthetic')[0].rule,
+    'PRIVATE_OR_ARCHIVE_FILE',
+  );
   assert.equal(
     inspect('desktop/.env.example', 'CSC_KEY_PASSWORD=visible-fixture')[0].rule,
     'INLINE_PRIVATE_SETTING',
