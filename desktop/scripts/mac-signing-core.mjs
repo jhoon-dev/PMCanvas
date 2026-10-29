@@ -277,10 +277,10 @@ export function createCsr(folder, email, passphrase, openssl = opensslPath()) {
           '-out',
           key,
           '-pass',
-          'env:PM_SIGNING_OUTPASS',
+          'stdin',
         ],
         {
-          secrets: { PM_SIGNING_OUTPASS: passphrase },
+          input: passphrase + '\n',
           label: '개인 키 생성에 실패했습니다. 이 폴더를 보존하고 새 작업 폴더에서 재시도하세요.',
         },
       );
@@ -291,7 +291,7 @@ export function createCsr(folder, email, passphrase, openssl = opensslPath()) {
           '-new',
           '-sha256',
           '-passin',
-          'env:PM_SIGNING_INPASS',
+          'stdin',
           '-keyform',
           'PEM',
           '-key',
@@ -302,7 +302,7 @@ export function createCsr(folder, email, passphrase, openssl = opensslPath()) {
           config,
         ],
         {
-          secrets: { PM_SIGNING_INPASS: passphrase },
+          input: passphrase + '\n',
           label: 'CSR 생성에 실패했습니다. 기존 개인 키는 보존했습니다.',
         },
       );
@@ -418,17 +418,17 @@ export function exportP12(
           '-iter',
           '100000',
           '-passin',
-          'env:PM_SIGNING_INPASS',
+          'stdin',
           '-passout',
-          'env:PM_SIGNING_OUTPASS',
+          'stdin',
         ],
         {
-          secrets: { PM_SIGNING_INPASS: keyPassword, PM_SIGNING_OUTPASS: p12Password },
+          input: keyPassword + '\n' + p12Password + '\n',
           label: 'P12 변환에 실패했습니다. 암호와 원본 키를 확인하세요.',
         },
       );
-      quietRun(openssl, ['pkcs12', '-in', temp, '-noout', '-passin', 'env:PM_SIGNING_INPASS'], {
-        secrets: { PM_SIGNING_INPASS: p12Password },
+      quietRun(openssl, ['pkcs12', '-in', temp, '-noout', '-passin', 'stdin'], {
+        input: p12Password + '\n',
         label: 'P12 검증에 실패했습니다.',
       });
       fs.renameSync(temp, output);
@@ -471,8 +471,8 @@ export function registerP12(folder, passphrase, run = quietRun, openssl = openss
       bytes = read(file);
     if (!state.p12Sha256 || digest(bytes) !== state.p12Sha256)
       fail('P12가 변경되었거나 이 작업에서 만든 파일이 아닙니다.');
-    quietRun(openssl, ['pkcs12', '-in', file, '-noout', '-passin', 'env:PM_SIGNING_INPASS'], {
-      secrets: { PM_SIGNING_INPASS: passphrase },
+    quietRun(openssl, ['pkcs12', '-in', file, '-noout', '-passin', 'stdin'], {
+      input: passphrase + '\n',
       label: 'P12 암호가 일치하지 않습니다.',
     });
     run('gh', ['auth', 'status', '--hostname', 'github.com'], {

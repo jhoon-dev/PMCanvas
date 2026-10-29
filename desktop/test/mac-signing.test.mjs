@@ -54,7 +54,7 @@ function authority(root) {
       '-new',
       '-x509',
       '-passin',
-      'env:PM_SIGNING_INPASS',
+      'stdin',
       '-keyform',
       'PEM',
       '-key',
@@ -72,7 +72,7 @@ function authority(root) {
       '-addext',
       'subjectKeyIdentifier=hash',
     ],
-    { secrets: { PM_SIGNING_INPASS: passA } },
+    { input: passA + '\n' },
   );
   return { key, file: cert, certificate: new X509Certificate(fs.readFileSync(cert)) };
 }
@@ -121,7 +121,7 @@ function issue(
       ca.key,
       '-CAcreateserial',
       '-passin',
-      'env:PM_SIGNING_INPASS',
+      'stdin',
       '-outform',
       'DER',
       '-out',
@@ -134,7 +134,7 @@ function issue(
       '-extfile',
       extensions,
     ],
-    { secrets: { PM_SIGNING_INPASS: passA } },
+    { input: passA + '\n' },
   );
   fs.unlinkSync(extensions);
   return file;
