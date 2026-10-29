@@ -47,6 +47,30 @@ test('update selection uses stable desktop tags, numeric versions and compatible
   bad.assets[0].browser_download_url = 'https://attacker.example/download.exe';
   assert.equal(selectUpdate([bad], '0.7.2', 'win32', 'x64').downloadAvailable, false);
 });
+test('Mac-only releases keep Windows updates pointed at the newest compatible installer', () => {
+  const mac = release('0.8.0');
+  mac.assets = ['arm64', 'x64'].flatMap((arch) =>
+    ['.dmg', '.dmg.sha256'].map((ext) => {
+      const name = 'PMCanvas-Desktop-0.8.0-macOS-' + arch + ext;
+      return {
+        name,
+        browser_download_url:
+          'https://github.com/jhoon-dev/PMCanvas/releases/download/desktop-v0.8.0/' + name,
+      };
+    }),
+  );
+  const data = [mac, release('0.7.2')];
+  const win = selectUpdate(data, '0.7.1', 'win32', 'x64');
+  assert.equal(win.version, '0.7.2');
+  assert.equal(win.downloadAvailable, true);
+  assert.equal(win.available, true);
+  assert.equal(win.url, RELEASES_PAGE + '/tag/desktop-v0.7.2');
+  for (const arch of ['arm64', 'x64'])
+    assert.equal(selectUpdate(data, '0.7.2', 'darwin', arch).version, '0.8.0');
+  assert.equal(selectUpdate(data, '0.8.0', 'win32', 'x64').available, false);
+  mac.assets = mac.assets.filter((asset) => !asset.name.endsWith('.sha256'));
+  assert.equal(selectUpdate(data, '0.7.2', 'darwin', 'arm64').downloadAvailable, false);
+});
 test('manual update checks share a request, cache successes and allow retry after offline errors', async () => {
   let calls = 0,
     clock = 1000,

@@ -1,5 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
+if (process.argv.includes('--cleanup')) {
+  if (process.platform === 'darwin' && process.env.RUNNER_TEMP)
+    fs.rmSync(path.join(process.env.RUNNER_TEMP, 'pmcanvas-notary.p8'), { force: true });
+  process.exit(0);
+}
 if (process.platform === 'darwin' && process.env.APPLE_API_KEY_BASE64) {
   const bytes = Buffer.from(process.env.APPLE_API_KEY_BASE64, 'base64');
   if (!bytes.length || bytes.length > 32768) throw Error('Invalid Apple API key size.');

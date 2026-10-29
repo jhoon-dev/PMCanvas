@@ -9,6 +9,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { screenProject } from '../../web/test/support/screen-fixtures.mjs';
 import { captureBaseline } from '../app/shared/planning.js';
+import { verifyWindowsSignature, verifyMacApp } from '../scripts/verify-signatures.mjs';
 const { _electron: electron } = createRequire(new URL('../../web/package.json', import.meta.url))(
   '@playwright/test',
 );
@@ -18,6 +19,9 @@ if (!['win32', 'darwin'].includes(process.platform)) throw Error('Windows or mac
 const desktop = fileURLToPath(new URL('../', import.meta.url));
 const version = JSON.parse(fs.readFileSync(path.join(desktop, 'package.json'))).version;
 const platform = process.platform === 'win32' ? 'win' : 'mac';
+const mode = process.env.PM_INSTALLER_MODE || 'unsigned';
+assert.ok(['signed', 'unsigned'].includes(mode));
+const signed = mode === 'signed';
 const name = (v) =>
   'PMCanvas-Desktop-' +
   v +
@@ -99,13 +103,14 @@ async function downloadBaseline() {
   );
   return file;
 }
-function findCurrent(folder) {
+function findCurrent(folder, expectedName = name(version)) {
   const matches = [];
   const visit = (dir) => {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       const f = path.join(dir, entry.name);
+      assert.equal(entry.isSymbolicLink(), false);
       if (entry.isDirectory()) visit(f);
-      else if (entry.name === name(version)) matches.push(f);
+      else if (entry.name === expectedName) matches.push(f);
     }
   };
   visit(folder);
@@ -117,6 +122,8 @@ function findCurrent(folder) {
 }
 function installPackage(file) {
   safeInstallPath();
+  const currentSigned = signed && path.basename(file) === name(version);
+  if (currentSigned && platform === 'win') verifyWindowsSignature(file);
   if (platform === 'win') run(file, ['/S', '/currentuser', '/D=' + install]);
   else {
     const mount = path.join(work, 'mounted-dmg');
@@ -133,6 +140,10 @@ function installPackage(file) {
     }
   }
   assert.ok(fs.existsSync(executable));
+  if (currentSigned) {
+    if (platform === 'win') verifyWindowsSignature(executable);
+    else verifyMacApp(install);
+  }
 }
 async function launch(expectedVersion) {
   application = await electron.launch({ executablePath: executable, args: [], timeout: 40000 });
@@ -189,9 +200,18 @@ async function waitRemoved() {
 try {
   absentInstallation();
   const baseline = await downloadBaseline();
-  const current = findCurrent(
-    path.resolve(process.argv[2] || path.join(desktop, 'dist/lifecycle-artifact')),
+  const artifactFolder = path.resolve(
+    process.argv[2] || path.join(desktop, 'dist/lifecycle-artifact'),
   );
+  const current = findCurrent(artifactFolder);
+  let zipSha256;
+  if (signed && platform === 'mac') {
+    const zip = findCurrent(artifactFolder, name(version).replace(/\.dmg$/, '.zip'));
+    const extracted = path.join(work, 'verified-zip');
+    run('ditto', ['-x', '-k', zip, extracted]);
+    verifyMacApp(path.join(extracted, 'PM Canvas Desktop.app'));
+    zipSha256 = hash(zip);
+  }
   installPackage(baseline);
   checks.push('Installed the checksum-pinned 0.7.1 installer.');
   let page = await launch('0.7.1');
@@ -258,6 +278,11 @@ try {
     arch: process.arch,
     baseline: '0.7.1',
     version,
+    mode,
+    installerSha256: hash(current),
+    signaturesVerified: signed,
+    notarizationVerified: signed && platform === 'mac',
+    ...(zipSha256 ? { zipSha256 } : {}),
     checks,
     projectSha256: hash(projectFile),
     verifiedAt: new Date().toISOString(),

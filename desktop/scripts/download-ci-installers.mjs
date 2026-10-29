@@ -5,6 +5,8 @@ import { execFileSync } from 'node:child_process';
 if (process.env.CI !== 'true' || !/^\d+$/.test(process.env.GITHUB_RUN_ID || ''))
   throw Error('A GitHub Actions run is required.');
 const root = fileURLToPath(new URL('../', import.meta.url));
+const mode = process.env.PM_INSTALLER_MODE || 'unsigned';
+if (!['signed', 'unsigned'].includes(mode)) throw Error('Invalid installer mode.');
 const output = path.join(root, 'dist/lifecycle-artifact');
 if (fs.existsSync(output)) throw Error('Preserve previous installer artifacts.');
 execFileSync(
@@ -14,7 +16,7 @@ execFileSync(
     'download',
     process.env.GITHUB_RUN_ID,
     '--name',
-    'PMCanvas-unsigned-' + (process.platform === 'win32' ? 'win' : 'mac'),
+    'PMCanvas-' + mode + '-' + (process.platform === 'win32' ? 'win' : 'mac'),
     '--dir',
     output,
   ],

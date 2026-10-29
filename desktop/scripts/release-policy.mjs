@@ -2,16 +2,38 @@ import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 
-export const releaseJobs = Object.freeze([
-  'verify (windows-latest)',
-  'verify (macos-latest)',
-  'unsigned (windows-latest, win)',
-  'unsigned (macos-latest, mac)',
-  'install (windows-latest)',
-  'install (macos-latest)',
-  'install (macos-15-intel)',
-]);
-export function verifiedReleaseSource(run, jobs) {
+export function releasePlan({ mode = 'unsigned', platform = 'all' } = {}) {
+  if (!['signed', 'unsigned'].includes(mode)) throw Error('Choose signed or unsigned.');
+  if (!['all', 'win', 'mac'].includes(platform)) throw Error('Choose all, win or mac.');
+  const builds = [
+    { os: 'windows-latest', target: 'win' },
+    { os: 'macos-latest', target: 'mac' },
+  ].filter((item) => platform === 'all' || item.target === platform);
+  const installs = builds.flatMap(({ target }) =>
+    target === 'win'
+      ? [{ os: 'windows-latest' }]
+      : [{ os: 'macos-latest' }, { os: 'macos-15-intel' }],
+  );
+  return {
+    mode,
+    platform,
+    platforms: builds.map(({ target }) => target),
+    builds: { include: builds },
+    installs: { include: installs },
+    systems: builds.flatMap(({ target }) =>
+      target === 'win' ? ['win32-x64'] : ['darwin-arm64', 'darwin-x64'],
+    ),
+    jobs: [
+      'verify (windows-latest)',
+      'verify (macos-latest)',
+      ...builds.map(({ os, target }) => `${mode} (${os}, ${target})`),
+      ...installs.map(({ os }) => `install (${os})`),
+    ],
+  };
+}
+// Preserve publication recovery for the original unsigned, two-platform runs.
+export const releaseJobs = Object.freeze(releasePlan().jobs);
+export function verifiedReleaseSource(run, jobs, options) {
   if (
     run.repository?.full_name?.toLowerCase() !== 'jhoon-dev/pmcanvas' ||
     run.event !== 'workflow_dispatch' ||
@@ -19,7 +41,7 @@ export function verifiedReleaseSource(run, jobs) {
     !/^[a-f0-9]{40}$/.test(run.head_sha || '')
   )
     throw Error('Release source must be a verified desktop build run in this repository.');
-  for (const name of releaseJobs)
+  for (const name of releasePlan(options).jobs)
     if (!jobs.some((job) => job.name === name && job.conclusion === 'success'))
       throw Error('Missing successful source job: ' + name);
   return run.head_sha;
