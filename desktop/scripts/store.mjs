@@ -88,6 +88,8 @@ try {
   ]);
   const unpacked = path.join(stage, 'pack/win-unpacked');
   verifyPackage(path.join(unpacked, 'resources/app.asar'), { root, commit });
+  // Native test fixtures import the prepared shared model; release bytes still come from Git.
+  run(process.execPath, ['scripts/prepare.mjs']);
   run(process.execPath, ['scripts/check-package.mjs', '--smoke'], {
     env: { ...env, PM_PACKAGE_DIR: path.join(stage, 'pack'), PM_SOURCE_COMMIT: commit },
   });

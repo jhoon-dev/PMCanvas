@@ -16,7 +16,7 @@ Windows의 기본 배포 경로는 **MSIX → Partner Center → Microsoft Store
 | `PM_STORE_PUBLISHER_DISPLAY_NAME` | Package/Properties/PublisherDisplayName   |
 | `PM_STORE_PRODUCT_ID`             | Store product ID — Store 링크의 12자리 ID |
 
-로컬에서는 `desktop/store.env.example`을 `.env.store`로 복사해 채웁니다. `.env.store`는 Git에서 제외됩니다. 아직 예약하지 않았다면 빈 상태로 두세요. 제출 빌드는 빈 값·예제 값·잘못된 ID를 거부합니다. 임의 ID의 테스트 파일을 실제 앱으로 제출하지 않습니다.
+로컬에서는 `desktop/store.env.example`을 `.env.msix`로 복사해 채웁니다. `.env.msix`는 Git에서 제외됩니다. 아직 예약하지 않았다면 빈 상태로 두세요. 제출 빌드는 빈 값·예제 값·잘못된 ID를 거부합니다. 임의 ID의 테스트 파일을 실제 앱으로 제출하지 않습니다.
 
 ## 2. 빌드와 검증
 

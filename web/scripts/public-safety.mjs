@@ -71,7 +71,6 @@ const fileExtensions = new Set([
   'plist',
   'sha256',
   'signing',
-  'store',
   'msix',
   'msixbundle',
   'msixupload',
