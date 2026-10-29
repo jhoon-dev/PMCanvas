@@ -97,6 +97,7 @@ test('공개 예제: 개인 호스트·이메일·IP·홈 경로·인라인 비�
   for (const [file, text, rule] of [
     ['docs/setup.md', 'PGHOST=db.privatecorp.tld PGPORT=35432', 'NON_EXAMPLE_DOMAIN'],
     ['README.md', 'db.privatecorp.tld:35432', 'NON_EXAMPLE_DOMAIN'],
+    ['README.md', 'db.privatecorp.store:35432', 'NON_EXAMPLE_DOMAIN'],
     ['README.md', 'admin@privatecorp.tld', 'NON_EXAMPLE_DOMAIN'],
     ['README.md', 'https://privatecorp.tld/setup', 'NON_EXAMPLE_HOST'],
     ['.env.example', 'PGHOST=10.21.22.23', 'NON_EXAMPLE_IP'],
@@ -142,6 +143,14 @@ test('공개 예제: 빈 값·환경 변수·공식 문서·Entra 예제는 정�
     ['.env.example', 'PGPASSWORD="${DB_PASSWORD}"\nPGHOST="localhost"'],
     ['compose.external.yml', 'PGPASSWORD: ${BACKUP_PGPASSWORD:-${PGPASSWORD}}'],
     ['README.md', 'https://github.com/example/project and https://playwright.dev/docs/ci'],
+    [
+      'desktop/MAC-SETUP.md',
+      'https://developer.apple.com/account/ https://support.apple.com/ https://account.apple.com/ https://appstoreconnect.apple.com/',
+    ],
+    [
+      'desktop/WINDOWS-STORE.md',
+      'store.env.example .env.msix PMCanvas-Store.msix package.msixbundle package.msixupload',
+    ],
     [
       'README.md',
       'server/federation.mjs config/auth.example.json dockerfile.backup blame.ignoreRevsFile',

@@ -32,6 +32,8 @@ npm start
 
 Windows와 macOS는 동일한 소스를 사용하며 각 OS에서 설치 파일을 만듭니다. 데스크톱은 WBS 계층·일괄 작업·하위 집계·기준 계획 비교, 일정 점검·조정 미리보기와 프로젝트 실행 취소·다시 실행을 지원하며, Windows에서 실제 앱의 저장·재시작·CSV 및 XLSX 입출력을 검증했습니다. 설치 파일 명령과 운영체제별 검증 범위는 [데스크톱 README](desktop/README.md)를 확인하세요.
 
+Windows는 [Microsoft Store 제출용 MSIX](desktop/WINDOWS-STORE.md)를 준비하고, Mac은 [Developer ID 인증서 발급·공증·GitHub Secrets 설정](desktop/MAC-SETUP.md) 후 서명된 DMG/ZIP을 배포합니다. 실제 Store 등록과 Apple 인증서 발급은 계정 소유자의 설정이 필요합니다.
+
 ## 개발
 
 저장소 루트에서 사용할 수 있는 명령입니다.

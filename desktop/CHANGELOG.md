@@ -1,5 +1,12 @@
 # 변경 이력
 
+## 0.7.4
+
+- Windows 기본 배포를 Microsoft Store 제출용 MSIX로 전환했습니다. Partner Center 제품 ID 설정, SDK 검증·추출 비교·원본 커밋 검사와 CI 설치 검증을 추가했습니다.
+- 기존 EXE에서 MSIX로 전환할 때 프로젝트·복구·언어·시간대를 보존하도록 AppData 가상화 정책을 명시했습니다. 제한 기능은 Store 제출 시 사용 사유와 승인이 필요합니다.
+- 실제 Store 패키지에서 실행된 앱은 Microsoft Store로 업데이트를 안내합니다. Mac·기존 EXE의 GitHub 업데이트는 유지합니다.
+- Mac CSR·Developer ID Application 인증서 발급·P12 내보내기·공증 자격 증명·GitHub Environment Secrets 등록 가이드를 추가했습니다.
+
 ## 0.7.3
 
 - CI 플랫폼 선택(`all`·`mac`·`win`)을 추가했습니다. Mac만 서명·공증할 때 Windows 인증서를 요구하지 않습니다.

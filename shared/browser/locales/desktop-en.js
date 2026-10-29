@@ -1,5 +1,10 @@
 // Authored interface text only; project names, notes and imported values are never translated.
 export default {
+  'Microsoft Store 열기': 'Open Microsoft Store',
+  '이 앱은 Microsoft Store에서 설치했습니다. 업데이트는 Store에서 관리합니다.':
+    'This app was installed from Microsoft Store. Updates are managed by the Store.',
+  'Microsoft Store의 라이브러리에서 업데이트를 확인하세요. 업데이트 전 프로젝트를 저장하고 앱을 종료하세요.':
+    'Check for updates in the Microsoft Store library. Save your project and close the app before updating.',
   '업데이트 확인': 'Check for updates',
   '새 버전을 확인하고 있습니다.': 'Checking for a new version.',
   '새 버전: ': 'New version: ',

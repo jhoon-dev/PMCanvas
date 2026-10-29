@@ -11,7 +11,7 @@ const { chromium } = createRequire(new URL('../../web/package.json', import.meta
 );
 const root = fileURLToPath(new URL('../app/', import.meta.url));
 
-async function harness(language = 'ko', timeZone = 'Asia/Seoul', offline = false) {
+async function harness(language = 'ko', timeZone = 'Asia/Seoul', offline = false, store = false) {
   let openedReleases = 0;
   let project = screenProject(),
     revision = 1,
@@ -24,6 +24,14 @@ async function harness(language = 'ko', timeZone = 'Asia/Seoul', offline = false
   await page.exposeFunction('fixtureCall', (name, ...args) => {
     if (name === 'checkUpdates') {
       if (offline) throw Error('offline');
+      if (store)
+        return {
+          channel: 'microsoft-store',
+          currentVersion: '0.7.4',
+          version: null,
+          available: false,
+          downloadAvailable: false,
+        };
       return {
         currentVersion: '0.7.2',
         version: '0.8.0',
@@ -114,6 +122,29 @@ test('manual update notices preserve projects, open links only on request and ha
   }
 });
 
+test('Store update notices use the Store library and preserve offline project data in both languages', async () => {
+  for (const language of ['ko', 'en']) {
+    const h = await harness(language, 'Asia/Seoul', false, true);
+    try {
+      const before = structuredClone(h.getProject());
+      await h.page
+        .getByText(language === 'en' ? 'File options' : '파일 옵션', { exact: true })
+        .click();
+      await h.page.locator('[data-command="updates"]').first().click();
+      await h.page.waitForFunction(() =>
+        document.querySelector('#updateStatus').textContent.includes('Microsoft Store'),
+      );
+      assert.match(await h.page.locator('#openRelease').textContent(), /Microsoft Store/);
+      assert.equal(h.openedReleases(), 0);
+      await h.page.locator('#openRelease').click();
+      assert.equal(h.openedReleases(), 1);
+      assert.deepEqual(h.getProject(), before);
+      assert.deepEqual(h.errors, []);
+    } finally {
+      await h.browser.close();
+    }
+  }
+});
 test('business time zone settings survive reload, use the configured day and preserve project records', async () => {
   const { browser, page, errors, getProject } = await harness('en', 'America/New_York');
   try {

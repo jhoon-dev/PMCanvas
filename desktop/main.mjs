@@ -21,7 +21,7 @@ import { getLanguage, setLanguage, ui, supportedLanguages } from './app/shared/i
 import { getBusinessTimeZone, setBusinessTimeZone } from './app/shared/business-clock.js';
 import { validateProject } from './app/shared/engine.js';
 import { readBounded } from './file-io.mjs';
-import { UpdateService } from './updates.mjs';
+import { UpdateService, StoreUpdateService } from './updates.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const testing = !app.isPackaged && process.env.PMCANVAS_DESKTOP_TEST === '1';
@@ -43,7 +43,7 @@ else {
     closing = false;
   const excelJob = createExcelJobs((...args) => utilityProcess.fork(...args));
   let excelImport;
-  const updates = new UpdateService();
+  const updates = process.windowsStore ? new StoreUpdateService() : new UpdateService();
   const updateHistoryMenu = (snapshot = document?.snapshot()) => {
     for (const [id, available] of [
       ['project-undo', snapshot?.canUndo],

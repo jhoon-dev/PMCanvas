@@ -98,6 +98,11 @@ try {
       },
     );
   verifySignatures(target, output);
+  // Prepare the local model used by native test fixtures, independently of the committed payload.
+  execFileSync(process.execPath, [path.join(desktop, 'scripts/prepare.mjs')], {
+    cwd: desktop,
+    stdio: 'inherit',
+  });
   execFileSync(process.execPath, [path.join(desktop, 'scripts/check-package.mjs'), '--smoke'], {
     cwd: desktop,
     stdio: 'inherit',
