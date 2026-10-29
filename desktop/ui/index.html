@@ -70,13 +70,18 @@
                 <button class="button" data-command="importExcel">Excel 가져오기</button>
                 <button class="button" data-command="exportTemplate">Excel 입력 양식 저장</button>
                 <button class="button" data-command="about">앱 정보</button>
-                <button class="button" data-command="updates">업데이트 확인</button>
+                <button class="button" data-command="appSettings">앱 설정</button>
                 <button class="button" data-command="timeZone">업무 기준 시간대</button>
               </div>
             </details>
           </div>
           <span id="saveStatus" role="status">프로젝트 파일을 열거나 새로 만드세요</span>
         </header>
+        <aside id="updateNotice" class="update-notice" role="status" aria-live="polite" hidden>
+          <span id="updateNoticeText"></span>
+          <button id="showUpdate" class="button small">업데이트 보기</button>
+          <button id="dismissUpdate" class="icon-button" aria-label="업데이트 알림 닫기">×</button>
+        </aside>
         <main id="content" tabindex="-1"></main>
         <footer class="desktop-footer">
           완료한 작업을 체크하면 진척률과 예상 완료일이 함께 바뀝니다.
@@ -103,16 +108,25 @@
     </dialog>
     <div id="toast" class="desktop-toast" role="status" hidden></div>
     <dialog id="updateDialog" class="desktop-dialog" aria-labelledby="updateTitle">
-      <div class="dialog-head"><h2 id="updateTitle">업데이트 확인</h2></div>
+      <div class="dialog-head"><h2 id="updateTitle">앱 설정</h2></div>
       <div class="dialog-body">
+        <h3>업데이트</h3>
+        <p id="currentVersion"></p>
+        <label class="update-option"
+          ><input type="checkbox" id="autoCheckUpdates" /> 앱 시작 시 새 버전 확인</label
+        >
         <p id="updateStatus" role="status"></p>
+        <progress id="updateProgress" hidden aria-label="업데이트 다운로드 진행률"></progress>
+        <p id="lastUpdateCheck" class="desktop-note"></p>
         <p id="updateInstructions">
           프로젝트를 저장한 뒤 새 설치 파일을 실행하세요. 프로젝트 파일과 PC 설정은 유지됩니다.
         </p>
+        <button id="openRelease" class="button small">공식 다운로드 페이지</button>
       </div>
       <div class="dialog-foot">
         <button id="closeUpdate" class="button">닫기</button
-        ><button id="openRelease" class="button primary">공식 다운로드 페이지</button>
+        ><button id="checkUpdates" class="button">업데이트 확인</button>
+        <button id="installUpdate" class="button primary" disabled>업데이트 다운로드</button>
       </div>
     </dialog>
     <dialog id="timeZoneDialog" class="desktop-dialog" aria-labelledby="timeZoneTitle">

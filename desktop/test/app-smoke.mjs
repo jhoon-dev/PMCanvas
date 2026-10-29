@@ -20,6 +20,11 @@ if (installed && !process.argv[3])
   throw Error('--installed requires the installed executable path.');
 const appPath = !installed && process.argv[2] ? path.resolve(process.argv[2]) : root;
 const temporary = mkdtempSync(path.join(os.tmpdir(), 'pmcanvas-electron-'));
+// Packaged apps honor this real preference as well; no startup outbound network in fixtures.
+writeFileSync(
+  path.join(temporary, 'preferences.json'),
+  JSON.stringify({ timeZone: 'Asia/Seoul', checkUpdatesOnStart: false }),
+);
 let application;
 let completed = false;
 let stage = 'launch';
@@ -328,11 +333,33 @@ try {
   });
   if (!(await page.locator('details.action-menu').evaluate((menu) => menu.open)))
     await page.getByText('파일 옵션', { exact: true }).click();
-  await page.getByRole('button', { name: '업데이트 확인', exact: true }).click();
+  await page.getByRole('button', { name: '앱 설정', exact: true }).click();
+  await page.locator('#checkUpdates').click();
   await page.getByText('새 버전: 0.99.0', { exact: false }).waitFor();
   assert.equal(await application.evaluate(() => globalThis.__releasePages.length), 0);
   await page.locator('#openRelease').click();
   await page.locator('#closeUpdate').click();
+  assert.equal((await page.evaluate(() => window.desktop.settings())).checkUpdatesOnStart, false);
+  await page.evaluate(() => window.desktop.setUpdatePreference(true));
+  assert.equal((await page.evaluate(() => window.desktop.settings())).checkUpdatesOnStart, true);
+  await assert.rejects(page.evaluate(() => window.desktop.setUpdatePreference('false')));
+  await assert.rejects(
+    page.evaluate(() => window.desktop.applyUpdate()),
+    /Download|다운로드/,
+  );
+  await page.evaluate(async () => {
+    const snapshot = await window.desktop.snapshot();
+    await window.desktop.replace(
+      { ...snapshot.project, description: 'Temporary update guard check' },
+      snapshot.revision,
+    );
+  });
+  await assert.rejects(
+    page.evaluate(() => window.desktop.applyUpdate()),
+    /저장|취소/,
+  );
+  await page.evaluate(async () => window.desktop.undo((await window.desktop.snapshot()).revision));
+  assert.deepEqual((await page.evaluate(() => window.desktop.snapshot())).project, finalProject);
   assert.deepEqual(await application.evaluate(() => globalThis.__releasePages), [
     'https://github.com/jhoon-dev/PMCanvas/releases/tag/desktop-v0.99.0',
   ]);
@@ -348,6 +375,10 @@ try {
     /언어/,
   );
   await page.evaluate(() => window.desktop.editing(true));
+  await assert.rejects(
+    page.evaluate(() => window.desktop.applyUpdate()),
+    /저장|입력/,
+  );
   await assert.rejects(
     page.evaluate(() => window.desktop.setLanguage('en')),
     /언어/,
@@ -394,6 +425,10 @@ try {
     parseDocument(readFileSync(path.join(temporary, 'Native.pmcanvas'))).tasks[0].name,
     'Native Excel import',
   );
+  const savedPreferences = JSON.parse(readFileSync(path.join(temporary, 'preferences.json')));
+  assert.equal(savedPreferences.checkUpdatesOnStart, true);
+  assert.equal(savedPreferences.timeZone, 'Pacific/Kiritimati');
+  await page.evaluate(() => window.desktop.setUpdatePreference(false));
   await application.close();
   checkpoint('restart');
   application = await launch();
@@ -410,6 +445,10 @@ try {
     'Pacific/Kiritimati',
   );
   assert.deepEqual(afterRestart.project, finalProject);
+  assert.equal(
+    (await restored.evaluate(() => window.desktop.settings())).checkUpdatesOnStart,
+    false,
+  );
   assert.equal(afterRestart.canUndo, false);
   assert.equal(afterRestart.canRedo, false);
   console.log(

@@ -15,6 +15,7 @@ import { editorForm, itemEditor, applyEditor } from './shared/project-editor.js'
 import { peopleView } from './shared/people-view.js';
 import { completionRecords } from './shared/reports.js';
 import { openExcelDialog } from './excel-ui.js';
+import { createUpdateUI } from './update-ui.js';
 import {
   planningView,
   parentField,
@@ -27,7 +28,8 @@ import { bulkProposal, bulkPreviewHtml } from './bulk-ui.js';
 import { pct, num, person, meter, badge, pageHead, btn, empty } from './shared/view-ui.js';
 
 const api = window.desktop;
-setBusinessTimeZone((await api.settings?.())?.timeZone || 'Asia/Seoul');
+const appSettings = (await api.settings?.()) || {};
+setBusinessTimeZone(appSettings.timeZone || 'Asia/Seoul');
 const $ = (selector) => document.querySelector(selector);
 const reportClock = new ReportClock();
 let state = { project: null, revision: -1, dirty: false, filename: '' };
@@ -605,6 +607,14 @@ async function commit(project) {
   accept(next);
 }
 async function command(name) {
+  if (name === 'appSettings' || name === 'updates') {
+    if (editor || importing) {
+      toast(ui('입력창의 변경사항을 먼저 적용하거나 취소해 주세요.'));
+      return;
+    }
+    await updateUI.open(name === 'updates');
+    return;
+  }
   if (name === 'timeZone') {
     if (busy || editor || importing || state.dirty) {
       toast(ui('변경사항을 저장하거나 취소한 뒤 시간대를 바꿔 주세요.'));
@@ -620,34 +630,6 @@ async function command(name) {
     return;
   }
   const result = await run(async () => {
-    if (name === 'updates') {
-      $('#updateStatus').textContent = ui('새 버전을 확인하고 있습니다.');
-      $('#updateDialog').showModal();
-      try {
-        const update = await api.checkUpdates();
-        const store = update.channel === 'microsoft-store';
-        $('#openRelease').textContent = ui(store ? 'Microsoft Store 열기' : '공식 다운로드 페이지');
-        $('#updateInstructions').textContent = ui(
-          store
-            ? 'Microsoft Store의 라이브러리에서 업데이트를 확인하세요. 업데이트 전 프로젝트를 저장하고 앱을 종료하세요.'
-            : '프로젝트를 저장한 뒤 새 설치 파일을 실행하세요. 프로젝트 파일과 PC 설정은 유지됩니다.',
-        );
-        $('#updateStatus').textContent = store
-          ? ui('이 앱은 Microsoft Store에서 설치했습니다. 업데이트는 Store에서 관리합니다.')
-          : update.available
-            ? ui('새 버전: ') +
-              update.version +
-              (update.downloadAvailable ? '' : ui(' · 이 운영체제의 설치 파일을 준비 중입니다.'))
-            : update.version
-              ? ui('현재 최신 버전입니다. ') + update.currentVersion
-              : ui('공개된 데스크톱 버전이 아직 없습니다.');
-      } catch {
-        $('#updateStatus').textContent = ui(
-          '업데이트를 확인하지 못했습니다. 네트워크 연결을 확인하거나 나중에 다시 시도해 주세요.',
-        );
-      }
-      return;
-    }
     if (name === 'undo' || name === 'redo') {
       const next = await api[name](state.revision);
       accept(next);
@@ -1019,10 +1001,15 @@ api.onCommand((name) => {
   void command(name);
 });
 api.onDocument(accept);
-$('#closeUpdate').onclick = () => $('#updateDialog').close();
-$('#openRelease').onclick = () => {
-  void api.openRelease().catch((error) => toast(ui(error.message)));
-};
+const updateUI = createUpdateUI({
+  api,
+  ui,
+  settings: appSettings,
+  onOpen: () => {
+    void command('appSettings');
+  },
+  onError: (error) => toast(ui(error.message || '요청을 처리하지 못했습니다.')),
+});
 $('#cancelTimeZone').onclick = () => $('#timeZoneDialog').close();
 $('#timeZoneForm').onsubmit = async (event) => {
   event.preventDefault();
@@ -1061,3 +1048,4 @@ document.addEventListener('focusout', () => setTimeout(() => refreshDate(), 150)
 document.addEventListener('close', () => refreshDate(), true);
 setInterval(() => refreshDate(), 30000);
 accept(await api.snapshot());
+await updateUI.initialise();

@@ -232,4 +232,36 @@ export default {
     'Record completed work to update progress and forecasts.',
   '프로젝트 변경 실행 취소': 'Undo project change',
   '프로젝트 변경 다시 실행': 'Redo project change',
+  '앱 설정': 'App settings',
+  업데이트: 'Updates',
+  '현재 버전: ': 'Current version: ',
+  '마지막 확인: ': 'Last checked: ',
+  '앱 시작 시 새 버전 확인': 'Check for updates at startup',
+  '업데이트 설정을 확인해 주세요.': 'Check the update preference.',
+  '업데이트 보기': 'View update',
+  '업데이트 알림 닫기': 'Dismiss update notification',
+  '업데이트 다운로드 진행률': 'Update download progress',
+  '새 업데이트가 있습니다.': 'An update is available.',
+  'Microsoft Store에서 업데이트': 'Update in Microsoft Store',
+  '설치 파일 열기': 'Open installer',
+  '업데이트 다운로드': 'Download update',
+  'Microsoft Store에서 업데이트합니다. 변경사항을 저장한 뒤 진행하세요.':
+    'Updates are installed through Microsoft Store. Save your changes before continuing.',
+  '프로젝트를 저장하고 앱을 종료한 뒤 설치를 마무리하세요. 프로젝트 파일과 PC 설정은 유지됩니다.':
+    'Save your project and close the app to finish installing. Project files and settings are preserved.',
+  '업데이트를 다운로드하고 검증하고 있습니다.': 'Downloading and verifying the update.',
+  '다운로드와 검증을 완료했습니다. 설치 파일을 열어 업데이트하세요.':
+    'Download verified. Open the installer to update.',
+  '다운로드 또는 검증에 실패했습니다. 다시 다운로드하거나 공식 페이지를 이용해 주세요.':
+    'Download or verification failed. Retry or use the official download page.',
+  'Store에서 업데이트 상태를 확인하지 못했습니다. Microsoft Store에서 직접 확인할 수 있습니다.':
+    'Could not check Store update availability. You can check directly in Microsoft Store.',
+  '현재 사용 가능한 업데이트가 없습니다.': 'No updates are currently available.',
+  '업데이트 확인을 눌러 새 버전을 확인하세요.':
+    'Select Check for updates to look for a new version.',
+  '변경사항과 입력창을 먼저 저장하거나 취소한 뒤 업데이트해 주세요.':
+    'Save or cancel your changes and close the editor before updating.',
+  '설치 파일을 열지 못했습니다. 다시 시도해 주세요.': 'Could not open the installer. Try again.',
+  '설치 파일이 변경되었습니다. 업데이트를 다시 다운로드해 주세요.':
+    'The installer changed. Download the update again.',
 };
