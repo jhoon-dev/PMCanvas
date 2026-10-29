@@ -24,8 +24,7 @@ export function selectUpdate(releases, currentVersion, platform, arch) {
       tag.test(release.tag_name),
   );
   candidates.sort((a, b) => compareVersions(b.tag_name.slice(9), a.tag_name.slice(9)));
-  const latest = candidates[0];
-  if (!latest)
+  if (!candidates.length)
     return {
       currentVersion,
       version: null,
@@ -33,30 +32,39 @@ export function selectUpdate(releases, currentVersion, platform, arch) {
       downloadAvailable: false,
       url: RELEASES_PAGE,
     };
-  const latestVersion = latest.tag_name.slice(9);
-  const url = RELEASES_PAGE + '/tag/' + latest.tag_name;
-  if (latest.html_url !== url || !Array.isArray(latest.assets) || latest.assets.length > 100)
-    throw Error('Invalid desktop release metadata.');
-  const name =
-    platform === 'win32' && arch === 'x64'
-      ? 'PMCanvas-Desktop-' + latestVersion + '-Windows-x64.exe'
-      : platform === 'darwin' && ['arm64', 'x64'].includes(arch)
-        ? 'PMCanvas-Desktop-' + latestVersion + '-macOS-' + arch + '.dmg'
-        : null;
-  const asset = (file) =>
-    latest.assets.some(
-      (a) =>
-        a.name === file &&
-        a.browser_download_url ===
-          'https://github.com/jhoon-dev/PMCanvas/releases/download/' + latest.tag_name + '/' + file,
-    );
-  return {
-    currentVersion,
-    version: latestVersion,
-    available: compareVersions(latestVersion, currentVersion) > 0,
-    downloadAvailable: Boolean(name && asset(name) && asset(name + '.sha256')),
-    url,
-  };
+  let fallback;
+  for (const latest of candidates) {
+    const latestVersion = latest.tag_name.slice(9);
+    const url = RELEASES_PAGE + '/tag/' + latest.tag_name;
+    if (latest.html_url !== url || !Array.isArray(latest.assets) || latest.assets.length > 100)
+      throw Error('Invalid desktop release metadata.');
+    const name =
+      platform === 'win32' && arch === 'x64'
+        ? 'PMCanvas-Desktop-' + latestVersion + '-Windows-x64.exe'
+        : platform === 'darwin' && ['arm64', 'x64'].includes(arch)
+          ? 'PMCanvas-Desktop-' + latestVersion + '-macOS-' + arch + '.dmg'
+          : null;
+    const asset = (file) =>
+      latest.assets.some(
+        (a) =>
+          a.name === file &&
+          a.browser_download_url ===
+            'https://github.com/jhoon-dev/PMCanvas/releases/download/' +
+              latest.tag_name +
+              '/' +
+              file,
+      );
+    const result = {
+      currentVersion,
+      version: latestVersion,
+      available: compareVersions(latestVersion, currentVersion) > 0,
+      downloadAvailable: Boolean(name && asset(name) && asset(name + '.sha256')),
+      url,
+    };
+    fallback ||= result;
+    if (result.downloadAvailable) return result;
+  }
+  return fallback;
 }
 export function fetchReleases(request = https.get) {
   return new Promise((resolve, reject) => {

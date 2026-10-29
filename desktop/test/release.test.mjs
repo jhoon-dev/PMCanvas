@@ -10,7 +10,91 @@ import {
   verifiedReleaseSource,
   editableReleaseDraft,
   releaseJobs,
+  releasePlan,
 } from '../scripts/release-policy.mjs';
+
+test('platform plans keep both default targets and require both Mac architectures without Windows signing', () => {
+  assert.equal(releasePlan().jobs.length, 7);
+  for (const mode of ['signed', 'unsigned']) {
+    const mac = releasePlan({ mode, platform: 'mac' });
+    assert.deepEqual(mac.builds.include, [{ os: 'macos-latest', target: 'mac' }]);
+    assert.deepEqual(mac.systems, ['darwin-arm64', 'darwin-x64']);
+    assert.ok(!mac.jobs.some((job) => job.startsWith(mode + ' (windows')));
+    const win = releasePlan({ mode, platform: 'win' });
+    assert.deepEqual(win.systems, ['win32-x64']);
+    assert.equal(win.installs.include.length, 1);
+    const run = {
+      repository: { full_name: 'jhoon-dev/PMCanvas' },
+      event: 'workflow_dispatch',
+      path: '.github/workflows/desktop.yml',
+      head_sha: 'a'.repeat(40),
+    };
+    const jobs = mac.jobs.map((name) => ({ name, conclusion: 'success' }));
+    assert.equal(verifiedReleaseSource(run, jobs, mac), run.head_sha);
+    for (const missing of mac.jobs)
+      assert.throws(
+        () =>
+          verifiedReleaseSource(
+            run,
+            jobs.filter((j) => j.name !== missing),
+            mac,
+          ),
+        /Missing successful/,
+      );
+    assert.throws(
+      () => verifiedReleaseSource(run, jobs, { mode, platform: 'all' }),
+      /Missing successful/,
+    );
+    assert.throws(
+      () =>
+        verifiedReleaseSource(run, jobs, {
+          mode: mode === 'signed' ? 'unsigned' : 'signed',
+          platform: 'mac',
+        }),
+      /Missing successful/,
+    );
+  }
+  assert.throws(() => releasePlan({ platform: 'linux' }), /Choose all/);
+  assert.throws(() => releasePlan({ mode: 'other' }), /Choose signed/);
+});
+
+test('CI dispatch rejects mixed signing modes, unsafe run IDs and publication without a build', (t) => {
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'pmcanvas-plan-'));
+  t.after(() => fs.rmSync(temp, { recursive: true, force: true }));
+  const output = path.join(temp, 'outputs'),
+    summary = path.join(temp, 'summary');
+  const env = {
+    ...process.env,
+    GITHUB_OUTPUT: output,
+    GITHUB_STEP_SUMMARY: summary,
+    PM_SIGNED: '',
+    PM_UNSIGNED: '',
+    PM_PUBLISH: '',
+    PM_RELEASE_RUN_ID: '',
+    PM_RELEASE_PLATFORM: '',
+  };
+  const run = (extra) =>
+    execFileSync(process.execPath, ['desktop/scripts/ci-release-plan.mjs'], {
+      cwd: new URL('../../', import.meta.url),
+      env: { ...env, ...extra },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+  for (const extra of [
+    { PM_SIGNED: 'true', PM_UNSIGNED: 'true' },
+    { PM_PUBLISH: 'true' },
+    { PM_RELEASE_RUN_ID: '12\nextra=value' },
+    { PM_RELEASE_PLATFORM: 'mac\nother' },
+  ])
+    assert.throws(() => run(extra));
+  run({ PM_SIGNED: 'true', PM_PUBLISH: 'true', PM_RELEASE_PLATFORM: 'mac' });
+  const lines = fs.readFileSync(output, 'utf8').trim().split('\n');
+  assert.equal(lines[0], 'mode=signed');
+  assert.deepEqual(
+    JSON.parse(lines[1].slice('builds='.length)),
+    releasePlan({ platform: 'mac' }).builds,
+  );
+  run({ PM_PUBLISH: 'true', PM_RELEASE_RUN_ID: '123' });
+});
 
 test('publication recovery requires all source checks and rejects another repository, workflow or event', () => {
   const run = {
