@@ -99,6 +99,13 @@ try {
     const updates = await page.evaluate(() => window.desktop.checkUpdates());
     assert.equal(updates.channel, 'microsoft-store');
     assert.equal(updates.url, 'ms-windows-store://downloadsandupdates');
+    assert.ok(['current', 'available', 'unsupported', 'error'].includes(updates.status));
+    assert.notEqual(updates.storeCheck, 'runtime', 'WinRT types and helpers must be available.');
+    assert.notEqual(
+      updates.storeCheck,
+      'identity',
+      'The Store query subprocess must inherit package identity.',
+    );
     // Exercise Excel's utility subprocess in the registered package, using a harmless save dialog stub.
     const file = path.join(request.work, 'Store-report.xlsx');
     await app.evaluate(({ dialog }, file) => {

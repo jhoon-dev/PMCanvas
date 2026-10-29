@@ -1,21 +1,40 @@
 import https from 'node:https';
+import { checkStoreUpdates } from './store-updates.mjs';
 
 export const RELEASES_PAGE = 'https://github.com/jhoon-dev/PMCanvas/releases';
 export const STORE_UPDATES = 'ms-windows-store://downloadsandupdates';
 export class StoreUpdateService {
-  constructor() {
+  constructor({ query = checkStoreUpdates, now = Date.now } = {}) {
     this.url = STORE_UPDATES;
+    this.query = query;
+    this.now = now;
+    this.last = null;
+    this.pending = null;
   }
-  async check(currentVersion) {
+  async check(currentVersion, _platform, _arch, { force = false } = {}) {
     compareVersions(currentVersion, currentVersion);
-    return {
-      channel: 'microsoft-store',
-      currentVersion,
-      version: null,
-      available: false,
-      downloadAvailable: false,
-      url: this.url,
-    };
+    if (this.pending) return this.pending;
+    if (!force && this.last && this.now() - this.last.at < 1800000) return this.last.value;
+    this.pending = (async () => {
+      try {
+        const result = await this.query();
+        const value = {
+          channel: 'microsoft-store',
+          currentVersion,
+          version: null,
+          available: result.supported && result.available,
+          checked: result.supported,
+          storeCheck: result.supported ? 'checked' : result.reason || 'unavailable',
+          downloadAvailable: false,
+          url: this.url,
+        };
+        if (result.supported) this.last = { at: this.now(), value };
+        return value;
+      } finally {
+        this.pending = null;
+      }
+    })();
+    return this.pending;
   }
 }
 export const RELEASES_API = 'https://api.github.com/repos/jhoon-dev/PMCanvas/releases?per_page=100';
@@ -77,6 +96,22 @@ export function selectUpdate(releases, currentVersion, platform, arch) {
       available: compareVersions(latestVersion, currentVersion) > 0,
       downloadAvailable: Boolean(name && asset(name) && asset(name + '.sha256')),
       url,
+      ...(name && asset(name) && asset(name + '.sha256')
+        ? {
+            fileName: name,
+            downloadUrl:
+              'https://github.com/jhoon-dev/PMCanvas/releases/download/' +
+              latest.tag_name +
+              '/' +
+              name,
+            checksumUrl:
+              'https://github.com/jhoon-dev/PMCanvas/releases/download/' +
+              latest.tag_name +
+              '/' +
+              name +
+              '.sha256',
+          }
+        : {}),
     };
     fallback ||= result;
     if (result.downloadAvailable) return result;
@@ -130,14 +165,21 @@ export class UpdateService {
     this.pending = null;
     this.url = RELEASES_PAGE;
   }
-  async check(currentVersion, platform = process.platform, arch = process.arch) {
-    if (this.last && this.now() - this.last.at < 600000) return this.last.value;
+  async check(
+    currentVersion,
+    platform = process.platform,
+    arch = process.arch,
+    { force = false } = {},
+  ) {
+    const key = [currentVersion, platform, arch].join('/');
+    if (!force && this.last?.key === key && this.now() - this.last.at < 600000)
+      return this.last.value;
     if (this.pending) return this.pending;
     this.pending = (async () => {
       try {
         const value = selectUpdate(await this.fetch(), currentVersion, platform, arch);
         this.url = value.url;
-        this.last = { at: this.now(), value };
+        this.last = { key, at: this.now(), value };
         return value;
       } finally {
         this.pending = null;

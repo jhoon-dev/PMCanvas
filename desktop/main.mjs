@@ -20,8 +20,9 @@ import { ExcelImportSession } from './excel-session.mjs';
 import { getLanguage, setLanguage, ui, supportedLanguages } from './app/shared/i18n.js';
 import { getBusinessTimeZone, setBusinessTimeZone } from './app/shared/business-clock.js';
 import { validateProject } from './app/shared/engine.js';
-import { readBounded } from './file-io.mjs';
 import { UpdateService, StoreUpdateService } from './updates.mjs';
+import { DesktopPreferences } from './preferences.mjs';
+import { UpdateManager } from './update-manager.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const testing = !app.isPackaged && process.env.PMCANVAS_DESKTOP_TEST === '1';
@@ -44,6 +45,7 @@ else {
   const excelJob = createExcelJobs((...args) => utilityProcess.fork(...args));
   let excelImport;
   const updates = process.windowsStore ? new StoreUpdateService() : new UpdateService();
+  let updateManager;
   const updateHistoryMenu = (snapshot = document?.snapshot()) => {
     for (const [id, available] of [
       ['project-undo', snapshot?.canUndo],
@@ -147,11 +149,14 @@ else {
     .whenReady()
     .then(async () => {
       const preferencesFile = path.join(app.getPath('userData'), 'preferences.json');
-      try {
-        setBusinessTimeZone(JSON.parse(readBounded(preferencesFile, 4096)).timeZone);
-      } catch (error) {
-        if (error.code !== 'ENOENT') throw error;
-      }
+      const preferences = new DesktopPreferences(preferencesFile);
+      setBusinessTimeZone(preferences.value.timeZone);
+      updateManager = new UpdateManager({
+        service: updates,
+        version: app.getVersion(),
+        directory: path.join(app.getPath('temp'), 'PMCanvas-updates'),
+        notify: (value) => send('desktop:update', value),
+      });
       process.env.PM_TIME_ZONE = getBusinessTimeZone();
       document = new DesktopDocument(path.join(app.getPath('userData'), 'recovery.json'));
       excelImport = new ExcelImportSession(document, excelJob);
@@ -254,6 +259,7 @@ else {
                 { label: ui('Excel 가져오기…'), click: () => command('importExcel') },
                 { label: ui('Excel 입력 양식 저장…'), click: () => command('exportTemplate') },
                 { label: ui('업데이트 확인'), click: () => command('updates') },
+                { label: ui('앱 설정'), click: () => command('appSettings') },
                 { type: 'separator' },
                 { role: process.platform === 'darwin' ? 'close' : 'quit' },
               ],
@@ -296,8 +302,35 @@ else {
         updateHistoryMenu();
         return language;
       });
-      handle('settings', () => ({ timeZone: getBusinessTimeZone() }), false);
-      handle('updates', () => updates.check(app.getVersion()), false);
+      handle('settings', () => ({ ...preferences.value, timeZone: getBusinessTimeZone() }), false);
+      handle(
+        'updatePreference',
+        (enabled) => {
+          if (typeof enabled !== 'boolean') throw Error(ui('업데이트 설정을 확인해 주세요.'));
+          preferences.update({ checkUpdatesOnStart: enabled });
+          return { ...preferences.value };
+        },
+        false,
+      );
+      handle('updateState', () => updateManager.snapshot(), false);
+      handle('updates', () => updateManager.check(true), false);
+      handle('downloadUpdate', () => updateManager.download(), false);
+      handle('applyUpdate', async () => {
+        const requireSaved = () => {
+          if (editing || document.dirty || excelImport.current)
+            throw Error(ui('변경사항과 입력창을 먼저 저장하거나 취소한 뒤 업데이트해 주세요.'));
+        };
+        requireSaved();
+        if (process.windowsStore) {
+          await shell.openExternal(updates.url);
+          return true;
+        }
+        const file = await updateManager.installerPath();
+        requireSaved();
+        const error = await shell.openPath(file);
+        if (error) throw Error(ui('설치 파일을 열지 못했습니다. 다시 시도해 주세요.'));
+        return true;
+      });
       handle('openRelease', () => shell.openExternal(updates.url), false);
       handle('timeZone', (value) => {
         if (editing || document.dirty || excelImport.current)
@@ -306,7 +339,7 @@ else {
         try {
           setBusinessTimeZone(value);
           if (document.project) validateProject(document.project);
-          atomicWrite(preferencesFile, JSON.stringify({ timeZone: getBusinessTimeZone() }) + '\n');
+          preferences.update({ timeZone: getBusinessTimeZone() });
         } catch (error) {
           setBusinessTimeZone(previous);
           throw error;
@@ -485,6 +518,15 @@ else {
         await message(error);
       }
       app.on('window-all-closed', () => app.quit());
+      // Startup discovery never blocks recovery, opens a modal, downloads, or restarts the app.
+      if (app.isPackaged && !testing) {
+        const timer = setTimeout(() => {
+          if (window && !window.isDestroyed())
+            void updateManager.start(preferences.value.checkUpdatesOnStart);
+        }, 1500);
+        timer.unref();
+        app.once('before-quit', () => clearTimeout(timer));
+      }
     })
     .catch(async (error) => {
       console.error('Desktop startup failed:', error.message || String(error));

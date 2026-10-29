@@ -1,6 +1,7 @@
 const allowed = new Set([
   'index.html',
   'renderer.js',
+  'update-ui.js',
   'excel-ui.js',
   'planning-ui.js',
   'bulk-ui.js',

@@ -13,6 +13,10 @@ contextBridge.exposeInMainWorld(
     setTimeZone: (value) => call('timeZone', value),
     info: () => call('info'),
     checkUpdates: () => call('updates'),
+    updateState: () => call('updateState'),
+    setUpdatePreference: (enabled) => call('updatePreference', enabled),
+    downloadUpdate: () => call('downloadUpdate'),
+    applyUpdate: () => call('applyUpdate'),
     openRelease: () => call('openRelease'),
     replace: (project, revision) => call('replace', project, revision),
     undo: (revision) => call('undo', revision),
@@ -34,6 +38,11 @@ contextBridge.exposeInMainWorld(
     },
     onDocument: (callback) => {
       ipcRenderer.on('desktop:document', (_event, snapshot) => callback(snapshot));
+    },
+    onUpdate: (callback) => {
+      const listener = (_event, value) => callback(value);
+      ipcRenderer.on('desktop:update', listener);
+      return () => ipcRenderer.removeListener('desktop:update', listener);
     },
   }),
 );
