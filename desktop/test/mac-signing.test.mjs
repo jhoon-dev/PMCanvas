@@ -53,10 +53,12 @@ function authority(root) {
       'req',
       '-new',
       '-x509',
-      '-key',
-      key,
       '-passin',
       'env:PM_SIGNING_INPASS',
+      '-keyform',
+      'PEM',
+      '-key',
+      key,
       '-out',
       cert,
       '-days',
@@ -87,7 +89,12 @@ function fixtureOpenSsl(args, options) {
       },
     });
   } catch {
-    assert.fail('Synthetic CA fixture failed: ' + diagnostic);
+    assert.fail(
+      'Synthetic CA fixture failed with ' +
+        quietRun(openssl, ['version']).toString() +
+        ': ' +
+        diagnostic,
+    );
   }
 }
 function issue(
@@ -165,6 +172,15 @@ test('signing commands suppress even failing subprocess output and keep credenti
       !Object.hasOwn(error, 'stderr'),
   );
   assert.equal(process.env.PM_SIGNING_INPASS, before);
+  const received = quietRun(
+    process.execPath,
+    ['-e', 'process.stdout.write(process.env.PM_SIGNING_INPASS || "")'],
+    {
+      secrets: { PM_SIGNING_INPASS: sentinel },
+    },
+  );
+  assert.equal(received.toString(), sentinel);
+  received.fill(0);
 });
 
 test('secret prompts do not echo keys or passwords and restore terminal mode on completion and cancellation', async () => {
