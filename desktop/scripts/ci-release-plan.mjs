@@ -5,6 +5,10 @@ const signed = process.env.PM_SIGNED === 'true';
 const unsigned = process.env.PM_UNSIGNED === 'true';
 const publish = process.env.PM_PUBLISH === 'true';
 const recovery = process.env.PM_RELEASE_RUN_ID || '';
+if (signed && !recovery && (process.env.PM_RELEASE_PLATFORM || 'all') !== 'mac')
+  throw Error(
+    'Windows production distribution uses the Windows Store MSIX workflow. Choose platform=mac for signed GitHub releases.',
+  );
 if (signed && unsigned) throw Error('Select only one build mode: signed or unsigned.');
 if (recovery && !/^\d+$/.test(recovery)) throw Error('release_run must be a numeric run ID.');
 if (publish && !signed && !unsigned && !recovery)

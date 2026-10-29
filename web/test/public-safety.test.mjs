@@ -143,6 +143,14 @@ test('공개 예제: 빈 값·환경 변수·공식 문서·Entra 예제는 정�
     ['compose.external.yml', 'PGPASSWORD: ${BACKUP_PGPASSWORD:-${PGPASSWORD}}'],
     ['README.md', 'https://github.com/example/project and https://playwright.dev/docs/ci'],
     [
+      'desktop/MAC-SETUP.md',
+      'https://developer.apple.com/account/ https://support.apple.com/ https://account.apple.com/ https://appstoreconnect.apple.com/',
+    ],
+    [
+      'desktop/WINDOWS-STORE.md',
+      'store.env.example .env.store PMCanvas-Store.msix package.msixbundle package.msixupload',
+    ],
+    [
       'README.md',
       'server/federation.mjs config/auth.example.json dockerfile.backup blame.ignoreRevsFile',
     ],

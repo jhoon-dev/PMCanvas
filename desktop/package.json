@@ -1,6 +1,6 @@
 {
   "name": "pmcanvas-desktop",
-  "version": "0.7.3",
+  "version": "0.7.4",
   "private": true,
   "description": "Offline project planning for Windows and macOS",
   "author": "PM Canvas",
@@ -15,7 +15,8 @@
     "test": "node --test test/*.test.mjs",
     "test:app": "node test/app-smoke.mjs",
     "pack": "npm run prepare:app && electron-builder --dir",
-    "dist:win": "node --env-file-if-exists=.env.signing scripts/release.mjs win",
+    "dist:win": "node --env-file-if-exists=.env.store scripts/store.mjs",
+    "dist:win:legacy": "node --env-file-if-exists=.env.signing scripts/release.mjs win",
     "dist:win:dev": "npm run prepare:app && electron-builder --win nsis --x64 --config.win.signAndEditExecutable=false",
     "dist:unsigned:win": "node scripts/unsigned.mjs win",
     "dist:unsigned:mac": "node scripts/unsigned.mjs mac",
@@ -24,7 +25,7 @@
     "pretest:app": "npm run prepare:app",
     "pretest:renderer": "npm run prepare:app",
     "test:renderer": "node test/renderer-smoke.mjs",
-    "release:check:win": "node --env-file-if-exists=.env.signing scripts/release.mjs win --check",
+    "release:check:win": "node --env-file-if-exists=.env.store scripts/store.mjs --check",
     "release:check:mac": "node --env-file-if-exists=.env.signing scripts/release.mjs mac --check",
     "test:dates-language": "node --test test/date-language-smoke.mjs",
     "test:package": "node test/package-safety.mjs"
@@ -80,7 +81,7 @@
     ],
     "asar": true,
     "win": {
-      "target": "nsis",
+      "target": "dir",
       "artifactName": "PMCanvas-Desktop-${version}-Windows-${arch}.${ext}"
     },
     "nsis": {

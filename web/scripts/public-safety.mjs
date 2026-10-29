@@ -23,6 +23,10 @@ const documentationHosts = new Set([
   'prettier.io',
   'www.electron.build',
   'www.electronjs.org',
+  'developer.apple.com',
+  'support.apple.com',
+  'account.apple.com',
+  'appstoreconnect.apple.com',
   'nodejs.org',
   'registry.npmjs.org',
 ]);
@@ -67,6 +71,10 @@ const fileExtensions = new Set([
   'plist',
   'sha256',
   'signing',
+  'store',
+  'msix',
+  'msixbundle',
+  'msixupload',
 ]);
 
 export function exampleHost(host) {

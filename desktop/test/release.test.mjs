@@ -81,6 +81,8 @@ test('CI dispatch rejects mixed signing modes, unsafe run IDs and publication wi
     });
   for (const extra of [
     { PM_SIGNED: 'true', PM_UNSIGNED: 'true' },
+    { PM_SIGNED: 'true', PM_RELEASE_PLATFORM: 'win' },
+    { PM_SIGNED: 'true', PM_RELEASE_PLATFORM: 'all' },
     { PM_PUBLISH: 'true' },
     { PM_RELEASE_RUN_ID: '12\nextra=value' },
     { PM_RELEASE_PLATFORM: 'mac\nother' },

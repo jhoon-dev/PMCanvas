@@ -1,6 +1,8 @@
-# PM Canvas Desktop 0.7.3
+# PM Canvas Desktop 0.7.4
 
 형제 shared/ 폴더의 계산·검증 코드를 사용하는 Windows·macOS용 오프라인 앱의 개발 초기 버전입니다. 사용자 PC에는 Node.js·Docker·PostgreSQL 설치가 필요하지 않습니다.
+
+Windows의 새 배포 경로는 [Microsoft Store 제출용 MSIX](WINDOWS-STORE.md)입니다. Partner Center 앱 예약 후 제품 ID를 설정하면 CI에서 제출 파일을 만들 수 있습니다. 아직 Store에 게시한 상태는 아니며 기존 공개 EXE는 호환용으로 유지합니다. Mac의 [인증서 발급 → 공증 → GitHub Secrets 등록 순서](MAC-SETUP.md)도 단계별로 안내합니다.
 
 **파일 옵션 → 업데이트 확인**에서 새 데스크톱 버전을 확인합니다. 사용자가 요청할 때만 GitHub의 공개 Release 목록을 조회하며 프로젝트·계정·파일 경로는 전송하지 않습니다. 웹 버전·초안·사전 릴리스는 제외하고 숫자 버전을 비교합니다. 설치 파일과 체크섬을 제공하는 해당 운영체제·아키텍처의 최신 릴리스를 안내합니다. Mac만 새 버전이 공개되면 Windows는 최신 Windows 설치 파일이 있는 릴리스를 찾습니다. 버튼을 눌러 고정된 공식 GitHub 페이지를 엽니다. 자동 다운로드·설치는 하지 않습니다. 오프라인에서도 기존 프로젝트 편집과 저장을 계속 사용할 수 있습니다.
 
@@ -120,16 +122,16 @@ $nsisCompiler = Get-ChildItem "$env:LOCALAPPDATA\electron-builder\Cache\nsis" -R
 
 | 환경               | 명령                   | 결과                                       |
 | ------------------ | ---------------------- | ------------------------------------------ |
-| Windows x64        | `npm run dist:win`     | 사용자별 NSIS 설치 프로그램 `.exe`         |
+| Windows x64        | `npm run dist:win`     | Microsoft Store 제출용 `.msix`             |
 | Windows x64 개발용 | `npm run dist:win:dev` | 서명·실행 파일 리소스 편집을 생략한 `.exe` |
 | macOS              | `npm run dist:mac`     | Apple Silicon·Intel용 `.dmg`와 `.zip`      |
 | 현재 OS 압축 전 앱 | `npm run pack`         | 패키징된 앱 디렉터리                       |
 
-결과는 `desktop/dist/`에 생성됩니다. `dist:win:dev`는 실행 파일 리소스 편집 도구를 풀 때 심볼릭 링크 권한이 없는 Windows PC에서도 개발용 설치 파일을 만들기 위한 명령입니다. 정식 배포용 서명·아이콘·버전 리소스 적용에는 `dist:win`을 사용하세요.
+결과는 `desktop/dist/`에 생성됩니다. Windows 기본 배포는 `dist:win`으로 만드는 MSIX를 Partner Center에 제출하는 방식이며 [Store 설정](WINDOWS-STORE.md)이 필요합니다. `dist:win:dev`는 기존 EXE 개발·호환용이며 별도 인증서가 있는 EXE 배포에는 `dist:win:legacy`를 사용합니다.
 
 저장소의 **Desktop verification and builds** 워크플로는 푸시·PR에서 Windows·macOS 파일·화면·날짜/언어·실제 앱과 패키징 후 실행을 자동 검사합니다. 정식 서명 빌드는 별도 수동 실행과 인증서 설정을 사용합니다. [서명·공증 설정](SIGNING.md)을 참고하세요.
 
-배포본은 앱 파일 허용 목록만 포함하며 웹 서버의 환경설정·키·백업·운영 데이터·계정 의존성을 포함하지 않습니다. 기본 아이콘을 사용합니다.
+배포본은 앱 파일 허용 목록만 포함하며 웹 서버의 환경설정·키·백업·운영 데이터·계정 의존성을 포함하지 않습니다. MSIX의 Store 타일에는 PM 아이콘을 사용합니다.
 
 정식 배포는 선택한 플랫폼의 서명과 설치·업데이트·제거 검증을 통과해야 합니다. CI에서 `platform=mac`, `signed=true`, `publish=true`를 선택하면 Windows 인증서 없이 Mac 서명·공증·검증 후 GitHub Release에 자동 공개할 수 있습니다. 인증서와 공증 자격 증명은 [서명·공증 설정](SIGNING.md)에 따라 등록하세요. 기존 웹 버전의 배포 ZIP과 별도 제품으로 관리합니다.
 

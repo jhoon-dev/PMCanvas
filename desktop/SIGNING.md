@@ -1,5 +1,7 @@
 # 데스크톱 서명·공증과 배포
 
+Mac은 [인증서 발급부터 GitHub Secrets 등록까지의 단계별 가이드](MAC-SETUP.md)를 참고하세요. Windows 기본 배포는 [Microsoft Store MSIX](WINDOWS-STORE.md)로 전환했습니다. 이 문서의 Windows PFX·Authenticode 설명은 기존 EXE를 별도로 배포하는 호환 경로에 해당하며 Store용 인증서 구매는 필요하지 않습니다.
+
 정식 배포 명령은 커밋되지 않은 변경을 거절하고 공개 파일 검사·인증서 설정 검사를 먼저 수행합니다. 서명 실패를 오류로 처리하며 macOS는 공증도 필수입니다. 웹 배포와 마찬가지로 소스 커밋을 확정한 뒤 실행하세요.
 
 빌드는 확정된 Git 커밋에서 파일을 읽어 격리된 임시 폴더에서 진행합니다. 생성된 `app/`의 변경은 배포에 포함되지 않으며, 완성된 ASAR를 해당 커밋의 원본·변환 결과와 독립적으로 비교합니다. 빌드 정보의 커밋·개발 빌드 여부도 검증합니다.
@@ -27,8 +29,7 @@ Apple 계정 아이디만으로는 서명할 수 없습니다. Apple Developer P
 
 ```sh
 # 먼저 변경사항을 검토해 커밋합니다.
-npm run release:check:win
-npm run dist:win
+npm run dist:win:legacy
 
 # macOS에서
 npm run release:check:mac
@@ -55,7 +56,7 @@ Mac은 실행에 필요한 임시 ad-hoc 서명만 적용합니다. 이는 Devel
 
 P8 원본은 `APPLE_API_KEY_BASE64`에 base64로 넣습니다. 워크플로가 macOS 임시 디렉터리에 현재 사용자 전용 파일로 준비합니다. 로컬 `APPLE_API_KEY`는 파일 경로를 사용합니다.
 
-**Desktop verification and builds**는 푸시·PR에서 Windows·macOS 테스트·감사·화면·날짜/언어·개발 실행·패키징 후 실제 실행을 검사합니다. 수동 실행의 `platform`에서 `all`(기본), `mac`, `win`을 선택합니다. 선택한 플랫폼만 설치 파일 빌드·설치 검증·공개 대상이 됩니다. 푸시·PR의 기존 양쪽 OS 검증은 유지하며 서명 단계는 PR에서 실행하지 않습니다.
+**Desktop verification and builds**는 푸시·PR에서 Windows·macOS 테스트·감사·화면·날짜/언어·개발 실행·패키징 후 실제 실행을 검사합니다. 수동 실행의 `platform` 기본값은 `mac`입니다. Mac 서명 공개는 이 워크플로를 사용하고 Windows Store 제출은 별도 **Windows Store MSIX** 워크플로를 사용합니다. `all`·`win`의 서명 없는 EXE 빌드는 기존 설치 검증·호환용으로 유지합니다. 푸시·PR의 기존 양쪽 OS 검증은 유지하며 서명 단계는 PR에서 실행하지 않습니다.
 
 ### Mac만 먼저 서명하고 자동 공개하기
 
@@ -70,7 +71,7 @@ CLI에서도 같은 실행을 시작할 수 있습니다.
 gh workflow run desktop.yml --ref main -f platform=mac -f signed=true -f publish=true
 ```
 
-Windows만 선택할 때는 `platform=win`, 모두 배포할 때는 `platform=all`입니다. `signed`와 `unsigned`를 동시에 켜면 오류로 중단합니다. 설치 파일만 확인하고 공개하지 않으려면 `publish=false`로 둡니다. 기본값은 빌드·공개 모두 꺼져 있습니다.
+새 Windows 정식 배포는 Windows Store MSIX를 사용합니다. `signed`와 `unsigned`를 동시에 켜면 오류로 중단합니다. 설치 파일만 확인하고 공개하지 않으려면 `publish=false`로 둡니다. 기본값은 빌드·공개 모두 꺼져 있습니다.
 
 인증서 없는 설치 파일은 `signed=false`, `unsigned=true`를 선택합니다. 이 작업은 서명용 Environment·Secrets를 사용하지 않으며 선택한 플랫폼의 설치 파일을 별도 artifact로 보관합니다. 기존 두 플랫폼 동시 빌드는 `platform=all`로 유지됩니다.
 

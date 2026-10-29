@@ -1,6 +1,23 @@
 import https from 'node:https';
 
 export const RELEASES_PAGE = 'https://github.com/jhoon-dev/PMCanvas/releases';
+export const STORE_UPDATES = 'ms-windows-store://downloadsandupdates';
+export class StoreUpdateService {
+  constructor() {
+    this.url = STORE_UPDATES;
+  }
+  async check(currentVersion) {
+    compareVersions(currentVersion, currentVersion);
+    return {
+      channel: 'microsoft-store',
+      currentVersion,
+      version: null,
+      available: false,
+      downloadAvailable: false,
+      url: this.url,
+    };
+  }
+}
 export const RELEASES_API = 'https://api.github.com/repos/jhoon-dev/PMCanvas/releases?per_page=100';
 const versionPattern = '(0|[1-9]\\d{0,5})\\.(0|[1-9]\\d{0,5})\\.(0|[1-9]\\d{0,5})';
 const version = new RegExp('^' + versionPattern + '$');

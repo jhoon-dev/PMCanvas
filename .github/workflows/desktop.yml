@@ -26,9 +26,9 @@ on:
         description: Platforms to build, install-test and publish
         type: choice
         options: [all, mac, win]
-        default: all
+        default: mac
       signed:
-        description: Build signed releases using the desktop-release environment
+        description: Sign Mac releases using desktop-release (Windows uses the Store workflow)
         type: boolean
         default: false
       unsigned:
