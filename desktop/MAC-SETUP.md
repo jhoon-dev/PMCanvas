@@ -30,6 +30,8 @@ npm --prefix desktop run signing:setup
 
 Apple 중간 인증서는 [Apple PKI](https://www.apple.com/certificateauthority/)의 Developer ID G1·G2에서 가져오며 고정된 지문을 검사합니다. P12에는 macOS 키체인 호환용 보호 방식을 사용하고, 원본 개인 키는 AES-256으로 암호화합니다. [OpenSSL P12 설명](https://docs.openssl.org/3.0/man1/openssl-pkcs12/)
 
+CI에서는 Windows용 생성·변환·등록 테스트를 실행한 뒤 Windows에서 실제로 생성한 테스트용 P12를 같은 실행의 Mac 작업에 전달합니다. Mac의 별도 임시 키체인에서 가져오기·내보내기를 확인하고 키체인을 삭제합니다. 이 테스트는 소유자의 인증서나 Secrets를 사용하지 않습니다.
+
 아래 절은 Mac 키체인을 이용해 수동으로 준비하는 대안입니다.
 
 ## 1. 준비

@@ -26,7 +26,8 @@ import {
 } from '../scripts/mac-signing-core.mjs';
 import { hiddenInput } from '../scripts/mac-signing-prompt.mjs';
 
-const openssl = opensslPath();
+// The wizard creates credentials only on Windows; macOS imports its actual Windows CI artifact.
+const openssl = process.platform === 'win32' ? opensslPath() : undefined;
 const passA = 'Fixture-Key-A-Only-12345',
   passB = 'Fixture-P12-B-Only-67890';
 function temp(t) {
@@ -48,7 +49,8 @@ function authority(root) {
     publicKeyEncoding: { type: 'spki', format: 'pem' },
   });
   saveNew(key, pair.privateKey);
-  fixtureOpenSsl(
+  quietRun(
+    openssl,
     [
       'req',
       '-new',
@@ -75,27 +77,6 @@ function authority(root) {
     { input: passA + '\n' },
   );
   return { key, file: cert, certificate: new X509Certificate(fs.readFileSync(cert)) };
-}
-// Only synthetic CA fixtures use this diagnostic; the interactive wizard never prints tool output.
-function fixtureOpenSsl(args, options) {
-  let diagnostic = '';
-  try {
-    return quietRun(openssl, args, {
-      ...options,
-      spawn: (...parameters) => {
-        const result = spawnSync(...parameters);
-        if (result.status !== 0) diagnostic = result.stderr?.toString() || 'no diagnostic';
-        return result;
-      },
-    });
-  } catch {
-    assert.fail(
-      'Synthetic CA fixture failed with ' +
-        quietRun(openssl, ['version']).toString() +
-        ': ' +
-        diagnostic,
-    );
-  }
 }
 function issue(
   folder,
@@ -209,92 +190,121 @@ test('secret prompts do not echo keys or passwords and restore terminal mode on 
   assert.throws(() => hiddenInput('No tty', new PassThrough(), output), /대화형/);
 });
 
-test('private workspaces reject repositories, worktrees, symlinks and nonprivate access; locks protect existing keys', (t) => {
-  const root = temp(t),
-    repo = path.join(root, 'repo');
-  fs.mkdirSync(repo);
-  saveNew(path.join(repo, '.git'), 'gitdir: elsewhere');
-  assert.throws(() => newWorkspace(repo), /Git/);
-  const inside = path.join(repo, 'nested');
-  fs.mkdirSync(inside);
-  assert.throws(() => newWorkspace(inside), /Git/);
-  const link = path.join(root, 'link');
-  fs.symlinkSync(root, link, process.platform === 'win32' ? 'junction' : 'dir');
-  assert.throws(() => privatePath(link, { directory: true }), /심볼릭/);
-  const folder = newWorkspace(root);
-  const exposed = newWorkspace(root);
-  if (process.platform === 'win32')
-    quietRun('icacls.exe', [exposed, '/grant', '*S-1-1-0:(OI)(CI)R']);
-  else fs.chmodSync(exposed, 0o755);
-  assert.throws(() => secureDirectory(exposed), /사용자 전용/);
-  assert.throws(() => locked(folder, () => locked(folder, () => {})), /다른 설정/);
-  assert.equal(fs.existsSync(path.join(folder, 'setup.lock')), false);
-  createCsr(folder, 'fixture@example.com', passA, openssl);
-  const before = fs.readFileSync(path.join(folder, 'developer-id.key.pem'));
-  assert.throws(() => createCsr(folder, 'fixture@example.com', passB, openssl), /빈 새 작업/);
-  assert.deepEqual(fs.readFileSync(path.join(folder, 'developer-id.key.pem')), before);
-  assert.ok(before.toString().startsWith('-----BEGIN ENCRYPTED ' + 'PRIVATE KEY-----'));
-  assert.equal(fs.existsSync(path.join(folder, 'request.conf')), false);
-  const state = fs.readFileSync(path.join(folder, 'state.json'), 'utf8');
-  assert.ok(
-    !state.includes(passA) && !state.includes(passB) && !state.includes('fixture@example.com'),
-  );
-  fs.appendFileSync(path.join(folder, 'PMCanvas.certSigningRequest'), 'tampered');
-  assert.throws(() => session(folder), /변경/);
-});
+test(
+  'private workspaces reject repositories, worktrees, symlinks and nonprivate access; locks protect existing keys',
+  { skip: process.platform !== 'win32' },
+  (t) => {
+    const root = temp(t),
+      repo = path.join(root, 'repo');
+    fs.mkdirSync(repo);
+    saveNew(path.join(repo, '.git'), 'gitdir: elsewhere');
+    assert.throws(() => newWorkspace(repo), /Git/);
+    const inside = path.join(repo, 'nested');
+    fs.mkdirSync(inside);
+    assert.throws(() => newWorkspace(inside), /Git/);
+    const link = path.join(root, 'link');
+    fs.symlinkSync(root, link, process.platform === 'win32' ? 'junction' : 'dir');
+    assert.throws(() => privatePath(link, { directory: true }), /심볼릭/);
+    const folder = newWorkspace(root);
+    const exposed = newWorkspace(root);
+    if (process.platform === 'win32')
+      quietRun('icacls.exe', [exposed, '/grant', '*S-1-1-0:(OI)(CI)R']);
+    else fs.chmodSync(exposed, 0o755);
+    assert.throws(() => secureDirectory(exposed), /사용자 전용/);
+    assert.throws(() => locked(folder, () => locked(folder, () => {})), /다른 설정/);
+    assert.equal(fs.existsSync(path.join(folder, 'setup.lock')), false);
+    createCsr(folder, 'fixture@example.com', passA, openssl);
+    const before = fs.readFileSync(path.join(folder, 'developer-id.key.pem'));
+    assert.throws(() => createCsr(folder, 'fixture@example.com', passB, openssl), /빈 새 작업/);
+    assert.deepEqual(fs.readFileSync(path.join(folder, 'developer-id.key.pem')), before);
+    assert.ok(before.toString().startsWith('-----BEGIN ENCRYPTED ' + 'PRIVATE KEY-----'));
+    assert.equal(fs.existsSync(path.join(folder, 'request.conf')), false);
+    const state = fs.readFileSync(path.join(folder, 'state.json'), 'utf8');
+    assert.ok(
+      !state.includes(passA) && !state.includes(passB) && !state.includes('fixture@example.com'),
+    );
+    fs.appendFileSync(path.join(folder, 'PMCanvas.certSigningRequest'), 'tampered');
+    assert.throws(() => session(folder), /변경/);
+  },
+);
 
-test('CSR and P12 round trip preserves the key and uploads only the encrypted bundle and matching password through stdin', (t) => {
-  const { folder, p12 } = bundle(t),
-    calls = [];
-  const run = (cmd, args, options) => {
-    calls.push({ cmd, args, input: options.input });
-    return Buffer.alloc(0);
-  };
-  registerP12(folder, passB, run, openssl);
-  const sets = calls.filter((item) => item.args[0] === 'secret');
-  assert.deepEqual(
-    sets.map((item) => item.args[2]),
-    ['MAC_CSC_LINK', 'MAC_CSC_KEY_PASSWORD'],
-  );
-  assert.equal(sets[0].input, fs.readFileSync(p12).toString('base64'));
-  assert.equal(sets[1].input, passB);
-  for (const item of calls) {
-    assert.ok(!item.args.includes('--body'));
-    assert.ok(!JSON.stringify(item.args).includes(passB));
-    if (item.args.includes('--repo'))
-      assert.equal(item.args[item.args.indexOf('--repo') + 1], 'github.com/jhoon-dev/PMCanvas');
-  }
-  const before = digest(fs.readFileSync(p12));
-  assert.throws(() => registerP12(folder, 'Wrong-Password-Here-1234', run, openssl), /암호/);
-  assert.equal(digest(fs.readFileSync(p12)), before);
-  fs.appendFileSync(p12, 'tampered');
-  assert.throws(() => registerP12(folder, passB, run, openssl), /변경/);
-});
+test(
+  'CSR and P12 round trip preserves the key and uploads only the encrypted bundle and matching password through stdin',
+  { skip: process.platform !== 'win32' },
+  (t) => {
+    const { folder, p12 } = bundle(t),
+      calls = [];
+    const run = (cmd, args, options) => {
+      calls.push({ cmd, args, input: options.input });
+      return Buffer.alloc(0);
+    };
+    registerP12(folder, passB, run, openssl);
+    const sets = calls.filter((item) => item.args[0] === 'secret');
+    assert.deepEqual(
+      sets.map((item) => item.args[2]),
+      ['MAC_CSC_LINK', 'MAC_CSC_KEY_PASSWORD'],
+    );
+    assert.equal(sets[0].input, fs.readFileSync(p12).toString('base64'));
+    assert.equal(sets[1].input, passB);
+    for (const item of calls) {
+      assert.ok(!item.args.includes('--body'));
+      assert.ok(!JSON.stringify(item.args).includes(passB));
+      if (item.args.includes('--repo'))
+        assert.equal(item.args[item.args.indexOf('--repo') + 1], 'github.com/jhoon-dev/PMCanvas');
+    }
+    const before = digest(fs.readFileSync(p12));
+    if (
+      process.env.GITHUB_ACTIONS === 'true' &&
+      process.env.RUNNER_ENVIRONMENT === 'github-hosted'
+    ) {
+      assert.match(process.env.GITHUB_SHA, /^[a-f0-9]{40}$/);
+      const output = fileURLToPath(new URL('../test-results/', import.meta.url));
+      fs.mkdirSync(output, { recursive: true });
+      saveNew(path.join(output, 'synthetic-signing.p12'), fs.readFileSync(p12));
+      saveNew(
+        path.join(output, 'synthetic-signing.json'),
+        JSON.stringify({
+          synthetic: true,
+          source: process.env.GITHUB_SHA,
+          sha256: before,
+        }),
+      );
+    }
+    assert.throws(() => registerP12(folder, 'Wrong-Password-Here-1234', run, openssl), /암호/);
+    assert.equal(digest(fs.readFileSync(p12)), before);
+    fs.appendFileSync(p12, 'tampered');
+    assert.throws(() => registerP12(folder, passB, run, openssl), /변경/);
+  },
+);
 
-test('P12 conversion rejects wrong keys, wrong certificate purposes, untrusted issuers and expired certificates without deleting originals', (t) => {
-  const root = temp(t),
-    ca = authority(root),
-    folder = newWorkspace(root),
-    other = newWorkspace(root);
-  createCsr(folder, 'fixture@example.com', passA, openssl);
-  createCsr(other, 'other@example.com', passA, openssl);
-  for (const [cert, authorities, pattern] of [
-    [issue(other, ca), [ca.certificate], /一致|일치/],
-    [
-      issue(folder, ca, { name: 'Developer ID Installer: Fixture' }),
-      [ca.certificate],
-      /Application/,
-    ],
-    [issue(folder, ca), [], /Apple/],
-    [issue(folder, ca, { days: '0' }), [ca.certificate], /만료/],
-  ])
-    assert.throws(() => exportP12(folder, cert, passA, passB, authorities, openssl), pattern);
-  assert.equal(fs.existsSync(path.join(folder, 'PMCanvas-DeveloperID.p12')), false);
-  assert.equal(fs.existsSync(path.join(folder, 'setup.lock')), false);
-  assert.ok(session(folder).publicKeySha256);
-  for (const value of ['short', 'contains space password', '한글암호테스트입니다123456'])
-    assert.throws(() => password(value));
-});
+test(
+  'P12 conversion rejects wrong keys, wrong certificate purposes, untrusted issuers and expired certificates without deleting originals',
+  { skip: process.platform !== 'win32' },
+  (t) => {
+    const root = temp(t),
+      ca = authority(root),
+      folder = newWorkspace(root),
+      other = newWorkspace(root);
+    createCsr(folder, 'fixture@example.com', passA, openssl);
+    createCsr(other, 'other@example.com', passA, openssl);
+    for (const [cert, authorities, pattern] of [
+      [issue(other, ca), [ca.certificate], /一致|일치/],
+      [
+        issue(folder, ca, { name: 'Developer ID Installer: Fixture' }),
+        [ca.certificate],
+        /Application/,
+      ],
+      [issue(folder, ca), [], /Apple/],
+      [issue(folder, ca, { days: '0' }), [ca.certificate], /만료/],
+    ])
+      assert.throws(() => exportP12(folder, cert, passA, passB, authorities, openssl), pattern);
+    assert.equal(fs.existsSync(path.join(folder, 'PMCanvas-DeveloperID.p12')), false);
+    assert.equal(fs.existsSync(path.join(folder, 'setup.lock')), false);
+    assert.ok(session(folder).publicKeySha256);
+    for (const value of ['short', 'contains space password', '한글암호테스트입니다123456'])
+      assert.throws(() => password(value));
+  },
+);
 
 test('notarization registration validates P8 files and checks both scopes for mixed credentials without deleting secrets', (t) => {
   const root = temp(t),
@@ -402,21 +412,41 @@ test('parent Node child_process tracing is rejected before any secret-bearing su
 });
 
 test(
-  'CI macOS imports the Windows-compatible P12 into an isolated disposable keychain',
+  'CI macOS imports the exact Windows-generated P12 into an isolated disposable keychain',
   {
     skip:
       process.platform !== 'darwin' ||
       process.env.GITHUB_ACTIONS !== 'true' ||
-      process.env.RUNNER_ENVIRONMENT !== 'github-hosted',
+      process.env.RUNNER_ENVIRONMENT !== 'github-hosted' ||
+      !process.env.PM_SIGNING_INTEROP_FOLDER,
   },
   (t) => {
-    const { folder, p12 } = bundle(t);
+    const folder = newWorkspace(temp(t));
+    const input = fs.realpathSync(process.env.PM_SIGNING_INTEROP_FOLDER);
+    const p12 = privatePath(path.join(input, 'synthetic-signing.p12'));
+    const metadata = JSON.parse(
+      fs.readFileSync(privatePath(path.join(input, 'synthetic-signing.json'))),
+    );
+    assert.equal(metadata.synthetic, true);
+    assert.equal(metadata.source, process.env.GITHUB_SHA);
+    assert.equal(metadata.sha256, digest(fs.readFileSync(p12)));
     const keychain = path.join(folder, 'interop.keychain-db'),
       fixturePassword = randomBytes(24).toString('hex');
     quietRun('security', ['create-keychain', '-p', fixturePassword, keychain]);
     try {
       quietRun('security', ['unlock-keychain', '-p', fixturePassword, keychain]);
-      quietRun('security', ['import', p12, '-k', keychain, '-P', passB, '-T', '/usr/bin/codesign']);
+      quietRun('security', [
+        'import',
+        p12,
+        '-k',
+        keychain,
+        '-P',
+        passB,
+        '-T',
+        '/usr/bin/codesign',
+        '-T',
+        '/usr/bin/security',
+      ]);
       const exported = path.join(folder, 'roundtrip.p12');
       quietRun('security', [
         'export',
