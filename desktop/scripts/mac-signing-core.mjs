@@ -141,10 +141,6 @@ export function secureDirectory(folder, create = false) {
       .toString()
       .match(/S-1-[0-9-]+/)?.[0];
     if (!sid) fail('현재 Windows 사용자 SID를 확인할 수 없습니다.');
-    if (create)
-      quietRun('icacls.exe', [folder, '/inheritance:r', '/grant:r', `*${sid}:(OI)(CI)F`], {
-        label: '사용자 전용 폴더 권한 설정에 실패했습니다.',
-      });
     quietRun(
       'powershell.exe',
       [
@@ -152,12 +148,16 @@ export function secureDirectory(folder, create = false) {
         '-NonInteractive',
         '-EncodedCommand',
         Buffer.from(
-          '$a=[IO.Directory]::GetAccessControl($env:PM_SIGNING_FOLDER); if (!$a.AreAccessRulesProtected) { exit 1 }; $ok=$false; foreach($r in $a.GetAccessRules($true,$true,[System.Security.Principal.SecurityIdentifier])) { if($r.AccessControlType -ne "Allow" -or $r.IdentityReference.Value -ne $env:PM_SIGNING_SID) { exit 1 }; if(($r.FileSystemRights -band [System.Security.AccessControl.FileSystemRights]::FullControl) -eq [System.Security.AccessControl.FileSystemRights]::FullControl) { $ok=$true } }; if(!$ok) { exit 1 }',
+          '$ErrorActionPreference="Stop"; $sid=[System.Security.Principal.SecurityIdentifier]::new($env:PM_SIGNING_SID); if($env:PM_SIGNING_CREATE -eq "true") { $new=[System.Security.AccessControl.DirectorySecurity]::new(); $new.SetAccessRuleProtection($true,$false); $new.SetOwner($sid); $rule=[System.Security.AccessControl.FileSystemAccessRule]::new($sid,[System.Security.AccessControl.FileSystemRights]::FullControl,[System.Security.AccessControl.InheritanceFlags]"ContainerInherit,ObjectInherit",[System.Security.AccessControl.PropagationFlags]::None,[System.Security.AccessControl.AccessControlType]::Allow); $new.AddAccessRule($rule); [IO.Directory]::SetAccessControl($env:PM_SIGNING_FOLDER,$new) }; $a=[IO.Directory]::GetAccessControl($env:PM_SIGNING_FOLDER); if (!$a.AreAccessRulesProtected) { exit 1 }; $ok=$false; foreach($r in $a.GetAccessRules($true,$true,[System.Security.Principal.SecurityIdentifier])) { if($r.AccessControlType -ne "Allow" -or $r.IdentityReference.Value -ne $env:PM_SIGNING_SID) { exit 1 }; if(($r.FileSystemRights -band [System.Security.AccessControl.FileSystemRights]::FullControl) -eq [System.Security.AccessControl.FileSystemRights]::FullControl) { $ok=$true } }; if(!$ok) { exit 1 }',
           'utf16le',
         ).toString('base64'),
       ],
       {
-        secrets: { PM_SIGNING_FOLDER: folder, PM_SIGNING_SID: sid },
+        secrets: {
+          PM_SIGNING_FOLDER: folder,
+          PM_SIGNING_SID: sid,
+          PM_SIGNING_CREATE: String(create),
+        },
         label: '작업 폴더가 현재 사용자 전용이 아닙니다. 권한을 확인하세요.',
       },
     );

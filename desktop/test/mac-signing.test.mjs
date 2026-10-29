@@ -48,8 +48,7 @@ function authority(root) {
     publicKeyEncoding: { type: 'spki', format: 'pem' },
   });
   saveNew(key, pair.privateKey);
-  quietRun(
-    openssl,
+  fixtureOpenSsl(
     [
       'req',
       '-new',
@@ -74,6 +73,22 @@ function authority(root) {
     { secrets: { PM_SIGNING_INPASS: passA } },
   );
   return { key, file: cert, certificate: new X509Certificate(fs.readFileSync(cert)) };
+}
+// Only synthetic CA fixtures use this diagnostic; the interactive wizard never prints tool output.
+function fixtureOpenSsl(args, options) {
+  let diagnostic = '';
+  try {
+    return quietRun(openssl, args, {
+      ...options,
+      spawn: (...parameters) => {
+        const result = spawnSync(...parameters);
+        if (result.status !== 0) diagnostic = result.stderr?.toString() || 'no diagnostic';
+        return result;
+      },
+    });
+  } catch {
+    assert.fail('Synthetic CA fixture failed: ' + diagnostic);
+  }
 }
 function issue(
   folder,
