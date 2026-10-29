@@ -64,7 +64,7 @@ try {
   if ((Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant() -ne $evidence.artifacts[0].sha256) { throw 'MSIX hash mismatch.' }
   $payload = Join-Path $work 'old-payload'
   Write-Output 'Store lifecycle: prepare lower-version MSIX servicing fixture'
-  & $makeappx unpack /p $file /d $payload /q
+  & $makeappx unpack /p $file /d $payload
   Check-Exit
   $manifestFile = Join-Path $payload 'AppxManifest.xml'
   [xml]$manifest = Get-Content -LiteralPath $manifestFile -Raw -Encoding UTF8
@@ -72,7 +72,7 @@ try {
   [IO.File]::WriteAllText($manifestFile, $manifest.OuterXml, [Text.UTF8Encoding]::new($false))
   foreach ($name in @('AppxBlockMap.xml', '[Content_Types].xml', 'AppxSignature.p7x')) { Remove-Item -LiteralPath (Join-Path $payload $name) -Force -ErrorAction SilentlyContinue }
   $old = Join-Path $work 'previous.msix'
-  & $makeappx pack /d $payload /p $old /h SHA256 /q
+  & $makeappx pack /d $payload /p $old /h SHA256 /nc
   Check-Exit
   $new = Join-Path $work 'current.msix'
   Copy-Item -LiteralPath $file -Destination $new
