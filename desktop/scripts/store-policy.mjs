@@ -10,11 +10,15 @@ export function storeConfiguration(env = process.env) {
   const publisher = get('PM_STORE_PUBLISHER');
   const publisherDisplayName = get('PM_STORE_PUBLISHER_DISPLAY_NAME');
   const productId = get('PM_STORE_PRODUCT_ID');
+  const displayName = env.PM_STORE_DISPLAY_NAME
+    ? get('PM_STORE_DISPLAY_NAME')
+    : 'PM Canvas Desktop';
   if (!/^[A-Za-z0-9.-]{3,50}$/.test(identityName)) throw Error('Invalid Store identity name.');
   if (!/^CN=.{1,250}$/.test(publisher)) throw Error('Invalid Store publisher distinguished name.');
   if (publisherDisplayName.length > 256) throw Error('Invalid Store publisher display name.');
+  if (displayName.length > 256) throw Error('Invalid Store display name.');
   if (!/^[A-Z0-9]{12}$/.test(productId)) throw Error('Invalid Store product ID.');
-  return { identityName, publisher, publisherDisplayName, productId };
+  return { identityName, publisher, publisherDisplayName, productId, displayName };
 }
 
 export function storeVersion(version) {
@@ -42,7 +46,7 @@ export function storeManifest(config, version) {
  IgnorableNamespaces="uap desktop6 virtualization rescap">
  <Identity Name="${xml(config.identityName)}" Publisher="${xml(config.publisher)}" Version="${storeVersion(version)}" ProcessorArchitecture="x64"/>
  <Properties>
-  <DisplayName>PM Canvas Desktop</DisplayName>
+  <DisplayName>${xml(config.displayName || 'PM Canvas Desktop')}</DisplayName>
   <PublisherDisplayName>${xml(config.publisherDisplayName)}</PublisherDisplayName>
   <Description>Offline project planning, WBS, Gantt and Excel reports</Description>
   <Logo>assets\\StoreLogo.png</Logo>
@@ -55,7 +59,7 @@ export function storeManifest(config, version) {
  <Resources><Resource Language="ko-KR"/><Resource Language="en-US"/></Resources>
  <Dependencies><TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.19041.0" MaxVersionTested="10.0.26100.0"/></Dependencies>
  <Applications><Application Id="PMCanvas" Executable="app\\PM Canvas Desktop.exe" EntryPoint="Windows.FullTrustApplication">
-  <uap:VisualElements DisplayName="PM Canvas Desktop" Description="Offline project planning" BackgroundColor="#2563EB"
+  <uap:VisualElements DisplayName="${xml(config.displayName || 'PM Canvas Desktop')}" Description="Offline project planning" BackgroundColor="#2563EB"
    Square150x150Logo="assets\\Square150x150Logo.png" Square44x44Logo="assets\\Square44x44Logo.png"/>
  </Application></Applications>
  <Capabilities><rescap:Capability Name="runFullTrust"/><rescap:Capability Name="unvirtualizedResources"/></Capabilities>

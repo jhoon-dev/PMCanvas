@@ -1,5 +1,5 @@
 $ErrorActionPreference = 'Stop'
-if ($env:CI -ne 'true' -or $env:GITHUB_ACTIONS -ne 'true' -or !$env:RUNNER_TEMP -or $env:GITHUB_RUN_ID -notmatch '^\d+$') { throw 'Disposable GitHub Windows runner required.' }
+if ($env:CI -ne 'true' -or $env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_ENVIRONMENT -ne 'github-hosted' -or !$env:RUNNER_TEMP -or $env:GITHUB_RUN_ID -notmatch '^\d+$') { throw 'Disposable GitHub Windows runner required.' }
 $desktopRoot = Split-Path $PSScriptRoot -Parent
 $package = Get-Content -LiteralPath (Join-Path $desktopRoot 'package.json') -Raw -Encoding UTF8 | ConvertFrom-Json
 $output = Join-Path $desktopRoot ('dist/store-' + $package.version + '-win')
@@ -27,9 +27,13 @@ function Check-Preserved {
   }
 }
 function Run-App($exe, $mode, $version, $registered) {
+  Write-Output ('Store lifecycle: app ' + $mode + ', registered=' + $registered + ', version=' + $version)
   $request = Join-Path $work ('request-' + [guid]::NewGuid().ToString('N') + '.json')
   $result = $request + '.result.json'
-  @{ executable=$exe; mode=$mode; version=$version; expected=$expected; work=$work } | ConvertTo-Json | Set-Content -LiteralPath $request -Encoding UTF8
+  # Windows' package broker does not inherit the caller's GITHUB_* environment.
+  # Forward only these non-secret CI markers, never tokens or signing credentials.
+  $ciContext = @{ CI='true'; GITHUB_ACTIONS='true'; GITHUB_RUN_ID=$env:GITHUB_RUN_ID; RUNNER_TEMP=$env:RUNNER_TEMP; RUNNER_ENVIRONMENT=$env:RUNNER_ENVIRONMENT }
+  @{ executable=$exe; mode=$mode; version=$version; expected=$expected; work=$work; ci=$ciContext } | ConvertTo-Json -Depth 3 | Set-Content -LiteralPath $request -Encoding UTF8
   # Node JSON.parse does not accept a UTF8 BOM.
   [IO.File]::WriteAllText($request, (Get-Content -LiteralPath $request -Raw -Encoding UTF8), [Text.UTF8Encoding]::new($false))
   if ($registered) {
@@ -45,6 +49,7 @@ function Run-App($exe, $mode, $version, $registered) {
   if (!$testResult.ok) { throw $testResult.error }
 }
 try {
+  Write-Output 'Store lifecycle: download and seed legacy installer'
   $baseline = Join-Path $work 'PMCanvas-Desktop-0.7.1-Windows-x64.exe'
   Invoke-WebRequest -UseBasicParsing -Uri 'https://github.com/jhoon-dev/PMCanvas/releases/download/desktop-v0.7.1/PMCanvas-Desktop-0.7.1-Windows-x64.exe' -OutFile $baseline
   if ((Get-FileHash -LiteralPath $baseline -Algorithm SHA256).Hash.ToLowerInvariant() -ne '82ca271d86dff7e87a7e1d47850d378aae817994cc2ed168b79e0e89d7c6666c') { throw 'Baseline hash mismatch.' }
@@ -58,7 +63,8 @@ try {
   $file = Join-Path $output $evidence.artifacts[0].name
   if ((Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant() -ne $evidence.artifacts[0].sha256) { throw 'MSIX hash mismatch.' }
   $payload = Join-Path $work 'old-payload'
-  & $makeappx unpack /p $file /d $payload
+  Write-Output 'Store lifecycle: prepare lower-version MSIX servicing fixture'
+  & $makeappx unpack /p $file /d $payload /q
   Check-Exit
   $manifestFile = Join-Path $payload 'AppxManifest.xml'
   [xml]$manifest = Get-Content -LiteralPath $manifestFile -Raw -Encoding UTF8
@@ -66,7 +72,7 @@ try {
   [IO.File]::WriteAllText($manifestFile, $manifest.OuterXml, [Text.UTF8Encoding]::new($false))
   foreach ($name in @('AppxBlockMap.xml', '[Content_Types].xml', 'AppxSignature.p7x')) { Remove-Item -LiteralPath (Join-Path $payload $name) -Force -ErrorAction SilentlyContinue }
   $old = Join-Path $work 'previous.msix'
-  & $makeappx pack /d $payload /p $old /h SHA256
+  & $makeappx pack /d $payload /p $old /h SHA256 /q
   Check-Exit
   $new = Join-Path $work 'current.msix'
   Copy-Item -LiteralPath $file -Destination $new
@@ -76,19 +82,23 @@ try {
   Export-Certificate -Cert $cert -FilePath $publicCert | Out-Null
   Import-Certificate -FilePath $publicCert -CertStoreLocation 'Cert:\LocalMachine\TrustedPeople' | Out-Null
   foreach ($item in @($old, $new)) { & $signtool sign /fd SHA256 /s My /sha1 $cert.Thumbprint $item; Check-Exit }
+  Write-Output 'Store lifecycle: register first MSIX'
   Add-AppxPackage -Path $old
   Check-Preserved
   $installed = Get-AppxPackage -Name $identity
   Run-App (Join-Path $installed.InstallLocation 'app\PM Canvas Desktop.exe') 'check' $package.version $true
   $checks.Add('Migrated the NSIS profile to a registered MSIX and verified Store identity, data and Excel export.')
+  Write-Output 'Store lifecycle: update MSIX'
   Add-AppxPackage -Path $new
   Check-Preserved
   $installed = Get-AppxPackage -Name $identity
   Run-App (Join-Path $installed.InstallLocation 'app\PM Canvas Desktop.exe') 'check' $package.version $true
   $checks.Add('Updated MSIX package version while preserving external project, recovery, preferences and language.')
+  Write-Output 'Store lifecycle: remove MSIX'
   Get-AppxPackage -Name $identity | Remove-AppxPackage
   Check-Preserved
   $checks.Add('Removed MSIX without deleting legacy profile or external projects.')
+  Write-Output 'Store lifecycle: reinstall MSIX'
   Add-AppxPackage -Path $new
   Check-Preserved
   $installed = Get-AppxPackage -Name $identity

@@ -14,11 +14,18 @@ const request = JSON.parse(fs.readFileSync(requestFile));
 let app;
 try {
   if (
-    process.env.GITHUB_ACTIONS !== 'true' ||
-    process.env.CI !== 'true' ||
+    request.ci?.GITHUB_ACTIONS !== 'true' ||
+    request.ci?.CI !== 'true' ||
+    request.ci?.RUNNER_ENVIRONMENT !== 'github-hosted' ||
+    !/^\d+$/.test(request.ci?.GITHUB_RUN_ID || '') ||
+    !path.isAbsolute(request.ci?.RUNNER_TEMP || '') ||
     process.platform !== 'win32'
   )
     throw Error('Store lifecycle tests require an isolated Windows CI runner.');
+  assert.ok(path.resolve(request.work).startsWith(path.resolve(request.ci.RUNNER_TEMP) + path.sep));
+  assert.ok(path.basename(request.work).startsWith('pmcanvas-msix-'));
+  for (const key of ['CI', 'GITHUB_ACTIONS', 'GITHUB_RUN_ID', 'RUNNER_TEMP', 'RUNNER_ENVIRONMENT'])
+    process.env[key] = request.ci[key];
   app = await electron.launch({ executablePath: request.executable, args: [], timeout: 40000 });
   const runtime = await app.evaluate(({ app }) => ({
     version: app.getVersion(),

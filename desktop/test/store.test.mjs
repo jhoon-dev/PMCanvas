@@ -14,6 +14,9 @@ const env = {
 test('Store builds require exact configured Partner Center identities and reject placeholders and injection', () => {
   const config = storeConfiguration(env);
   assert.equal(config.identityName, env.PM_STORE_IDENTITY_NAME);
+  assert.equal(config.displayName, 'PM Canvas Desktop');
+  const custom = storeConfiguration({ ...env, PM_STORE_DISPLAY_NAME: 'PM Canvas & Work' });
+  assert.match(storeManifest(custom, '0.7.4'), /DisplayName="PM Canvas &amp; Work"/);
   for (const key of Object.keys(env))
     assert.throws(() => storeConfiguration({ ...env, [key]: '' }), /Configure/);
   for (const [key, value] of [

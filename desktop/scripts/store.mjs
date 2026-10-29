@@ -108,8 +108,8 @@ try {
   const name = `PMCanvas-Desktop-${pkg.version}-Windows-x64${ciTest ? '-CI-TEST-ONLY' : '-Store'}.msix`;
   const file = path.join(output, name),
     extracted = path.join(stage, 'verified');
-  run(makeappx, ['pack', '/d', payload, '/p', file, '/h', 'SHA256']);
-  run(makeappx, ['unpack', '/p', file, '/d', extracted]);
+  run(makeappx, ['pack', '/d', payload, '/p', file, '/h', 'SHA256', '/q']);
+  run(makeappx, ['unpack', '/p', file, '/d', extracted, '/q']);
   if (fs.readFileSync(path.join(extracted, 'AppxManifest.xml'), 'utf8') !== manifest)
     throw Error('MSIX manifest differs from configuration.');
   function compare(folder, relative = '') {
