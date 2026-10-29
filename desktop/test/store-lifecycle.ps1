@@ -1,5 +1,6 @@
 $ErrorActionPreference = 'Stop'
 if ($env:CI -ne 'true' -or $env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_ENVIRONMENT -ne 'github-hosted' -or !$env:RUNNER_TEMP -or $env:GITHUB_RUN_ID -notmatch '^\d+$') { throw 'Disposable GitHub Windows runner required.' }
+$ProgressPreference = 'SilentlyContinue'
 $desktopRoot = Split-Path $PSScriptRoot -Parent
 $package = Get-Content -LiteralPath (Join-Path $desktopRoot 'package.json') -Raw -Encoding UTF8 | ConvertFrom-Json
 $output = Join-Path $desktopRoot ('dist/store-' + $package.version + '-win')
@@ -105,6 +106,7 @@ try {
   Run-App (Join-Path $installed.InstallLocation 'app\PM Canvas Desktop.exe') 'check' $package.version $true
   $checks.Add('Reinstalled MSIX and reopened the same project and settings with Store update routing.')
   $report = @{ version=$package.version; commit=$evidence.commit; packageVersion=$evidence.packageVersion; mode='ci-test-only'; msixSha256=$evidence.artifacts[0].sha256; checks=$checks.ToArray(); verifiedAt=(Get-Date).ToUniversalTime().ToString('o') }
+  [IO.Directory]::CreateDirectory((Join-Path $desktopRoot 'test-results')) | Out-Null
   [IO.File]::WriteAllText((Join-Path $desktopRoot 'test-results/store-install-validation.json'), ($report | ConvertTo-Json -Depth 5), [Text.UTF8Encoding]::new($false))
   $checks | ForEach-Object { Write-Output ('PASS: ' + $_) }
 } finally {
