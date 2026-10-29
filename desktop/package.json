@@ -11,6 +11,7 @@
   },
   "scripts": {
     "prepare:app": "node scripts/prepare.mjs",
+    "signing:setup": "node scripts/setup-mac-signing.mjs",
     "start": "npm run prepare:app && electron .",
     "test": "node --test test/*.test.mjs",
     "test:app": "node test/app-smoke.mjs",

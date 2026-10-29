@@ -113,10 +113,32 @@ jobs:
           name: desktop-test-results-${{ runner.os }}
           path: desktop/test-results/
           retention-days: 7
+  mac-p12-interop:
+    name: Windows P12 import on macOS
+    needs: verify
+    runs-on: macos-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - name: Download synthetic Windows credential fixture from this run
+        run: gh run download "$GITHUB_RUN_ID" --repo github.com/jhoon-dev/PMCanvas --name desktop-test-results-Windows --dir "$PM_SIGNING_INTEROP_FOLDER"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PM_SIGNING_INTEROP_FOLDER: ${{ runner.temp }}/pmcanvas-signing-interop
+      - name: Import and export Windows P12 in a disposable keychain
+        run: node --test --test-name-pattern='CI macOS imports' desktop/test/mac-signing.test.mjs
+        env:
+          PM_SIGNING_INTEROP_FOLDER: ${{ runner.temp }}/pmcanvas-signing-interop
   unsigned:
     name: unsigned (${{ matrix.os }}, ${{ matrix.target }})
     if: github.event_name == 'workflow_dispatch' && inputs.unsigned && inputs.release_run == ''
-    needs: [plan, verify]
+    needs: [plan, verify, mac-p12-interop]
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.plan.outputs.builds) }}
@@ -204,7 +226,7 @@ jobs:
   signed:
     name: signed (${{ matrix.os }}, ${{ matrix.target }})
     if: github.event_name == 'workflow_dispatch' && inputs.signed && inputs.release_run == ''
-    needs: [plan, verify]
+    needs: [plan, verify, mac-p12-interop]
     environment: desktop-release
     strategy:
       fail-fast: false

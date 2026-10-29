@@ -2,9 +2,41 @@
 
 현재 CI는 Mac ARM64·Intel DMG/ZIP을 Developer ID로 서명하고 Apple에 공증을 요청합니다. 두 Mac의 설치 검증과 파일 해시 검증을 통과한 뒤 GitHub Release를 공개합니다. Apple 로그인·회원 가입·약관 동의·인증서 발급은 계정 소유자가 진행합니다. Apple 계정 이메일만 등록한 상태로는 서명할 수 없습니다.
 
+## Windows 자동 설정 도구 — Mac이 없는 경우
+
+저장소 루트의 PowerShell에서 실행합니다. Node.js와 Git for Windows의 OpenSSL 3, GitHub CLI가 필요합니다. 이 PC의 기본 Git OpenSSL 경로는 도구가 자동으로 찾습니다.
+
+```powershell
+npm --prefix desktop run signing:setup
+```
+
+1. **새 작업 폴더**를 선택하고 메뉴 **1**에서 개발자 이메일과 개인 키 암호 A를 입력합니다. 숨김 입력이므로 화면에 글자가 나타나지 않습니다. CSR과 AES-256으로 암호화한 개인 키를 생성합니다.
+2. 도구가 표시한 Apple 페이지에서 **Certificates → + → Developer ID Application**을 선택하고 표시된 CSR만 업로드합니다. Apple 로그인·멤버십·약관·발급은 본인이 진행합니다. 개인 키를 Apple에 올리지 않습니다.
+3. 발급된 `.cer`를 다운로드합니다. 스크립트를 종료했다면 같은 명령을 다시 실행하고 기존 작업 폴더를 선택합니다.
+4. 메뉴 **2**에서 `.cer` 경로, 원래 개인 키 암호 A, 새 P12 암호 B를 입력합니다. 인증서 종류·유효기간·키 일치·Apple 중간 인증서 서명과 고정 SHA-256을 확인한 뒤 P12를 생성합니다. 기존 키·완성된 P12는 덮어쓰지 않습니다.
+5. GitHub CLI 로그인이 필요하면 다른 터미널에서 `gh auth login`을 완료합니다. 메뉴 **3**에서 P12 암호 B를 입력하면 `jhoon-dev/PMCanvas`의 **desktop-release Environment**에 `MAC_CSC_LINK`, `MAC_CSC_KEY_PASSWORD`를 등록합니다.
+6. 메뉴 **4**에서 공증 방식을 선택합니다. Apple 계정 방식은 앱 전용 암호·Team ID를, API 방식은 App Manager 권한의 Team Key P8·Key ID·Issuer ID를 입력합니다. 키 발급 위치와 정확한 Secret 이름은 아래 5·6절에 설명합니다.
+7. 등록 후 **Actions → Desktop verification and builds**에서 `platform=mac`, `signed=true`, `unsigned=false`, `publish=false`로 먼저 확인합니다. 성공 실행을 확인한 뒤 공개합니다.
+
+개인 키·CSR·P12와 지문만 담은 상태 파일은 `%LOCALAPPDATA%` 아래의 무작위 `PMCanvas-MacSigning-` 작업 폴더에 보관합니다. 폴더는 현재 Windows 사용자만 접근하도록 ACL을 제한합니다. 도구는 Git 저장소·worktree 내부, 정션·심볼릭 링크, 공유 접근 권한이 있는 작업 폴더를 거부합니다. 여러 작업을 동시에 실행하면 잠금으로 중복 생성을 막습니다.
+
+암호는 공백 없이 영문·숫자·기호 **16~128자**로 설정합니다. **A는 개인 키를 여는 암호, B는 P12 암호이자 `MAC_CSC_KEY_PASSWORD` 값**입니다. 두 암호를 비밀번호 관리자에 구분해 보관하세요. 상태 파일에 암호를 저장하지 않습니다.
+
+암호·P12 base64·P8 원문은 화면·스크립트 로그·클립보드·명령 인수에 출력하지 않습니다. OpenSSL 암호와 GitHub Secret 값은 자식 프로세스의 표준 입력으로만 전달하며 암호를 환경 변수에도 넣지 않습니다. 외부 도구의 원문 오류도 출력하지 않습니다. 입력·출력을 파일로 리다이렉트한 비대화형 실행은 거부합니다.
+
+`NODE_DEBUG`, `NODE_OPTIONS` 또는 Node의 디버그·추적 옵션이 활성화되어 있으면 비밀값을 받기 전에 중단합니다. 특히 `NODE_DEBUG=child_process`가 자식 프로세스 환경을 로그에 남기는 것을 막습니다.
+
+공증 방식을 바꿀 때 다른 방식의 Secret이 Environment 또는 저장소에 남아 있으면 등록을 중단합니다. 기존 Secret은 자동 삭제하지 않습니다. GitHub에서 다른 그룹을 직접 제거한 뒤 다시 등록하세요. 네트워크 오류로 등록이 중단되면 일부 Secret만 갱신되었을 수 있으므로 같은 등록 단계를 다시 실행합니다. 도구는 CI 빌드나 Release 공개를 자동 실행하지 않습니다.
+
+Apple 중간 인증서는 [Apple PKI](https://www.apple.com/certificateauthority/)의 Developer ID G1·G2에서 가져오며 고정된 지문을 검사합니다. P12에는 macOS 키체인 호환용 보호 방식을 사용하고, 원본 개인 키는 AES-256으로 암호화합니다. [OpenSSL P12 설명](https://docs.openssl.org/3.0/man1/openssl-pkcs12/)
+
+CI에서는 Windows용 생성·변환·등록 테스트를 실행한 뒤 Windows에서 실제로 생성한 테스트용 P12를 같은 실행의 Mac 작업에 전달합니다. Mac의 별도 임시 키체인에서 가져오기·내보내기를 확인하고 키체인을 삭제합니다. 이 테스트는 소유자의 인증서나 Secrets를 사용하지 않습니다.
+
+아래 절은 Mac 키체인을 이용해 수동으로 준비하는 대안입니다.
+
 ## 1. 준비
 
-- Mac 한 대: CSR 생성과 개인 키가 포함된 P12 내보내기에 사용합니다. 이후 빌드는 GitHub의 Mac runner에서 실행할 수 있습니다.
+- Windows 자동 도구 또는 Mac 키체인으로 CSR·P12를 준비할 수 있습니다. Mac을 직접 보유할 필요는 없으며 실제 빌드는 GitHub의 Mac runner에서 실행합니다.
 - 활성 Apple Developer Program 멤버십. [Apple Developer 계정](https://developer.apple.com/account/)에서 Membership details와 Team ID를 확인하세요.
 - 인증서 생성 권한. 수동 Developer ID 발급은 Account Holder 권한이 필요합니다.
 - 이 저장소의 GitHub Settings에 접근할 수 있는 계정.

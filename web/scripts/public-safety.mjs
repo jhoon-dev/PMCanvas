@@ -27,6 +27,8 @@ const documentationHosts = new Set([
   'support.apple.com',
   'account.apple.com',
   'appstoreconnect.apple.com',
+  'www.apple.com',
+  'docs.openssl.org',
   'nodejs.org',
   'registry.npmjs.org',
 ]);
@@ -74,6 +76,7 @@ const fileExtensions = new Set([
   'msix',
   'msixbundle',
   'msixupload',
+  'certsigningrequest',
 ]);
 
 export function exampleHost(host) {
@@ -112,6 +115,7 @@ export function publicPathProblem(file) {
   )
     return 'UNSAFE_PATH';
   const parts = file.split('/');
+  if (parts.some((part) => /^PMCanvas-MacSigning-/i.test(part))) return 'PRIVATE_PATH';
   if (
     parts.some((part) =>
       [
@@ -149,7 +153,9 @@ export function publicPathProblem(file) {
     parts.slice(certIndex).join('/') !== 'certs/.gitkeep'
   )
     return 'PRIVATE_CERTIFICATE';
-  if (/\.(?:key|pem|p8|p12|pfx|cer|mobileprovision|crt|dump|bak|zip)$/i.test(file))
+  if (
+    /\.(?:key|pem|p8|p12|pfx|cer|certSigningRequest|mobileprovision|crt|dump|bak|zip)$/i.test(file)
+  )
     return 'PRIVATE_OR_ARCHIVE_FILE';
   return null;
 }
