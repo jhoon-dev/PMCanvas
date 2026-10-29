@@ -11,7 +11,7 @@ const root = fileURLToPath(new URL('../app/', import.meta.url));
 const browser = await chromium.launch({ headless: true });
 const errors = [];
 try {
-  const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+  const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, locale: 'ko-KR' });
   page.on('pageerror', (error) => errors.push(error.message));
   await page.route('https://desktop.test/**', async (route) => {
     const url = new URL(route.request().url());

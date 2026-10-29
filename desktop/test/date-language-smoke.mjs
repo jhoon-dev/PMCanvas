@@ -26,6 +26,7 @@ async function harness(language = 'ko', timeZone = 'Asia/Seoul', offline = false
       if (offline) throw Error('offline');
       if (store)
         return {
+          status: 'unsupported',
           channel: 'microsoft-store',
           currentVersion: '0.7.4',
           version: null,
@@ -33,13 +34,15 @@ async function harness(language = 'ko', timeZone = 'Asia/Seoul', offline = false
           downloadAvailable: false,
         };
       return {
+        status: 'available',
+        channel: 'github',
         currentVersion: '0.7.2',
         version: '0.8.0',
         available: true,
         downloadAvailable: true,
       };
     }
-    if (name === 'openRelease') {
+    if (name === 'openRelease' || name === 'applyUpdate') {
       openedReleases++;
       return;
     }
@@ -75,6 +78,7 @@ async function harness(language = 'ko', timeZone = 'Asia/Seoul', offline = false
         'setTimeZone',
         'checkUpdates',
         'openRelease',
+        'applyUpdate',
       ].map((name) => [name, (...args) => window.fixtureCall(name, ...args)]),
     );
     window.desktop.onCommand = () => {};
@@ -104,8 +108,15 @@ test('manual update notices preserve projects, open links only on request and ha
     try {
       const before = structuredClone(h.getProject());
       await h.page.getByText('File options', { exact: true }).click();
-      await h.page.getByRole('button', { name: 'Check for updates', exact: true }).click();
-      await h.page.waitForFunction(() => !document.querySelector('#openRelease').disabled);
+      await h.page.getByRole('button', { name: 'App settings', exact: true }).click();
+      await h.page.locator('#checkUpdates').click();
+      await h.page.waitForFunction(
+        (offline) =>
+          document
+            .querySelector('#updateStatus')
+            .textContent.includes(offline ? 'Could not check' : '0.8.0'),
+        offline,
+      );
       assert.match(
         await h.page.locator('#updateStatus').textContent(),
         offline ? /Could not check/ : /0.8.0/,
@@ -130,13 +141,15 @@ test('Store update notices use the Store library and preserve offline project da
       await h.page
         .getByText(language === 'en' ? 'File options' : '파일 옵션', { exact: true })
         .click();
-      await h.page.locator('[data-command="updates"]').first().click();
+      await h.page.locator('[data-command="appSettings"]').first().click();
+      await h.page.locator('#checkUpdates').click();
       await h.page.waitForFunction(() =>
         document.querySelector('#updateStatus').textContent.includes('Microsoft Store'),
       );
-      assert.match(await h.page.locator('#openRelease').textContent(), /Microsoft Store/);
+      assert.match(await h.page.locator('#installUpdate').textContent(), /Microsoft Store/);
+      assert.equal(await h.page.locator('#openRelease').isVisible(), false);
       assert.equal(h.openedReleases(), 0);
-      await h.page.locator('#openRelease').click();
+      await h.page.locator('#installUpdate').click();
       assert.equal(h.openedReleases(), 1);
       assert.deepEqual(h.getProject(), before);
       assert.deepEqual(h.errors, []);

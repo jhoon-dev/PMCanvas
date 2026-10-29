@@ -100,6 +100,11 @@ try {
     assert.equal(updates.channel, 'microsoft-store');
     assert.equal(updates.url, 'ms-windows-store://downloadsandupdates');
     assert.ok(['current', 'available', 'unsupported', 'error'].includes(updates.status));
+    assert.ok(
+      ['checked', 'query'].includes(updates.storeCheck),
+      'Store discovery must reach the native update query.',
+    );
+    console.log('Store update discovery: ' + updates.status + ' / ' + updates.storeCheck);
     assert.notEqual(updates.storeCheck, 'runtime', 'WinRT types and helpers must be available.');
     assert.notEqual(
       updates.storeCheck,
