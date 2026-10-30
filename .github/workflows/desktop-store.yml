@@ -57,6 +57,7 @@ jobs:
           PM_STORE_PUBLISHER_DISPLAY_NAME: ${{ vars.PM_STORE_PUBLISHER_DISPLAY_NAME }}
           PM_STORE_PRODUCT_ID: ${{ vars.PM_STORE_PRODUCT_ID }}
           PM_STORE_DISPLAY_NAME: ${{ vars.PM_STORE_DISPLAY_NAME }}
+          PM_STORE_BUILD_NUMBER: ${{ github.run_number }}
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: PMCanvas-Windows-Store-submission

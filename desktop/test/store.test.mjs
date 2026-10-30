@@ -50,6 +50,18 @@ test('MSIX manifest preserves external AppData, escapes identities and uses full
   assert.match(xml, /Name="runFullTrust"/);
   assert.doesNotMatch(xml, /RegistryWriteVirtualization|runFullTrust.*runFullTrust/s);
 });
+
+test('rebuilding the same application gets a distinct Store identity without using the reserved fourth field', () => {
+  assert.equal(storeVersion('0.8.3', 70), '1.8.73.0');
+  assert.equal(storeVersion('0.8.3', '71'), '1.8.74.0');
+  const xml = storeManifest(storeConfiguration(env), '0.8.3', 71);
+  const doc = new DOMParser().parseFromString(xml, 'application/xml');
+  assert.equal(doc.getElementsByTagName('Identity')[0].getAttribute('Version'), '1.8.74.0');
+  for (const build of ['', -1, 0.5, '01', ' 1', '1\n', 'nope', NaN, Infinity, 2 ** 53, null, true])
+    assert.throws(() => storeVersion('0.8.3', build));
+  assert.equal(storeVersion('0.8.3', 65532), '1.8.65535.0');
+  assert.throws(() => storeVersion('0.8.3', 65533), /65535/);
+});
 test('Store installations direct updates to the fixed Store library without requesting GitHub releases', async () => {
   const updates = new StoreUpdateService();
   const value = await updates.check('0.7.4');

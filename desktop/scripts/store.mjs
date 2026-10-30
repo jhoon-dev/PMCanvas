@@ -40,14 +40,16 @@ const config = ciTest
   : storeConfiguration();
 const commit = releaseSource(root);
 requirePublicSafety(checkPublicRepository(root));
+const pkg = JSON.parse(sourceBytes(root, 'package.json', commit));
+const buildNumber = ciTest ? 0 : (process.env.PM_STORE_BUILD_NUMBER ?? 0);
+const packageVersion = storeVersion(pkg.version, buildNumber);
 if (args.includes('--check')) {
   console.log('Store configuration verified.');
   process.exit(0);
 }
-const pkg = JSON.parse(sourceBytes(root, 'package.json', commit));
 const output = path.join(desktop, 'dist', 'store-' + pkg.version + '-win');
 if (fs.existsSync(output) && fs.readdirSync(output).length)
-  throw Error('Preserve previous Store output; choose a new version.');
+  throw Error('Preserve previous Store output outside the build folder before rebuilding.');
 const stage = fs.mkdtempSync(path.join(os.tmpdir(), 'pmcanvas-store-'));
 const build = path.join(stage, 'source'),
   payload = path.join(stage, 'payload');
@@ -100,7 +102,7 @@ try {
       path.join(payload, 'assets', name),
       sourceBytes(root, 'build/store/' + name, commit),
     );
-  const manifest = storeManifest(config, pkg.version);
+  const manifest = storeManifest(config, pkg.version, buildNumber);
   fs.writeFileSync(path.join(payload, 'AppxManifest.xml'), manifest);
   // The pinned builder ships checksums for this Windows SDK bundle; no beta MSIX builder target needed.
   const { kit } = await getWindowsKitsBundle({ winCodeSign: '1.1.0', arch: Arch.x64 });
@@ -133,7 +135,8 @@ try {
       {
         product: pkg.name,
         version: pkg.version,
-        packageVersion: storeVersion(pkg.version),
+        packageVersion,
+        buildNumber: Number(buildNumber),
         commit,
         channel: 'microsoft-store',
         intendedFor: ciTest ? 'ci-test-only' : 'partner-center',
