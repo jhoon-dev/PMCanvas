@@ -30,7 +30,7 @@ try {
     manifest.artifacts.length !== 1 ||
     manifest.commit !== releaseSource(path.dirname(desktop)) ||
     manifest.version !== pkg.version ||
-    manifest.bundleId !== pkg.build.appId
+    manifest.bundleId !== (pkg.build.mac?.appId || pkg.build.appId)
   )
     throw Error('Upload requires a signed PKG from the current source commit.');
   const artifact = manifest.artifacts[0];

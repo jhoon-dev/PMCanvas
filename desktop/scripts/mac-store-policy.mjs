@@ -42,6 +42,7 @@ export function macStoreConfiguration(pkg, env = process.env, verify = false) {
   };
   return {
     ...pkg.build,
+    appId: pkg.build.mac?.appId || pkg.build.appId,
     forceCodeSigning: !verify,
     mac: { ...pkg.build.mac, ...common },
     mas: {

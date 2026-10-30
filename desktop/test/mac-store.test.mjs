@@ -11,7 +11,10 @@ import { MacFileAccess } from '../mac-file-access.mjs';
 test('MAS requires dedicated distribution credentials; verification cannot produce a signed submission', () => {
   const pkg = {
     version: '0.8.3',
-    build: { appId: 'app.pmcanvas.desktop', mac: { target: ['dmg', 'zip'] } },
+    build: {
+      appId: 'app.pmcanvas.desktop',
+      mac: { appId: 'app.jhoon-dev.pmcanvas', target: ['dmg', 'zip'] },
+    },
   };
   assert.throws(() => macStoreConfiguration(pkg, {}), /Configure Mac App Store credentials/);
   const env = {
@@ -25,6 +28,9 @@ test('MAS requires dedicated distribution credentials; verification cannot produ
   };
   const config = macStoreConfiguration(pkg, env);
   assert.equal(config.forceCodeSigning, true);
+  assert.equal(config.appId, 'app.jhoon-dev.pmcanvas');
+  assert.equal(config.mac.appId, 'app.jhoon-dev.pmcanvas');
+  assert.equal(pkg.build.appId, 'app.pmcanvas.desktop');
   assert.equal(config.mas.bundleVersion, '1');
   assert.equal(config.mas.extendInfo.ElectronTeamID, env.PM_MAS_TEAM_ID);
   assert.equal(config.mas.notarize, false);

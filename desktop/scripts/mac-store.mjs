@@ -52,7 +52,7 @@ try {
     if (
       profile.TeamIdentifier?.[0] !== process.env.PM_MAS_TEAM_ID ||
       entitlements['com.apple.application-identifier'] !==
-        process.env.PM_MAS_TEAM_ID + '.' + pkg.build.appId ||
+        process.env.PM_MAS_TEAM_ID + '.' + config.appId ||
       new Date(profile.ExpirationDate).getTime() <= Date.now() ||
       !Number.isFinite(new Date(profile.ExpirationDate).getTime()) ||
       profile.ProvisionedDevices ||
@@ -119,7 +119,7 @@ try {
   );
   const { parse } = createRequire(import.meta.url)('plist');
   const info = parse(fs.readFileSync(path.join(appPath, 'Contents/Info.plist'), 'utf8'));
-  if (info.CFBundleIdentifier !== pkg.build.appId) throw Error('Unexpected MAS bundle identifier.');
+  if (info.CFBundleIdentifier !== config.appId) throw Error('Unexpected MAS bundle identifier.');
   const architectures = run('lipo', [
     '-archs',
     path.join(appPath, 'Contents/MacOS', info.CFBundleExecutable),
@@ -162,7 +162,7 @@ try {
       {
         version: pkg.version,
         commit,
-        bundleId: pkg.build.appId,
+        bundleId: config.appId,
         buildNumber: verify ? null : process.env.PM_MAS_BUILD_NUMBER,
         architectures: ['arm64', 'x64'],
         signed: !verify,
