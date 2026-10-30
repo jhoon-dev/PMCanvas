@@ -2,6 +2,8 @@
 
 형제 shared/ 폴더의 계산·검증 코드를 사용하는 Windows·macOS용 오프라인 앱의 개발 초기 버전입니다. 사용자 PC에는 Node.js·Docker·PostgreSQL 설치가 필요하지 않습니다.
 
+빈 프로젝트는 참여인력 → 첫 업무 → 완료 기록 순서로 시작을 안내합니다. 업무 입력창은 이름·담당자·일정·체크리스트를 먼저 보여주며, **분류 · 선행 업무 · 메모**를 펼치면 상위 업무와 추가 설정을 수정할 수 있습니다. 기존 상위·선행 업무나 메모가 있으면 자동으로 펼쳐집니다. 검색 중에는 **필터 초기화**로 전체 업무로 돌아올 수 있으며 입력·완료 기록은 유지됩니다. 상단 실행 취소·다시 실행은 작은 화살표로 표시하며 키보드 단축키도 사용할 수 있습니다.
+
 Windows의 새 배포 경로는 [Microsoft Store 제출용 MSIX](WINDOWS-STORE.md)입니다. Partner Center 앱 예약 후 제품 ID를 설정하면 CI에서 제출 파일을 만들 수 있습니다. 아직 Store에 게시한 상태는 아니며 기존 공개 EXE는 호환용으로 유지합니다. Mac의 [인증서 발급 → 공증 → GitHub Secrets 등록 순서](MAC-SETUP.md)도 단계별로 안내합니다.
 
 Mac이 없어도 Windows에서 `npm --prefix desktop run signing:setup`으로 개인 키·CSR 생성, Apple 발급 안내, P12 변환·검증, GitHub Secrets 등록을 이어서 진행할 수 있습니다. 개인 키는 Git 밖에 암호화해 보관하며 입력한 암호를 파일이나 로그에 남기지 않습니다. 자세한 사용법은 [Mac 설정 가이드](MAC-SETUP.md)를 참고하세요.

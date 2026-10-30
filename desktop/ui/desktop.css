@@ -47,6 +47,7 @@ body {
   inset: 0 auto 0 0;
   width: 224px;
   z-index: 10;
+  overflow-y: auto;
 }
 .desktop-brand {
   display: flex;
@@ -95,6 +96,9 @@ body {
   gap: 7px;
 }
 .desktop-sidebar nav button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   border: 0;
   background: none;
   text-align: left;
@@ -104,6 +108,14 @@ body {
   font: inherit;
   font-size: 14px;
   cursor: pointer;
+}
+.desktop-sidebar nav button:hover {
+  background: #f4f7fc;
+  color: #354d70;
+}
+.desktop-sidebar nav .icon {
+  width: 18px;
+  height: 18px;
 }
 .desktop-sidebar nav button.active {
   color: #416be8;
@@ -134,7 +146,7 @@ body {
   min-width: 0;
 }
 .desktop-toolbar {
-  padding: 16px 32px;
+  padding: 14px 32px;
   background: #fff;
   border-bottom: 1px solid #e5e8ef;
   display: flex;
@@ -152,9 +164,10 @@ body {
   flex-wrap: wrap;
 }
 #saveStatus {
-  font-size: 11px;
-  color: #7c889c;
+  font-size: 12px;
+  color: #52677e;
   text-align: right;
+  max-width: 260px;
 }
 #content {
   padding: 32px;
@@ -172,21 +185,58 @@ body {
   gap: 10px;
   align-items: center;
   margin: 22px 0;
+  flex-wrap: wrap;
+  padding: 14px 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
 }
 .desktop-controls input[type='search'] {
   flex: 1;
   min-width: 140px;
+}
+.desktop-controls.date-only {
+  padding: 0;
+  border: 0;
+  background: none;
+}
+.desktop-controls input,
+.desktop-controls select {
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid #d9e1ec;
+  border-radius: 7px;
+  background: #fff;
+  color: #334b67;
+  font-size: 13px;
+}
+.desktop-controls input:focus,
+.desktop-controls select:focus {
+  outline: 2px solid #8fb4ff;
+  outline-offset: 1px;
 }
 .desktop-controls select {
   max-width: 180px;
 }
 .desktop-controls label {
   font-size: 12px;
-  color: #78849b;
+  color: #52677e;
   white-space: nowrap;
 }
 .desktop-controls input[type='date'] {
-  width: 150px;
+  width: 152px;
+}
+@media (max-width: 1150px) {
+  .desktop-toolbar {
+    padding: 12px 24px;
+    flex-wrap: wrap;
+  }
+  #content {
+    padding: 24px;
+  }
+  .desktop-controls label {
+    margin-left: 0;
+  }
 }
 .desktop-table-wrap {
   overflow: auto;
@@ -194,15 +244,18 @@ body {
 .desktop-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: 13px;
   text-align: left;
 }
 .desktop-table th {
   padding: 14px 16px;
-  color: #8b95a9;
+  color: #60738d;
   font-weight: 500;
   border-bottom: 1px solid #e9edf5;
   white-space: nowrap;
+}
+.desktop-table tbody tr:hover {
+  background: #f8faff;
 }
 .desktop-table td {
   padding: 16px;
@@ -232,7 +285,7 @@ body {
 }
 .desktop-note {
   font-size: 12px;
-  color: #8a94a7;
+  color: #64748b;
   line-height: 1.8;
   margin-top: 20px;
 }
@@ -283,6 +336,9 @@ body {
   max-height: 58vh;
   overflow: auto;
 }
+.desktop-dialog #dialogBody {
+  padding-top: 20px;
+}
 .desktop-dialog .dialog-foot {
   border-top: 1px solid #edf0f7;
 }
@@ -325,7 +381,7 @@ body {
 }
 button:disabled {
   opacity: 0.5;
-  cursor: wait;
+  cursor: not-allowed;
 }
 .desktop-gantt {
   padding: 20px;
@@ -386,7 +442,7 @@ button:disabled {
 }
 .desktop-metric small {
   display: block;
-  color: #8792a7;
+  color: #60738d;
   font-size: 12px;
 }
 .desktop-metric strong {
@@ -398,7 +454,7 @@ button:disabled {
 }
 .desktop-metric p {
   font-size: 11px;
-  color: #8691a5;
+  color: #60738d;
   margin: 10px 0 0;
 }
 .desktop-section-head {
@@ -415,6 +471,15 @@ button:disabled {
   margin-left: auto;
   color: #8c97a9;
   font-size: 11px;
+}
+.desktop-workspace .check-item > input {
+  position: static;
+  opacity: 1;
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  accent-color: #3774e9;
 }
 .desktop-report-panel {
   margin-top: 24px;
@@ -558,4 +623,9 @@ button:disabled {
   gap: 8px;
   font-size: 12px;
   margin: 16px 0;
+}
+@media (max-width: 1150px) {
+  .desktop-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }

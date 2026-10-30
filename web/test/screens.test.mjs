@@ -38,7 +38,7 @@ test('대시보드와 WBS는 빈 프로젝트·미지정 담당자·HTML 입력�
     }
   }
   const { p, at } = cases.find((c) => c.name === 'empty');
-  assert.match(dashboardView(p, summary(p, at), at), /업무를 등록하면 진척 추이가 표시됩니다/);
+  assert.match(dashboardView(p, summary(p, at), at), /첫 업무부터 시작해 보세요/);
   const viewer = cases.find((c) => c.name === 'viewer-unassigned');
   const view = new WbsView({});
   const html = view.render(viewer.p, viewer.at);

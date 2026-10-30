@@ -15,6 +15,7 @@ import {
   pageHead,
   dateToolbar,
   empty,
+  projectStart,
 } from './view-ui.js';
 function methodLabel(f) {
   return (
@@ -43,20 +44,22 @@ export function dashboardView(p, s, asOf) {
       0,
     ),
     eff = p.members.reduce((n, m) => n + m.allocation / 100, 0);
+  const heading = pageHead(
+    'PROJECT OVERVIEW',
+    p.name,
+    p.description || ui('팀의 오늘을 기록하고, 프로젝트의 내일을 확인하세요.'),
+    btn(ui('＋ 업무 추가'), 'quick-task', 'primary') +
+      ui(
+        '<details class="action-menu"><summary class="button">프로젝트 관리</summary><div class="menu-popover">',
+      ) +
+      btn(ui('변경 이력'), 'audit') +
+      (p._role === 'owner' ? btn(ui('공유'), 'sharing') : '') +
+      btn(ui('설정'), 'settings') +
+      '</div></details>',
+  );
+  if (!p.tasks.length) return heading + projectStart(p, 'quick-task');
   return (
-    pageHead(
-      'PROJECT OVERVIEW',
-      p.name,
-      p.description || ui('팀의 오늘을 기록하고, 프로젝트의 내일을 확인하세요.'),
-      btn(ui('＋ 업무 추가'), 'quick-task', 'primary') +
-        ui(
-          '<details class="action-menu"><summary class="button">프로젝트 관리</summary><div class="menu-popover">',
-        ) +
-        btn(ui('변경 이력'), 'audit') +
-        (p._role === 'owner' ? btn(ui('공유'), 'sharing') : '') +
-        btn(ui('설정'), 'settings') +
-        '</div></details>',
-    ) +
+    heading +
     dateToolbar(
       asOf,
       ui('<span class="period-label">프로젝트 기간 <strong>') +

@@ -361,7 +361,9 @@ export class WbsWorkspace {
             '</option>',
         )
         .join('') +
-      '</select></label></div>' +
+      '</select></label>' +
+      (this.query || this.owner ? button(ui('필터 초기화'), 'reset-filters', 'ghost small') : '') +
+      '</div>' +
       selected +
       '<p class="wbs-error" role="alert"></p><p class="wbs-warning"></p>'
     );
@@ -922,7 +924,15 @@ export class WbsWorkspace {
       b.disabled =
         this.saving ||
         (this.readOnly &&
-          !['copy', 'discard', 'expand', 'collapse', 'forget', 'unselect'].includes(a)) ||
+          ![
+            'copy',
+            'discard',
+            'expand',
+            'collapse',
+            'forget',
+            'unselect',
+            'reset-filters',
+          ].includes(a)) ||
         (a === 'save' && !this.dirty) ||
         (a === 'undo' && !this.undoStack.length && !this.pending.size) ||
         (a === 'redo' && !this.redoStack.length);
@@ -1125,6 +1135,13 @@ export class WbsWorkspace {
   async action(action) {
     if (this.saving) return;
     try {
+      if (action === 'reset-filters') {
+        this.query = '';
+        this.owner = '';
+        this.selected.clear();
+        this.repaint({ filter: 'wbsQuery' });
+        return;
+      }
       if (action === 'unselect') {
         this.selected.clear();
         this.repaint();
