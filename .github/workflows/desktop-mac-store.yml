@@ -55,18 +55,20 @@ jobs:
       CSC_INSTALLER_LINK: ${{ secrets.MAS_INSTALLER_CSC_LINK }}
       CSC_INSTALLER_KEY_PASSWORD: ${{ secrets.MAS_INSTALLER_CSC_KEY_PASSWORD }}
       PM_MAS_PROFILE_BASE64: ${{ secrets.MAS_PROVISION_PROFILE_BASE64 }}
-      PM_MAS_PROFILE: ${{ runner.temp }}/pmcanvas-mas.provisionprofile
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
       - name: Prepare provisioning profile
+        env:
+          PM_MAS_PROFILE: ${{ runner.temp }}/pmcanvas-mas.provisionprofile
         run: |
           node --input-type=module -e '
           import fs from "node:fs";
           if (!process.env.PM_MAS_PROFILE_BASE64) throw Error("Configure MAS_PROVISION_PROFILE_BASE64 in desktop-mac-store.");
-          fs.writeFileSync(process.env.PM_MAS_PROFILE, Buffer.from(process.env.PM_MAS_PROFILE_BASE64, "base64"), { mode: 0o600 });'
+          fs.writeFileSync(process.env.PM_MAS_PROFILE, Buffer.from(process.env.PM_MAS_PROFILE_BASE64, "base64"), { mode: 0o600 });
+          fs.appendFileSync(process.env.GITHUB_ENV, "PM_MAS_PROFILE=" + process.env.PM_MAS_PROFILE + "\n");'
       - run: npm ci --ignore-scripts
         working-directory: web
       - run: npm ci
@@ -91,4 +93,4 @@ jobs:
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
       - name: Remove provisioning profile
         if: always()
-        run: rm -f -- "$PM_MAS_PROFILE"
+        run: rm -f -- "$RUNNER_TEMP/pmcanvas-mas.provisionprofile"
