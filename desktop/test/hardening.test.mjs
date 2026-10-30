@@ -105,7 +105,7 @@ test('signed updates bind publisher key, version, asset, size and hash; replacin
   };
   const a = await downloadInstaller(update, directory, { open, verify: f.verify });
   const b = await downloadInstaller(update, directory, { open, verify: f.verify });
-  assert.equal(a.file, b.file);
+  assert.equal(await fs.promises.realpath(a.file), await fs.promises.realpath(b.file));
   assert.equal(binaries, 1);
   assert.deepEqual(fs.readFileSync(a.file), f.payload);
   const hostile = async (url) => {
@@ -159,8 +159,10 @@ test('cache retention bounds completed downloads and preserves current, active, 
     path.join(root, 'download-link'),
     process.platform === 'win32' ? 'junction' : 'dir',
   );
+  const alias = path.join(directory, 'cache-alias');
+  fs.symlinkSync(root, alias, process.platform === 'win32' ? 'junction' : 'dir');
   await cleanupUpdateCache(root, {
-    keep: [path.join(keep, name), path.join(current, name)],
+    keep: [path.join(alias, path.basename(keep), name), path.join(current, name)],
     maxFolders: 1,
   });
   assert.equal(fs.existsSync(expired), false);

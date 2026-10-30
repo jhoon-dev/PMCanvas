@@ -61,7 +61,20 @@ export async function cleanupUpdateCache(
   const folders = (await entries(directory)).sort((a, b) => b.mtime - a.mtime);
   let total = folders.reduce((sum, f) => sum + f.size, 0),
     count = folders.length;
-  const protectedFiles = new Set(keep.map((file) => path.resolve(file)));
+  // Resolve with the same native API as entries(): Windows may report 8.3 names
+  // while the downloader holds a long path to that same file.
+  const protectedFiles = new Set(
+    await Promise.all(
+      keep.map(async (file) => {
+        try {
+          return await fs.realpath(file);
+        } catch (error) {
+          if (error.code !== 'ENOENT') throw error;
+          return path.resolve(file);
+        }
+      }),
+    ),
+  );
   for (const item of [...folders].reverse()) {
     const active =
       item.files.some(
