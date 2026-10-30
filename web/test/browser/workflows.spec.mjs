@@ -658,6 +658,49 @@ test('동시 수정은 비교·선택 후 저장하며 서버의 완료 기록�
   await other.close();
 });
 
+test('새로고침으로 복구한 초안은 원래 버전과 비교해 충돌·서버 메모·완료 기록을 보존', async ({
+  page,
+}) => {
+  const session = await login(page),
+    p = await createProject(page, session, { name: '복구 병합 검증' });
+  await selectProject(page, p);
+  await page.locator('[data-cell=name]').fill('복구한 내 이름');
+  await page.locator('[data-cell=name]').press('Tab');
+  const server = structuredClone(p);
+  server.tasks[0].name = '다른 기기에서 바꾼 이름';
+  server.tasks[0].memo = '서버에서 보존할 메모';
+  server.tasks[0].items[0].doneDate = today();
+  expect(
+    (
+      await page.request.put(api + 'projects/' + p.id, {
+        headers: { Origin: origin, 'X-CSRF-Token': session.csrf },
+        data: { project: server, revision: p._revision },
+      })
+    ).ok(),
+  ).toBe(true);
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.reload();
+  await expect(page.locator('#authGate')).toBeHidden();
+  if (await page.locator('#projectSelect').isVisible())
+    await page.locator('#projectSelect').selectOption(p.id);
+  else await page.locator('#projectList [data-project="' + p.id + '"]').click();
+  await expect(page.locator('.wbs-recovery')).toBeVisible();
+  await page.locator('[data-wbs-action=recover]').click();
+  await expect(page.locator('[data-cell=name]')).toHaveValue('복구한 내 이름');
+  await page.locator('[data-wbs-action=save]').click();
+  await expect(page.locator('.merge-dialog')).toBeVisible();
+  await expect(page.locator('.merge-field')).toHaveCount(1);
+  await page.locator('.merge-dialog input[value=mine]').check();
+  await page.locator('#conflictForm .primary').click();
+  await page.locator('[data-wbs-action=save]').click();
+  await expect(page.locator('.wbs-state')).toHaveText('저장됨');
+  const result = (await (await page.request.get(api + 'projects/' + p.id)).json()).project;
+  expect(result.tasks[0].name).toBe('복구한 내 이름');
+  expect(result.tasks[0].memo).toBe(server.tasks[0].memo);
+  expect(result.tasks[0].items[0].doneDate).toBe(today());
+  await expect(page.locator('.wbs-recovery')).toHaveCount(0);
+});
+
 test('영어 UI·언어 유지·사용자 데이터 보존·미저장 언어 전환 차단', async ({ page }) => {
   await page.goto('./');
   await page.locator('#loginForm .language-select').selectOption('en');

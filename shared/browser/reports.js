@@ -1,5 +1,6 @@
 import { progress, planned, taskHours, workdays, addDays, validDate } from './engine.js';
 import { ui } from './i18n.js';
+import { hierarchy } from './planning.js';
 
 // Quote every value and force formula-like user text to plain text in Excel.
 export function csvText(rows) {
@@ -21,6 +22,7 @@ export function csvText(rows) {
 }
 
 export function wbsRows(project, at, forecast, tasks = project.tasks) {
+  const tree = hierarchy(project);
   const header = [
     '프로젝트',
     '보고 기준일',
@@ -58,7 +60,7 @@ export function wbsRows(project, at, forecast, tasks = project.tasks) {
       return [
         project.name,
         at,
-        String(project.tasks.indexOf(task) + 1).padStart(2, '0'),
+        tree.get(task.id).number,
         task.phase || '',
         task.name,
         member?.name || ui('미지정'),

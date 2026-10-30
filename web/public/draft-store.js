@@ -61,12 +61,13 @@ export class DraftStore {
     this.storage.setItem(
       this.key(base.id),
       JSON.stringify({
-        version: 2,
+        version: 3,
         projectId: base.id,
         userId: this.userId,
         revision: draft._revision,
         savedAt: new Date(this.now()).toISOString(),
         expiresAt: this.now() + ttl,
+        base,
         draft,
         pending: [...pending.values()],
       }),
@@ -81,10 +82,14 @@ export class DraftStore {
       return null;
     }
     if (
-      value.version !== 2 ||
+      ![2, 3].includes(value.version) ||
       value.userId !== this.userId ||
       value.projectId !== id ||
       value.draft?.id !== id ||
+      (value.version === 3 &&
+        (value.base?.id !== id ||
+          value.base._revision !== value.revision ||
+          value.draft._revision !== value.revision)) ||
       !Array.isArray(value.pending) ||
       value.pending.length > 4000
     )

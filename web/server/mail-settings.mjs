@@ -3,7 +3,7 @@ import path from 'node:path';
 import { hkdfSync } from 'node:crypto';
 import { seal, unseal } from './admin-mfa.mjs';
 import { fail } from './errors.mjs';
-import { mailConfig, createMailer, mailAddress } from './mailer.mjs';
+import { mailConfig, mailConfigFile, createMailer, mailAddress } from './mailer.mjs';
 import { classifyMailFailure } from './mail-failures.mjs';
 
 export function reviewRecipients(value = []) {
@@ -34,7 +34,7 @@ const empty = () => ({
   reviewRecipients: [],
 });
 export function legacyMailSettings(env = process.env) {
-  const file = env.MAIL_CONFIG_FILE || 'config/mail.json';
+  const file = mailConfigFile(env);
   if (!fs.existsSync(file)) {
     if (env.MAIL_CONFIG_FILE) throw Error('MAIL_CONFIG_FILE was not found.');
     return { config: empty(), password: '' };

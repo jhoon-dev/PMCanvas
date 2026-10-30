@@ -56,6 +56,8 @@ from은 실제 발신 권한이 있는 이메일 주소를 지정하세요. SMTP
 
 파일 설정은 관리자 화면에서 아직 설정을 저장하지 않은 경우 적용됩니다. 화면에 한 번 저장한 뒤에는 화면에서 관리하세요. 파일 변경을 적용하려면 앱을 다시 기동합니다.
 
+기본·외부 DB Compose 구성은 `MAIL_CONFIG_DIR=/app/config`로 마운트한 `mail.json`을 읽습니다. 파일이 없는 새 설치도 정상 기동하며 메일은 비활성화됩니다. Docker 없이 실행하면 기존 `config/mail.json`을 사용하고, `MAIL_CONFIG_FILE`을 지정하면 기본 디렉터리보다 우선합니다.
+
     npm run service:up
     docker compose exec app node scripts/check-mail.mjs
 

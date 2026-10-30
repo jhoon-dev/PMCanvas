@@ -165,8 +165,10 @@ export function createMailer(config, { createTransport = nodemailer.createTransp
     close: () => transport.close(),
   };
 }
+export const mailConfigFile = (env = process.env) =>
+  env.MAIL_CONFIG_FILE || path.join(env.MAIL_CONFIG_DIR || 'config', 'mail.json');
 export function loadMailer(env = process.env) {
-  const file = env.MAIL_CONFIG_FILE || 'config/mail.json';
+  const file = mailConfigFile(env);
   if (!fs.existsSync(file)) {
     if (env.MAIL_CONFIG_FILE) throw Error('MAIL_CONFIG_FILE was not found.');
     return null;

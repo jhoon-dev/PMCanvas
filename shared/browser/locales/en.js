@@ -575,6 +575,8 @@ export default {
     'Data is stored in PostgreSQL on the server. Owners can invite editors and viewers. Screens refresh every 15 seconds; concurrent changes trigger conflict handling. JSON backup and import are available.',
   '이 브라우저의 복구 초안을 읽지 못했습니다.':
     'Could not read the recovery draft in this browser.',
+  '이전 형식의 초안은 서버가 변경되어 복구할 수 없습니다. 기준 원본이 없는 초안은 브라우저에 보존했습니다.':
+    'This older draft cannot be recovered because the server has changed. The draft has no original merge base and was preserved in this browser.',
   '이 사용자의 비밀번호를 재설정하고 모든 기기에서 로그아웃할까요?':
     "Reset this user's password and sign them out on all devices?",
   '이 사용자의 프로젝트 접근 권한을 해제할까요?': "Remove this user's project access?",

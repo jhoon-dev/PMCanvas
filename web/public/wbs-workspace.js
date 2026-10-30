@@ -1157,9 +1157,20 @@ export class WbsWorkspace {
         if (this.dirty) throw Error(ui('현재 초안을 먼저 저장하거나 취소해 주세요.'));
         const saved = this.recovery,
           p = clone(saved.draft);
+        // Legacy drafts have no merge base; a newer server snapshot cannot replace it.
+        if (!saved.base && saved.revision !== this.base._revision)
+          throw Error(
+            ui(
+              '이전 형식의 초안은 서버가 변경되어 복구할 수 없습니다. 기준 원본이 없는 초안은 브라우저에 보존했습니다.',
+            ),
+          );
+        const base = clone(saved.base || this.base);
+        base._role = this.base._role;
         p._role = this.base._role;
         p._revision = saved.revision;
+        checkDraft(base);
         checkDraft(p);
+        this.base = base;
         this.changed(p);
         this.pending = new Map(
           saved.pending
