@@ -15,6 +15,18 @@ import {
 
 const inspect = (file, text) => inspectPublicFile(file, Buffer.from(text));
 
+test('privacy documentation permits the official Microsoft policy host but rejects lookalike hosts', () => {
+  assert.deepEqual(
+    inspect('desktop/PRIVACY.md', 'https://privacy.microsoft.com/privacystatement'),
+    [],
+  );
+  assert.ok(
+    inspect('desktop/PRIVACY.md', 'https://privacy.microsoft.com.privatecorp.tld/policy').some(
+      (finding) => finding.rule === 'NON_EXAMPLE_HOST',
+    ),
+  );
+});
+
 test('Apple signing keys and provisioning files are private; desktop signing examples receive secret checks', () => {
   for (const file of ['signing/key.p8', 'signing/app.mobileprovision', 'signing/app.pfx']) {
     assert.equal(inspect(file, 'synthetic')[0].rule, 'PRIVATE_OR_ARCHIVE_FILE');

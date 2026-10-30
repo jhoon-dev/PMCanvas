@@ -374,6 +374,15 @@ try {
   assert.deepEqual(await application.evaluate(() => globalThis.__releasePages), [
     'https://github.com/jhoon-dev/PMCanvas/releases/tag/desktop-v0.99.0',
   ]);
+  checkpoint('privacy-policy');
+  const beforePrivacy = await page.evaluate(() => window.desktop.snapshot());
+  await page.getByText('파일 옵션', { exact: true }).click();
+  await page.getByRole('button', { name: '개인정보처리방침', exact: true }).click();
+  assert.deepEqual(await application.evaluate(() => globalThis.__releasePages), [
+    'https://github.com/jhoon-dev/PMCanvas/releases/tag/desktop-v0.99.0',
+    'https://github.com/jhoon-dev/PMCanvas/blob/main/desktop/PRIVACY.md',
+  ]);
+  assert.deepEqual(await page.evaluate(() => window.desktop.snapshot()), beforePrivacy);
   assert.deepEqual((await page.evaluate(() => window.desktop.snapshot())).project, finalProject);
   await application.evaluate(({ shell }) => {
     process.getBuiltinModule('https').get = globalThis.__updateRequest;

@@ -222,6 +222,10 @@ test('historical dates stay fixed; midnight never replaces an open editor and de
 test('English screens persist selection, protect open or unsaved edits, preserve Korean project data and hide unselected bulk actions', async () => {
   const { browser, page, errors, getProject } = await harness('en');
   try {
+    assert.equal(
+      await page.getByRole('button', { name: 'Privacy policy', exact: true }).count(),
+      1,
+    );
     await page.getByRole('button', { name: 'Project overview', exact: true }).waitFor();
     await page.getByText('화면 회귀 검증', { exact: true }).first().waitFor();
     await page.getByRole('button', { name: 'WBS · Baseline', exact: true }).click();

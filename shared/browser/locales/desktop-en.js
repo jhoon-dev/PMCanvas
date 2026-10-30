@@ -267,6 +267,7 @@ export default {
   '프로젝트 변경 실행 취소': 'Undo project change',
   '프로젝트 변경 다시 실행': 'Redo project change',
   '앱 설정': 'App settings',
+  개인정보처리방침: 'Privacy policy',
   업데이트: 'Updates',
   '현재 버전: ': 'Current version: ',
   '마지막 확인: ': 'Last checked: ',
