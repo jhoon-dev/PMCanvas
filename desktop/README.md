@@ -1,4 +1,4 @@
-# PM Canvas Desktop 0.8.2
+# PM Canvas Desktop 0.8.3
 
 형제 shared/ 폴더의 계산·검증 코드를 사용하는 Windows·macOS용 오프라인 앱의 개발 초기 버전입니다. 사용자 PC에는 Node.js·Docker·PostgreSQL 설치가 필요하지 않습니다.
 
