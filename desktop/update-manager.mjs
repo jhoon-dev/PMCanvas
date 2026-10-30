@@ -108,9 +108,13 @@ export class UpdateManager {
           },
         });
         return this.set({ status: 'downloaded', progress: null });
-      } catch {
+      } catch (error) {
         this.installer = null;
-        return this.set({ status: 'error', error: 'download', progress: null });
+        return this.set({
+          status: 'error',
+          error: error.code === 'UPDATE_UNTRUSTED' ? 'verification' : 'download',
+          progress: null,
+        });
       } finally {
         this.pending = null;
       }

@@ -222,6 +222,22 @@ export function createProjectEditor({
   const $ = (s) => document.querySelector(s),
     currentDay = () => (typeof currentDate === 'function' ? currentDate() : currentDate);
   let editor = null;
+  let initialFields = '';
+  const fields = () =>
+    JSON.stringify([
+      Array.from($('#editorForm').elements || [])
+        .filter((el) => el.name)
+        .map((el) => [
+          el.name,
+          el.type,
+          ['checkbox', 'radio'].includes(el.type) ? el.checked : el.value,
+        ]),
+      Array.from($('#editorForm').querySelectorAll?.('.item-editor') || []).map((el) => [
+        el.dataset.itemId,
+        el.dataset.doneDate,
+      ]),
+    ]);
+  const isDirty = () => Boolean($('#editorDialog').open && fields() !== initialFields);
   function openEditor(type, id = '') {
     if (wbs.dirty) {
       toast(ui('WBS 변경사항을 먼저 저장하거나 취소해 주세요.'));
@@ -245,6 +261,7 @@ export function createProjectEditor({
     const body = form.body;
     $('#dialogTitle').textContent = form.title;
     $('#dialogBody').innerHTML = body;
+    initialFields = fields();
     $('#editorDialog').showModal();
     setTimeout(() => {
       $('#dialogBody input')?.focus({ preventScroll: true });
@@ -343,5 +360,5 @@ export function createProjectEditor({
 
   $('#closeDialog').onclick = $('#cancelDialog').onclick = () => $('#editorDialog').close();
 
-  return { open: openEditor };
+  return { open: openEditor, isDirty };
 }

@@ -6,6 +6,11 @@ import { createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
 import { verifiedReleaseSource, editableReleaseDraft, releasePlan } from './release-policy.mjs';
 import { stageReleaseArtifacts } from './release-evidence.mjs';
+import {
+  signUpdateManifest,
+  verifyUpdateManifest,
+  UPDATE_MANIFEST,
+} from '../update-signatures.mjs';
 
 // Both modes require successful builds and every selected architecture's real installation test.
 if (process.env.GITHUB_ACTIONS !== 'true' || !/^\d+$/.test(process.env.GITHUB_RUN_ID || ''))
@@ -17,6 +22,9 @@ const gh = (args) =>
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
     maxBuffer: 4 * 1024 * 1024,
+    env: Object.fromEntries(
+      Object.entries(process.env).filter(([name]) => name !== 'PM_UPDATE_SIGNING_KEY'),
+    ),
   });
 const plan = releasePlan({
   mode: process.env.PM_RELEASE_MODE || 'unsigned',
@@ -33,6 +41,14 @@ const sourcePackage = JSON.parse(
   gh(['api', 'repos/jhoon-dev/PMCanvas/contents/desktop/package.json?ref=' + commit]),
 );
 const pkg = JSON.parse(Buffer.from(sourcePackage.content, 'base64'));
+const trustSource = JSON.parse(
+  gh(['api', 'repos/jhoon-dev/PMCanvas/contents/desktop/update-trust.mjs?ref=' + commit]),
+);
+assert.equal(
+  Buffer.from(trustSource.content, 'base64').toString('utf8'),
+  fs.readFileSync(path.join(root, 'desktop/update-trust.mjs'), 'utf8'),
+  'Update verification keys must match the verified app build.',
+);
 const version = pkg.version;
 assert.match(version, /^\d+\.\d+\.\d+$/);
 const tag = 'desktop-v' + version;
@@ -74,6 +90,26 @@ const { uploads, sums, evidence } = await stageReleaseArtifacts(files, stage, {
   commit,
   plan,
 });
+if (!process.env.PM_UPDATE_SIGNING_KEY)
+  throw Error('The protected update signing key is required.');
+const authorizedAssets = uploads
+  .filter((file) => /\.(exe|dmg|zip)$/.test(file))
+  .map((file) => ({
+    name: path.basename(file),
+    size: fs.statSync(file).size,
+    sha256: createHash('sha256').update(fs.readFileSync(file)).digest('hex'),
+  }));
+const authorization = signUpdateManifest(
+  { schema: 1, product: pkg.name, version, commit, assets: authorizedAssets },
+  process.env.PM_UPDATE_SIGNING_KEY,
+);
+// Refuse to publish if the configured signing key does not match the app's pinned key.
+for (const asset of authorizedAssets)
+  verifyUpdateManifest(authorization, { version, fileName: asset.name });
+const authorizationFile = path.join(stage, UPDATE_MANIFEST);
+fs.writeFileSync(authorizationFile, authorization);
+uploads.push(authorizationFile);
+delete process.env.PM_UPDATE_SIGNING_KEY;
 fs.writeFileSync(path.join(stage, 'SHA256SUMS.txt'), sums.join('\n') + '\n');
 uploads.push(path.join(stage, 'SHA256SUMS.txt'));
 const validation = path.join(stage, 'desktop-' + version + '-install-validation.json');

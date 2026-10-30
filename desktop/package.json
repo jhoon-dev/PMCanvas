@@ -1,6 +1,6 @@
 {
   "name": "pmcanvas-desktop",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "private": true,
   "description": "Offline project planning for Windows and macOS",
   "author": "PM Canvas",
@@ -32,7 +32,7 @@
     "test:package": "node test/package-safety.mjs"
   },
   "devDependencies": {
-    "electron": "45.0.0",
+    "electron": "45.1.0",
     "electron-builder": "26.18.0"
   },
   "build": {
@@ -48,6 +48,9 @@
       "preferences.mjs",
       "update-manager.mjs",
       "update-download.mjs",
+      "update-signatures.mjs",
+      "update-trust.mjs",
+      "update-cache.mjs",
       "preload.cjs",
       "document.mjs",
       "assets.mjs",

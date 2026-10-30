@@ -23,6 +23,7 @@ import { validateProject } from './app/shared/engine.js';
 import { UpdateService, StoreUpdateService } from './updates.mjs';
 import { DesktopPreferences } from './preferences.mjs';
 import { UpdateManager } from './update-manager.mjs';
+import { cleanupUpdateCache } from './update-cache.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const testing = !app.isPackaged && process.env.PMCANVAS_DESKTOP_TEST === '1';
@@ -151,12 +152,20 @@ else {
       const preferencesFile = path.join(app.getPath('userData'), 'preferences.json');
       const preferences = new DesktopPreferences(preferencesFile);
       setBusinessTimeZone(preferences.value.timeZone);
+      const updateDirectory = path.join(app.getPath('userData'), 'updates');
       updateManager = new UpdateManager({
         service: updates,
         version: app.getVersion(),
-        directory: path.join(app.getPath('temp'), 'PMCanvas-updates'),
+        directory: updateDirectory,
         notify: (value) => send('desktop:update', value),
       });
+      await cleanupUpdateCache(updateDirectory).catch(() =>
+        console.warn('Update cache cleanup deferred.'),
+      );
+      if (!testing && process.env.PMCANVAS_DESKTOP_TEST !== '1')
+        await cleanupUpdateCache(path.join(app.getPath('temp'), 'PMCanvas-updates')).catch(() =>
+          console.warn('Legacy update cache cleanup deferred.'),
+        );
       process.env.PM_TIME_ZONE = getBusinessTimeZone();
       document = new DesktopDocument(path.join(app.getPath('userData'), 'recovery.json'));
       excelImport = new ExcelImportSession(document, excelJob);
@@ -302,7 +311,15 @@ else {
         updateHistoryMenu();
         return language;
       });
-      handle('settings', () => ({ ...preferences.value, timeZone: getBusinessTimeZone() }), false);
+      handle(
+        'settings',
+        () => ({
+          ...preferences.value,
+          timeZone: getBusinessTimeZone(),
+          recovery: preferences.recovery,
+        }),
+        false,
+      );
       handle(
         'updatePreference',
         (enabled) => {

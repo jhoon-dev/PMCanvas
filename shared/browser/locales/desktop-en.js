@@ -1,5 +1,17 @@
 // Authored interface text only; project names, notes and imported values are never translated.
 export default {
+  '업데이트의 발행자를 확인하지 못했습니다. 설치를 중단했습니다. 나중에 다시 확인해 주세요.':
+    'Could not verify the update publisher. Installation was stopped. Check again later.',
+  '다운로드 또는 검증에 실패했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.':
+    'Download or verification failed. Check your connection and try again.',
+  '설정 오류를 복구해 실행했습니다. 원본 설정 사본은 이 PC에 보관했습니다. 시간대와 업데이트 설정을 확인해 주세요.':
+    'Recovered settings to start the app. A copy of the original settings is stored on this PC. Review your time zone and update settings.',
+  '설정을 읽지 못해 기본값으로 실행했습니다. 원본 파일은 유지됩니다. 설정을 저장하려면 파일 접근 권한과 크기를 확인해 주세요.':
+    'Started with defaults because settings could not be read. The original file is preserved. Check file permissions and size before saving settings.',
+  '설정 오류를 복구해 실행했습니다. 앱 설정에서 내용을 확인해 주세요.':
+    'Recovered settings to start the app. Review them in App settings.',
+  '원래 설정 파일을 보존하지 못했습니다. 파일 접근 권한과 크기를 확인해 주세요.':
+    'Could not preserve the original settings. Check file permissions and size.',
   '분류 · 선행 업무 · 메모': 'Category · dependency · notes',
   '선택 설정': 'Optional',
   등록됨: 'Added',

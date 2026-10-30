@@ -539,7 +539,7 @@ async function reloadServer() {
   }
 }
 window.addEventListener('beforeunload', (e) => {
-  if (saveInFlight || storageError || wbs.dirty) {
+  if (saveInFlight || storageError || wbs.dirty || editorUi.isDirty()) {
     e.preventDefault();
     e.returnValue = '';
   }
