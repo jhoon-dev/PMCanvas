@@ -650,6 +650,10 @@ async function command(name) {
     await updateUI.open(name === 'updates');
     return;
   }
+  if (name === 'privacy') {
+    await run(() => api.openPrivacyPolicy());
+    return;
+  }
   if (name === 'timeZone') {
     if (busy || editor || importing || state.dirty) {
       toast(ui('변경사항을 저장하거나 취소한 뒤 시간대를 바꿔 주세요.'));

@@ -26,6 +26,7 @@ import { UpdateManager } from './update-manager.mjs';
 import { cleanupUpdateCache } from './update-cache.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
+const PRIVACY_POLICY = 'https://github.com/jhoon-dev/PMCanvas/blob/main/desktop/PRIVACY.md';
 const testing = !app.isPackaged && process.env.PMCANVAS_DESKTOP_TEST === '1';
 if (!app.isPackaged && process.env.PMCANVAS_DESKTOP_DATA)
   app.setPath('userData', path.resolve(process.env.PMCANVAS_DESKTOP_DATA));
@@ -269,6 +270,7 @@ else {
                 { label: ui('Excel 입력 양식 저장…'), click: () => command('exportTemplate') },
                 { label: ui('업데이트 확인'), click: () => command('updates') },
                 { label: ui('앱 설정'), click: () => command('appSettings') },
+                { label: ui('개인정보처리방침'), click: () => command('privacy') },
                 { type: 'separator' },
                 { role: process.platform === 'darwin' ? 'close' : 'quit' },
               ],
@@ -349,6 +351,7 @@ else {
         return true;
       });
       handle('openRelease', () => shell.openExternal(updates.url), false);
+      handle('privacyPolicy', () => shell.openExternal(PRIVACY_POLICY), false);
       handle('timeZone', (value) => {
         if (editing || document.dirty || excelImport.current)
           throw Error(ui('변경사항을 저장하거나 취소한 뒤 시간대를 바꿔 주세요.'));

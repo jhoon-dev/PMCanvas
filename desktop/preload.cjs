@@ -18,6 +18,7 @@ contextBridge.exposeInMainWorld(
     downloadUpdate: () => call('downloadUpdate'),
     applyUpdate: () => call('applyUpdate'),
     openRelease: () => call('openRelease'),
+    openPrivacyPolicy: () => call('privacyPolicy'),
     replace: (project, revision) => call('replace', project, revision),
     undo: (revision) => call('undo', revision),
     redo: (revision) => call('redo', revision),

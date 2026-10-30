@@ -14,6 +14,7 @@ const documentationHosts = new Set([
   'docs.github.com',
   'raw.githubusercontent.com',
   'learn.microsoft.com',
+  'privacy.microsoft.com',
   'login.microsoftonline.com',
   'schemas.xmlsoap.org',
   'www.w3.org',
