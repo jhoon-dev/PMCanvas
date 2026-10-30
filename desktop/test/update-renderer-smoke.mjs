@@ -163,6 +163,23 @@ try {
   assert.equal(await page.locator('#installUpdate').textContent(), 'Microsoft Store에서 업데이트');
   await page.locator('#installUpdate').click();
   assert.equal(await page.evaluate(() => window.calls.downloads), 2);
+  await page.evaluate(() =>
+    window.publishUpdate({
+      ...window.update,
+      status: 'unsupported',
+      channel: 'mac-app-store',
+      available: false,
+      downloadAvailable: false,
+      version: null,
+    }),
+  );
+  assert.equal(await page.locator('#installUpdate').textContent(), 'Mac App Store에서 업데이트');
+  assert.equal(await page.locator('#openRelease').isVisible(), false);
+  await page.locator('#installUpdate').click();
+  assert.equal(await page.evaluate(() => window.calls.downloads), 2);
+  await page
+    .getByText('Mac App Store에서 업데이트를 확인할 수 있습니다.', { exact: true })
+    .waitFor();
   await page.locator('#closeUpdate').click();
   await page.evaluate(() => {
     localStorage.setItem('pmcanvas.language', 'en');

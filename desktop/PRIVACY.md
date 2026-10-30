@@ -13,6 +13,8 @@
 
 ### 저장과 외부 전송
 
+Mac App Store 설치본은 GitHub 업데이트 API를 조회하거나 설치 파일을 내려받지 않고 Mac App Store 업데이트 화면을 엽니다. Apple의 설치·업데이트·진단 처리는 [Apple 개인정보 처리방침](https://www.apple.com/legal/privacy/)을 따릅니다. 사용자가 선택한 프로젝트의 파일 접근 권한을 다시 사용하기 위한 보안 북마크는 앱의 로컬 컨테이너에 보관합니다. 아래 GitHub 업데이트 설명은 Store 외부 배포본에만 적용됩니다.
+
 - 프로젝트와 내보낸 `.pmcanvas`·JSON·Excel·CSV 파일은 사용자가 선택한 위치에 저장합니다. 복구 사본, 최근 파일 경로, 언어·시간대·업데이트 설정과 업데이트 캐시는 운영체제의 앱 사용자 데이터 영역에 저장합니다. 손상된 설정·복구 파일을 보존한 사본도 남을 수 있습니다.
 - 개발자는 앱을 통해 프로젝트 내용이나 파일 경로를 개발자 서버로 자동 수집·전송하지 않습니다. 앱에 광고·사용 행태 추적·자동 오류 보고 기능은 없습니다.
 - Microsoft Store 설치본은 Windows Store API로 업데이트를 확인하고 Store 업데이트 화면을 엽니다. Microsoft의 설치·업데이트·진단·백업 처리는 [Microsoft 개인정보처리방침](https://privacy.microsoft.com/privacystatement)을 따릅니다.
@@ -38,6 +40,8 @@ This policy covers **PM Canvas Desktop** for Windows and macOS. It does not cove
 The app processes project names, team members' names and roles, tasks, schedules, notes, estimated hours and completion records entered by the user or imported from files. It uses this information for planning, progress and forecast calculations, display, saving and recovery, and report generation. Names and notes may contain personal information. The app does not require its own user account, contacts, location, camera or microphone.
 
 ### Storage and third parties
+
+Mac App Store installations open the Mac App Store updates page without querying GitHub update APIs or downloading installers. Apple's installation, update and diagnostic processing follows the [Apple Privacy Policy](https://www.apple.com/legal/privacy/). Security-scoped bookmarks used to restore access to the selected project are stored locally in the app container. The GitHub update description below applies only to builds distributed outside the Store.
 
 - Projects and exported `.pmcanvas`, JSON, Excel and CSV files are saved to locations selected by the user. Recovery copies, recent file paths, language, time zone and update preferences, and update caches are stored in the operating system's app user-data area. Preserved copies of damaged preferences or recovery files may remain there.
 - The developer does not automatically collect or upload project contents or file paths to a developer server. The app has no advertising, usage tracking or automatic crash reporting feature.

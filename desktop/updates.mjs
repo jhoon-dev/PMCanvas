@@ -3,6 +3,25 @@ import { checkStoreUpdates } from './store-updates.mjs';
 
 export const RELEASES_PAGE = 'https://github.com/jhoon-dev/PMCanvas/releases';
 export const STORE_UPDATES = 'ms-windows-store://downloadsandupdates';
+export const MAC_STORE_UPDATES = 'macappstore://showUpdatesPage';
+export class MacStoreUpdateService {
+  constructor() {
+    this.url = MAC_STORE_UPDATES;
+  }
+  async check(currentVersion) {
+    compareVersions(currentVersion, currentVersion);
+    // App Store owns discovery and installation; never fetch GitHub installers in MAS.
+    return {
+      channel: 'mac-app-store',
+      currentVersion,
+      version: null,
+      checked: false,
+      available: false,
+      downloadAvailable: false,
+      url: this.url,
+    };
+  }
+}
 export class StoreUpdateService {
   constructor({ query = checkStoreUpdates, now = Date.now } = {}) {
     this.url = STORE_UPDATES;

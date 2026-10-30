@@ -28,7 +28,12 @@ test('privacy documentation permits the official Microsoft policy host but rejec
 });
 
 test('Apple signing keys and provisioning files are private; desktop signing examples receive secret checks', () => {
-  for (const file of ['signing/key.p8', 'signing/app.mobileprovision', 'signing/app.pfx']) {
+  for (const file of [
+    'signing/key.p8',
+    'signing/app.mobileprovision',
+    'signing/app.provisionprofile',
+    'signing/app.pfx',
+  ]) {
     assert.equal(inspect(file, 'synthetic')[0].rule, 'PRIVATE_OR_ARCHIVE_FILE');
   }
   assert.equal(inspect('PMCanvas-MacSigning-test/state.json', '{}')[0].rule, 'PRIVATE_PATH');
