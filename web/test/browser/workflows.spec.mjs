@@ -743,7 +743,8 @@ test('같은 탭에서 변환한 구형 초안은 새로고침 후 복구·저�
   const session = await login(page),
     p = await createProject(page, session, { name: '구형 초안 이관' });
   await selectProject(page, p);
-  await page.evaluate(
+  // Seed before the next app boot, after the current page's clean-draft cleanup.
+  await page.addInitScript(
     ({ user, project }) => {
       const draft = structuredClone(project);
       draft.tasks[0].name = '구형 초안의 입력';
