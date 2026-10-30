@@ -824,3 +824,100 @@ for (const kind of ['project', 'task'])
     const server = (await (await page.request.get(api + 'projects/' + p.id)).json()).project;
     expect(server).toEqual(p);
   });
+
+const unloadGuard = (page) =>
+  page.evaluate(() => {
+    const event = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(event);
+    return event.defaultPrevented;
+  });
+
+test('계정 비밀번호 입력은 새로고침·닫기 취소로 보존하고 요청 처리 중 이동을 막는다', async ({
+  page,
+}) => {
+  await login(page);
+  await page.locator('#accountButton').click();
+  await page.getByText('내 비밀번호 변경', { exact: true }).click();
+  const form = page.locator('#changePasswordForm');
+  expect(await unloadGuard(page)).toBe(false);
+  await form.locator('[name=currentPassword]').fill(PASSWORD);
+  await form.locator('[name=newPassword]').fill('fixture-new-password');
+  await form.locator('[name=confirmPassword]').fill('fixture-new-password');
+  expect(await unloadGuard(page)).toBe(true);
+  const reloadDialog = page.waitForEvent('dialog');
+  await page.evaluate(() => {
+    setTimeout(() => location.reload(), 0);
+  });
+  const reload = await reloadDialog;
+  expect(reload.type()).toBe('beforeunload');
+  await reload.dismiss();
+  await expect(form.locator('[name=newPassword]')).toHaveValue('fixture-new-password');
+  const closeDialog = page.waitForEvent('dialog');
+  const close = page.locator('#closeInfo').click();
+  await (await closeDialog).dismiss();
+  await close;
+  await expect(form).toBeVisible();
+  let release, entered;
+  const gate = new Promise((resolve) => {
+    release = resolve;
+  });
+  const started = new Promise((resolve) => {
+    entered = resolve;
+  });
+  await page.route('**/api/auth/password', async (route) => {
+    entered();
+    await gate;
+    await route.fulfill({
+      status: 503,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: { code: 'TEST_BUSY', message: '테스트 요청 실패' } }),
+    });
+  });
+  try {
+    await form.locator('button').click();
+    await started;
+    await expect(form).toHaveAttribute('data-submitting', 'true');
+    await page.locator('#closeInfo').click();
+    await expect(form).toBeVisible();
+    expect(await unloadGuard(page)).toBe(true);
+  } finally {
+    release();
+  }
+  await expect(form.locator('button')).toBeEnabled();
+  await expect(form.locator('[name=newPassword]')).toHaveValue('fixture-new-password');
+  await form.locator('[name=currentPassword]').fill('');
+  await form.locator('[name=newPassword]').fill('');
+  await form.locator('[name=confirmPassword]').fill('');
+  expect(await unloadGuard(page)).toBe(false);
+  await page.locator('#closeInfo').click();
+  expect(await unloadGuard(page)).toBe(false);
+});
+
+test('사용자 추가 입력은 관리자 탭 전환을 취소하면 유지하고 명시적으로 버리면 초기화한다', async ({
+  page,
+}) => {
+  await login(page, 'admin@example.com');
+  await page.locator('#accountButton').click();
+  await page.locator('[data-action=admin]').click();
+  await page.getByText('사용자 직접 추가', { exact: true }).click();
+  const form = page.locator('#createUserForm');
+  await form.locator('[name=name]').fill('입력 보존 검증');
+  await form.locator('[name=email]').fill('unsaved@example.test');
+  expect(await unloadGuard(page)).toBe(true);
+  const cancelDialog = page.waitForEvent('dialog');
+  const cancelled = page.locator('[data-admin-tab=mail]').click();
+  await (await cancelDialog).dismiss();
+  await cancelled;
+  await expect(form.locator('[name=name]')).toHaveValue('입력 보존 검증');
+  const acceptDialog = page.waitForEvent('dialog');
+  const accepted = page.locator('[data-admin-tab=mail]').click();
+  await (await acceptDialog).accept();
+  await accepted;
+  await expect(page.locator('#mailSettingsForm')).toBeVisible();
+  expect(await unloadGuard(page)).toBe(false);
+  await page.locator('[data-admin-tab=users]').click();
+  await page.getByText('사용자 직접 추가', { exact: true }).click();
+  await expect(form.locator('[name=name]')).toHaveValue('');
+  await expect(form.locator('[name=email]')).toHaveValue('');
+  expect(await unloadGuard(page)).toBe(false);
+});

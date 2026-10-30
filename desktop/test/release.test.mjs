@@ -8,6 +8,7 @@ import {
   signingPolicy,
   releaseSource,
   verifiedReleaseSource,
+  assertMainlineCommit,
   editableReleaseDraft,
   releaseJobs,
   releasePlan,
@@ -28,6 +29,7 @@ test('platform plans keep both default targets and require both Mac architecture
       event: 'workflow_dispatch',
       path: '.github/workflows/desktop.yml',
       head_sha: 'a'.repeat(40),
+      head_branch: 'main',
     };
     const jobs = mac.jobs.map((name) => ({ name, conclusion: 'success' }));
     assert.equal(verifiedReleaseSource(run, jobs, mac), run.head_sha);
@@ -104,9 +106,15 @@ test('publication recovery requires all source checks and rejects another reposi
     event: 'workflow_dispatch',
     path: '.github/workflows/desktop.yml',
     head_sha: 'a'.repeat(40),
+    head_branch: 'main',
   };
   const jobs = releaseJobs.map((name) => ({ name, conclusion: 'success' }));
   assert.equal(verifiedReleaseSource(run, jobs), run.head_sha);
+  for (const branch of [undefined, 'codex/unreviewed', 'refs/heads/main', 'Main'])
+    assert.throws(
+      () => verifiedReleaseSource({ ...run, head_branch: branch }, jobs),
+      /verified desktop/,
+    );
   assert.throws(
     () =>
       verifiedReleaseSource(
@@ -127,6 +135,33 @@ test('publication recovery requires all source checks and rejects another reposi
     () => verifiedReleaseSource({ ...run, path: '.github/workflows/other.yml' }, jobs),
     /verified desktop/,
   );
+});
+
+test('publication accepts current/older main commits but rejects unmerged, removed and unverifiable history', () => {
+  const source = 'a'.repeat(40),
+    main = 'b'.repeat(40);
+  const proof = {
+    status: 'ahead',
+    ahead_by: 2,
+    behind_by: 0,
+    base_commit: { sha: source },
+    merge_base_commit: { sha: source },
+  };
+  assert.doesNotThrow(() => assertMainlineCommit(source, main, proof));
+  assert.doesNotThrow(() =>
+    assertMainlineCommit(source, source, { ...proof, status: 'identical', ahead_by: 0 }),
+  );
+  for (const changed of [
+    null,
+    {},
+    { ...proof, status: 'diverged' },
+    { ...proof, status: 'behind' },
+    { ...proof, behind_by: 1 },
+    { ...proof, base_commit: { sha: main } },
+    { ...proof, merge_base_commit: { sha: main } },
+  ])
+    assert.throws(() => assertMainlineCommit(source, main, changed), /current main history/);
+  assert.throws(() => assertMainlineCommit(source, 'main', proof), /current main history/);
 });
 test('draft recovery resolves IDs from the release list and never overwrites a published or different source release', () => {
   const release = {

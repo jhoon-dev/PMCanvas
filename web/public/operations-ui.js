@@ -113,6 +113,7 @@ export function workspaceOperations({
           )),
     );
     body().querySelector('#userStatus').value = initialStatus;
+    dialog.guardForms(body());
     await refreshUsers();
   }
   function filterUsers(data) {

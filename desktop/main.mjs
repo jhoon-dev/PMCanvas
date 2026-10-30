@@ -75,7 +75,7 @@ else {
     dialog.showMessageBox(window, {
       type: 'error',
       title: 'PM Canvas Desktop',
-      message: error.message || String(error),
+      message: ui(error.message || String(error)),
     });
   function assertSender(event) {
     if (
