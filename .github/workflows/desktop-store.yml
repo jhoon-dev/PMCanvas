@@ -3,7 +3,6 @@ on:
   push:
     paths: ['desktop/**', 'shared/**', 'web/package*.json', '.github/workflows/desktop-store.yml']
   pull_request:
-    paths: ['desktop/**', 'shared/**', 'web/package*.json', '.github/workflows/desktop-store.yml']
   workflow_dispatch:
     inputs:
       submission:

@@ -37,6 +37,7 @@ export function verifiedReleaseSource(run, jobs, options) {
   if (
     run.repository?.full_name?.toLowerCase() !== 'jhoon-dev/pmcanvas' ||
     run.event !== 'workflow_dispatch' ||
+    run.head_branch !== 'main' ||
     run.path !== '.github/workflows/desktop.yml' ||
     !/^[a-f0-9]{40}$/.test(run.head_sha || '')
   )
@@ -45,6 +46,19 @@ export function verifiedReleaseSource(run, jobs, options) {
     if (!jobs.some((job) => job.name === name && job.conclusion === 'success'))
       throw Error('Missing successful source job: ' + name);
   return run.head_sha;
+}
+export function assertMainlineCommit(commit, main, comparison) {
+  if (
+    !/^[a-f0-9]{40}$/.test(commit || '') ||
+    !/^[a-f0-9]{40}$/.test(main || '') ||
+    comparison?.status !== (commit === main ? 'identical' : 'ahead') ||
+    !Number.isSafeInteger(comparison?.ahead_by) ||
+    (commit === main ? comparison.ahead_by !== 0 : comparison.ahead_by <= 0) ||
+    comparison.behind_by !== 0 ||
+    comparison.base_commit?.sha !== commit ||
+    comparison.merge_base_commit?.sha !== commit
+  )
+    throw Error('Release source must belong to the current main history.');
 }
 export function editableReleaseDraft(releases, tag, commit) {
   const matches = releases.filter((release) => release.tag_name === tag);

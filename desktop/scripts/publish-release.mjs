@@ -4,7 +4,12 @@ import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
-import { verifiedReleaseSource, editableReleaseDraft, releasePlan } from './release-policy.mjs';
+import {
+  verifiedReleaseSource,
+  assertMainlineCommit,
+  editableReleaseDraft,
+  releasePlan,
+} from './release-policy.mjs';
 import { stageReleaseArtifacts } from './release-evidence.mjs';
 import {
   signUpdateManifest,
@@ -37,6 +42,14 @@ const jobs = JSON.parse(
   gh(['api', 'repos/jhoon-dev/PMCanvas/actions/runs/' + runId + '/jobs?per_page=100']),
 ).jobs;
 const commit = verifiedReleaseSource(sourceRun, jobs, plan);
+const main = JSON.parse(gh(['api', 'repos/jhoon-dev/PMCanvas/git/ref/heads/main'])).object;
+assert.equal(main.type, 'commit');
+assert.match(main.sha, /^[a-f0-9]{40}$/);
+assertMainlineCommit(
+  commit,
+  main.sha,
+  JSON.parse(gh(['api', 'repos/jhoon-dev/PMCanvas/compare/' + commit + '...' + main.sha])),
+);
 const sourcePackage = JSON.parse(
   gh(['api', 'repos/jhoon-dev/PMCanvas/contents/desktop/package.json?ref=' + commit]),
 );

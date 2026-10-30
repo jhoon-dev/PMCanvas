@@ -54,6 +54,7 @@ export function createAdminUi({
     openSecurityAudit = security.audit;
   async function openAccount() {
     if (!user()) return showAuth();
+    if (!dialog.canLeave()) return;
     openInfo(
       ui('계정 관리'),
       '<p><strong>' +
@@ -111,6 +112,7 @@ export function createAdminUi({
               '<button class="button primary">비밀번호 변경</button><p class="account-result" role="status"></p></form></details></section>',
             )),
     );
+    dialog.guardForms($('#infoBody'));
   }
   let knownUsers = [];
   async function refreshUsers({ cached = false } = {}) {
@@ -137,6 +139,8 @@ export function createAdminUi({
     const form = e.target,
       data = new FormData(form),
       button = form.querySelector('button');
+    if (form.dataset.submitting === 'true') return;
+    form.dataset.submitting = 'true';
     button.disabled = true;
     try {
       if (form.id === 'createUserForm') {
@@ -186,6 +190,7 @@ export function createAdminUi({
         showAuth(ui(error.message));
       }
     } finally {
+      delete form.dataset.submitting;
       button.disabled = false;
     }
   });
@@ -270,6 +275,7 @@ export function createAdminUi({
       toast(ui('저장 완료 후 로그아웃해 주세요.'));
       return;
     }
+    if (!dialog.canLeave()) return;
     if (hasUnsaved() && !confirm(ui('미저장 변경사항과 보관 초안을 삭제하고 로그아웃할까요?')))
       return;
     api('auth/logout', { method: 'POST', body: {} })

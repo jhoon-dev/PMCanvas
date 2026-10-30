@@ -10,16 +10,8 @@ on:
         '.prettier*',
         '.github/workflows/desktop.yml',
       ]
+  # Required branch checks must run for every PR, including web-only/doc changes.
   pull_request:
-    paths:
-      [
-        'desktop/**',
-        'shared/**',
-        'web/package*.json',
-        'package.json',
-        '.prettier*',
-        '.github/workflows/desktop.yml',
-      ]
   workflow_dispatch:
     inputs:
       platform:

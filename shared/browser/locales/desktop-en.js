@@ -298,4 +298,8 @@ export default {
   '설치 파일을 열지 못했습니다. 다시 시도해 주세요.': 'Could not open the installer. Try again.',
   '설치 파일이 변경되었습니다. 업데이트를 다시 다운로드해 주세요.':
     'The installer changed. Download the update again.',
+  '손상된 복구 원본을 보존하지 못했습니다. 파일 접근 권한과 크기를 확인해 주세요.':
+    'Could not preserve the damaged recovery file. Check file permissions and size.',
+  '복구 파일을 읽지 못했습니다. 원본은 별도 사본에 보관했습니다. 프로젝트 파일을 열거나 새 문서를 만들 수 있습니다.':
+    'Could not read the recovery file. The original was preserved separately. You can open a project file or create a new document.',
 };

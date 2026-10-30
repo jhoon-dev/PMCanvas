@@ -8,6 +8,8 @@ import {
   readdirSync,
   rmSync,
   mkdirSync,
+  symlinkSync,
+  linkSync,
 } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -162,6 +164,63 @@ test('corrupted recovery is reported and left intact', (t) => {
   assert.throws(() => document.recovery());
   assert.equal(readFileSync(file, 'utf8'), '{broken');
   assert.equal(existsSync(file), true);
+  const backups = readdirSync(root).filter((name) => name.startsWith('recovery.json.invalid-'));
+  assert.equal(backups.length, 1);
+  assert.equal(readFileSync(path.join(root, backups[0]), 'utf8'), '{broken');
+  document.create(fixture());
+  assert.equal(readFileSync(path.join(root, backups[0]), 'utf8'), '{broken');
+  assert.equal(new DesktopDocument(file).recovery().project.name, fixture().name);
+});
+
+test('case, directory alias and hard-link paths cannot bypass external-edit protection', (t) => {
+  const root = temporary(t),
+    directory = path.join(root, 'files');
+  mkdirSync(directory);
+  const alias = path.join(root, 'alias');
+  symlinkSync(directory, alias, process.platform === 'win32' ? 'junction' : 'dir');
+  for (const kind of ['case', 'directory', 'hardlink']) {
+    const file = path.join(directory, kind + '.pmcanvas');
+    writeFileSync(file, serializeDocument(fixture()));
+    let target = path.join(directory, kind.toUpperCase() + '.pmcanvas');
+    if (kind === 'case' && !existsSync(target)) continue; // Case-sensitive volumes have two distinct names.
+    if (kind === 'directory') target = path.join(alias, kind + '.pmcanvas');
+    if (kind === 'hardlink') {
+      target = path.join(root, 'linked.pmcanvas');
+      linkSync(file, target);
+    }
+    const doc = new DesktopDocument(path.join(root, 'recovery-' + kind + '.json'));
+    doc.open(file);
+    doc.replace({ ...doc.project, name: 'unsaved change' }, doc.revision);
+    writeFileSync(file, 'external edit');
+    const before = doc.snapshot();
+    assert.throws(() => doc.save(target), /외부에서 변경/);
+    assert.equal(readFileSync(file, 'utf8'), 'external edit');
+    assert.equal(readFileSync(target, 'utf8'), 'external edit');
+    assert.deepEqual(doc.snapshot(), before);
+    doc.save(path.join(root, kind + '-copy.pmcanvas'));
+    assert.equal(doc.dirty, false);
+  }
+});
+
+test('corrupt recovery is preserved before the first write and a failed backup cannot accept a new document', (t) => {
+  const root = temporary(t),
+    file = path.join(root, 'recovery.json');
+  writeFileSync(file, 'first corrupt data');
+  const doc = new DesktopDocument(file);
+  doc.create(fixture()); // Even a caller that did not run startup recovery must preserve it.
+  const backup = readdirSync(root).find((name) => name.startsWith('recovery.json.invalid-'));
+  assert.equal(readFileSync(path.join(root, backup), 'utf8'), 'first corrupt data');
+  writeFileSync(file, 'second corrupt data');
+  const restarted = new DesktopDocument(file);
+  assert.throws(() => restarted.recovery(), /별도 사본/);
+  const second = readdirSync(root)
+    .filter((name) => name.startsWith('recovery.json.invalid-'))
+    .find((name) => name !== backup);
+  writeFileSync(path.join(root, second), 'broken backup');
+  assert.throws(() => restarted.create(fixture()), /보존하지 못했습니다/);
+  assert.equal(restarted.project, null);
+  assert.equal(readFileSync(file, 'utf8'), 'second corrupt data');
+  assert.equal(readFileSync(path.join(root, backup), 'utf8'), 'first corrupt data');
 });
 test('custom protocol exposes only renderer assets, never native model, preload or secrets', () => {
   assert.equal(assetPath('pmcanvas://desktop/index.html'), 'index.html');

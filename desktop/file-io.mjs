@@ -1,4 +1,27 @@
 import { openSync, fstatSync, readSync, closeSync, constants } from 'node:fs';
+import { lstatSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+
+export function preserveInvalidFile(file, max) {
+  const original = lstatSync(file);
+  if (!original.isFile() || original.isSymbolicLink()) throw Error('Invalid recovery file.');
+  const bytes = readBounded(file, max);
+  const backup = file + '.invalid-' + createHash('sha256').update(bytes).digest('hex');
+  try {
+    writeFileSync(backup, bytes, { flag: 'wx', mode: 0o600 });
+  } catch (error) {
+    if (error.code !== 'EEXIST') throw error;
+    const existing = lstatSync(backup);
+    if (
+      !existing.isFile() ||
+      existing.isSymbolicLink() ||
+      existing.nlink !== 1 ||
+      !readBounded(backup, max).equals(bytes)
+    )
+      throw error;
+  }
+  return backup;
+}
 
 export function readBounded(file, max) {
   const fd = openSync(file, constants.O_RDONLY | (constants.O_NONBLOCK || 0));

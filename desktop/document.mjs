@@ -8,11 +8,12 @@ import {
   closeSync,
   fsyncSync,
   statSync,
+  realpathSync,
 } from 'node:fs';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { cleanProject } from './app/model/project.mjs';
-import { readBounded } from './file-io.mjs';
+import { readBounded, preserveInvalidFile } from './file-io.mjs';
 
 export const MAX_BYTES = 8 * 1024 * 1024;
 export const MAX_HISTORY_STEPS = 20;
@@ -58,6 +59,18 @@ export function serializeDocument(project) {
 function readLimited(file, max = MAX_BYTES) {
   return readBounded(file, max);
 }
+function sameFile(left, right) {
+  if (path.resolve(left) === path.resolve(right)) return true;
+  try {
+    if (realpathSync.native(left) === realpathSync.native(right)) return true;
+    const a = statSync(left, { bigint: true }),
+      b = statSync(right, { bigint: true });
+    return a.ino !== 0n && a.ino === b.ino && a.dev === b.dev;
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+    return false;
+  }
+}
 export function atomicWrite(file, bytes) {
   const temporary = file + '.' + randomUUID() + '.tmp';
   let descriptor;
@@ -88,6 +101,8 @@ export class DesktopDocument {
     this.revision = 0;
     this.undoStack = [];
     this.redoStack = [];
+    this.recoveryChecked = false;
+    this.recoveryProblem = false;
   }
   snapshot() {
     return {
@@ -101,10 +116,28 @@ export class DesktopDocument {
   }
   writeRecovery(next) {
     mkdirSync(path.dirname(this.recoveryFile), { recursive: true });
+    if (!this.recoveryChecked) {
+      try {
+        this.recovery();
+      } catch {
+        /* Preservation below must succeed before replacing it. */
+      }
+    }
+    if (this.recoveryProblem) {
+      try {
+        preserveInvalidFile(this.recoveryFile, MAX_BYTES * 2);
+      } catch (error) {
+        if (error.code !== 'ENOENT')
+          throw Error(
+            '손상된 복구 원본을 보존하지 못했습니다. 파일 접근 권한과 크기를 확인해 주세요.',
+          );
+      }
+    }
     atomicWrite(
       this.recoveryFile,
       JSON.stringify({ version: 1, savedProjectHash: this.savedProjectHash, ...next }),
     );
+    this.recoveryProblem = false;
   }
   update(next) {
     this.writeRecovery(next);
@@ -187,7 +220,7 @@ export class DesktopDocument {
   }
   save(file = this.file) {
     if (!this.project || !file) throw Error('저장할 프로젝트와 파일 이름을 확인해 주세요.');
-    if (this.file && path.resolve(file) === path.resolve(this.file)) {
+    if (this.file && sameFile(file, this.file)) {
       let currentHash;
       try {
         currentHash = fingerprint(readLimited(file));
@@ -209,6 +242,26 @@ export class DesktopDocument {
     return this.snapshot();
   }
   recovery() {
+    this.recoveryChecked = true;
+    try {
+      const result = this.readRecovery();
+      this.recoveryProblem = false;
+      return result;
+    } catch {
+      this.recoveryProblem = true;
+      try {
+        preserveInvalidFile(this.recoveryFile, MAX_BYTES * 2);
+      } catch {
+        throw Error(
+          '손상된 복구 원본을 보존하지 못했습니다. 파일 접근 권한과 크기를 확인해 주세요.',
+        );
+      }
+      throw Error(
+        '복구 파일을 읽지 못했습니다. 원본은 별도 사본에 보관했습니다. 프로젝트 파일을 열거나 새 문서를 만들 수 있습니다.',
+      );
+    }
+  }
+  readRecovery() {
     let bytes;
     try {
       bytes = readLimited(this.recoveryFile, MAX_BYTES * 2);
