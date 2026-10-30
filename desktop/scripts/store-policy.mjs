@@ -59,7 +59,7 @@ export function storeManifest(config, version) {
  <Resources><Resource Language="ko-KR"/><Resource Language="en-US"/></Resources>
  <Dependencies><TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.19041.0" MaxVersionTested="10.0.26100.0"/></Dependencies>
  <Applications><Application Id="PMCanvas" Executable="app\\PM Canvas Desktop.exe" EntryPoint="Windows.FullTrustApplication">
-  <uap:VisualElements DisplayName="${xml(config.displayName || 'PM Canvas Desktop')}" Description="Offline project planning" BackgroundColor="#2563EB"
+  <uap:VisualElements DisplayName="${xml(config.displayName || 'PM Canvas Desktop')}" Description="Offline project planning" BackgroundColor="transparent"
    Square150x150Logo="assets\\Square150x150Logo.png" Square44x44Logo="assets\\Square44x44Logo.png"/>
  </Application></Applications>
  <Capabilities><rescap:Capability Name="runFullTrust"/><rescap:Capability Name="unvirtualizedResources"/></Capabilities>

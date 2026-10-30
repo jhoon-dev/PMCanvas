@@ -203,12 +203,13 @@ else {
           return new Response('Not found', { status: 404 });
         }
         const headers = new Headers({
-          'Content-Type':
-            (asset.endsWith('.html')
-              ? 'text/html'
-              : asset.endsWith('.css')
-                ? 'text/css'
-                : 'text/javascript') + '; charset=utf-8',
+          'Content-Type': asset.endsWith('.png')
+            ? 'image/png'
+            : (asset.endsWith('.html')
+                ? 'text/html'
+                : asset.endsWith('.css')
+                  ? 'text/css'
+                  : 'text/javascript') + '; charset=utf-8',
         });
         headers.set(
           'Content-Security-Policy',
@@ -227,6 +228,7 @@ else {
         minHeight: 720,
         show: !testing,
         backgroundColor: '#f5f6fa',
+        icon: path.join(root, 'app/icon.png'),
         webPreferences: {
           preload: path.join(root, 'preload.cjs'),
           nodeIntegration: false,

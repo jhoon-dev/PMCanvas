@@ -55,6 +55,7 @@ const fileExtensions = new Set([
   'xlsx',
   'log',
   'png',
+  'ico',
   'jpg',
   'backup',
   'env',

@@ -224,6 +224,7 @@ test('corrupt recovery is preserved before the first write and a failed backup c
 });
 test('custom protocol exposes only renderer assets, never native model, preload or secrets', () => {
   assert.equal(assetPath('pmcanvas://desktop/index.html'), 'index.html');
+  assert.equal(assetPath('pmcanvas://desktop/icon.png'), 'icon.png');
   assert.equal(assetPath('pmcanvas://desktop/shared/engine.js'), 'shared/engine.js');
   for (const url of [
     'pmcanvas://desktop/model/project.mjs',

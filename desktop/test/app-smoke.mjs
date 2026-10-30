@@ -77,6 +77,11 @@ try {
   await page.waitForLoadState('load');
   console.log('Native smoke: loaded');
   checkpoint('initial-content');
+  await page.locator('img.brand-symbol').evaluate(async (image) => {
+    await image.decode();
+    if (image.naturalWidth !== 256 || image.naturalHeight !== 256)
+      throw Error('The packaged desktop icon did not load.');
+  });
   await page.locator('#content [data-command="new"]').waitFor();
   await page.evaluate(() => localStorage.setItem('pmcanvas.language', 'ko'));
   await page.reload();

@@ -25,7 +25,11 @@ export function sourceBytes(root, file, commit = null) {
   return bytes;
 }
 export function preparePackage(root, output, pkg, provenance, commit = null) {
-  const files = [...pkg.build.files, ...(pkg.build.nsis?.include ? [pkg.build.nsis.include] : [])];
+  const files = new Set(
+    [...pkg.build.files, pkg.build.nsis?.include, pkg.build.win?.icon, pkg.build.mac?.icon].filter(
+      Boolean,
+    ),
+  );
   for (const file of files) {
     if (path.isAbsolute(file) || file.includes('..') || file.includes('\\'))
       throw Error('Package sources must use explicit relative paths.');

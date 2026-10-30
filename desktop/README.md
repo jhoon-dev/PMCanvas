@@ -153,7 +153,7 @@ $nsisCompiler = Get-ChildItem "$env:LOCALAPPDATA\electron-builder\Cache\nsis" -R
 
 저장소의 **Desktop verification and builds** 워크플로는 푸시·PR에서 Windows·macOS 파일·화면·날짜/언어·실제 앱과 패키징 후 실행을 자동 검사합니다. 정식 서명 빌드는 별도 수동 실행과 인증서 설정을 사용합니다. [서명·공증 설정](SIGNING.md)을 참고하세요.
 
-배포본은 앱 파일 허용 목록만 포함하며 웹 서버의 환경설정·키·백업·운영 데이터·계정 의존성을 포함하지 않습니다. MSIX의 Store 타일에는 PM 아이콘을 사용합니다.
+배포본은 앱 파일 허용 목록만 포함하며 웹 서버의 환경설정·키·백업·운영 데이터·계정 의존성을 포함하지 않습니다. Windows·Mac 앱, 앱 내부와 Store 타일은 기존 Windows 원자 모양 아이콘으로 통일합니다. 원본과 재생성 방법은 [아이콘 안내](build/ICONS.md)를 참고하세요.
 
 정식 배포는 선택한 플랫폼의 서명과 설치·업데이트·제거 검증을 통과해야 합니다. CI에서 `platform=mac`, `signed=true`, `publish=true`를 선택하면 Windows 인증서 없이 Mac 서명·공증·검증 후 GitHub Release에 자동 공개할 수 있습니다. 인증서와 공증 자격 증명은 [서명·공증 설정](SIGNING.md)에 따라 등록하세요. 기존 웹 버전의 배포 ZIP과 별도 제품으로 관리합니다.
 
