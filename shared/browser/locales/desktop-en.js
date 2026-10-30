@@ -238,6 +238,7 @@ export default {
   '저장하지 않으면 이번 변경사항이 사라집니다.': 'Unsaved changes will be discarded.',
   '저장하지 않음': 'Discard',
   '열기…': 'Open…',
+  열기: 'Open',
   '다른 이름으로 저장…': 'Save as…',
   '웹 버전용 JSON 내보내기…': 'Export web JSON…',
   'Excel 입력 양식 저장…': 'Save Excel template…',
