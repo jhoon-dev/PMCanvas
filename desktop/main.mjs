@@ -20,7 +20,8 @@ import { ExcelImportSession } from './excel-session.mjs';
 import { getLanguage, setLanguage, ui, supportedLanguages } from './app/shared/i18n.js';
 import { getBusinessTimeZone, setBusinessTimeZone } from './app/shared/business-clock.js';
 import { validateProject } from './app/shared/engine.js';
-import { UpdateService, StoreUpdateService } from './updates.mjs';
+import { UpdateService, StoreUpdateService, MacStoreUpdateService } from './updates.mjs';
+import { MacFileAccess } from './mac-file-access.mjs';
 import { DesktopPreferences } from './preferences.mjs';
 import { UpdateManager } from './update-manager.mjs';
 import { cleanupUpdateCache } from './update-cache.mjs';
@@ -46,7 +47,12 @@ else {
     closing = false;
   const excelJob = createExcelJobs((...args) => utilityProcess.fork(...args));
   let excelImport;
-  const updates = process.windowsStore ? new StoreUpdateService() : new UpdateService();
+  const updates = process.mas
+    ? new MacStoreUpdateService()
+    : process.windowsStore
+      ? new StoreUpdateService()
+      : new UpdateService();
+  let fileAccess;
   let updateManager;
   const updateHistoryMenu = (snapshot = document?.snapshot()) => {
     for (const [id, available] of [
@@ -118,8 +124,14 @@ else {
       file = result.filePath;
       if (!file.toLowerCase().endsWith('.pmcanvas')) file += '.pmcanvas';
     }
-    document.save(file);
-    return publish();
+    return fileAccess.write(
+      file,
+      () => {
+        document.save(file);
+        return publish();
+      },
+      true,
+    );
   }
   async function mayLeave() {
     if (editing) {
@@ -151,6 +163,15 @@ else {
     .whenReady()
     .then(async () => {
       const preferencesFile = path.join(app.getPath('userData'), 'preferences.json');
+      fileAccess = new MacFileAccess({
+        enabled: Boolean(process.mas),
+        app,
+        dialog,
+        window: () => window,
+        file: path.join(app.getPath('userData'), 'file-access.json'),
+        ui,
+      });
+      app.once('will-quit', () => fileAccess.dispose());
       const preferences = new DesktopPreferences(preferencesFile);
       setBusinessTimeZone(preferences.value.timeZone);
       const updateDirectory = path.join(app.getPath('userData'), 'updates');
@@ -163,7 +184,7 @@ else {
       await cleanupUpdateCache(updateDirectory).catch(() =>
         console.warn('Update cache cleanup deferred.'),
       );
-      if (!testing && process.env.PMCANVAS_DESKTOP_TEST !== '1')
+      if (!process.mas && !testing && process.env.PMCANVAS_DESKTOP_TEST !== '1')
         await cleanupUpdateCache(path.join(app.getPath('temp'), 'PMCanvas-updates')).catch(() =>
           console.warn('Legacy update cache cleanup deferred.'),
         );
@@ -340,7 +361,7 @@ else {
             throw Error(ui('변경사항과 입력창을 먼저 저장하거나 취소한 뒤 업데이트해 주세요.'));
         };
         requireSaved();
-        if (process.windowsStore) {
+        if (process.windowsStore || process.mas) {
           await shell.openExternal(updates.url);
           return true;
         }
@@ -411,13 +432,16 @@ else {
       });
       handle('open', async () => {
         if (!(await mayLeave()).proceed) return null;
-        const result = await dialog.showOpenDialog(window, {
-          title: ui('프로젝트 열기 / 웹 JSON 불러오기'),
-          properties: ['openFile'],
-          filters: [
-            { name: ui('PM Canvas 프로젝트 / JSON 백업'), extensions: ['pmcanvas', 'json'] },
-          ],
-        });
+        const result = await fileAccess.open(
+          {
+            title: ui('프로젝트 열기 / 웹 JSON 불러오기'),
+            properties: ['openFile'],
+            filters: [
+              { name: ui('PM Canvas 프로젝트 / JSON 백업'), extensions: ['pmcanvas', 'json'] },
+            ],
+          },
+          true,
+        );
         if (result.canceled || !result.filePaths.length) return null;
         document.open(result.filePaths[0]);
         return publish();
@@ -454,8 +478,10 @@ else {
                 dirty: document.dirty,
               })
             : report.csv;
-        atomicWrite(file, bytes);
-        return true;
+        return fileAccess.write(file, () => {
+          atomicWrite(file, bytes);
+          return true;
+        });
       });
       handle('openExcel', async (revision) => {
         if (editing) throw Error(ui('입력창의 변경사항을 먼저 적용하거나 취소해 주세요.'));
@@ -485,14 +511,16 @@ else {
         const file = result.filePath.toLowerCase().endsWith('.xlsx')
           ? result.filePath
           : result.filePath + '.xlsx';
-        atomicWrite(
-          file,
-          await excelJob('template', {
-            project: { name: document.project.name, members: document.project.members },
-            language: getLanguage(),
-          }),
-        );
-        return true;
+        return fileAccess.write(file, async () => {
+          atomicWrite(
+            file,
+            await excelJob('template', {
+              project: { name: document.project.name, members: document.project.members },
+              language: getLanguage(),
+            }),
+          );
+          return true;
+        });
       });
       handle('exportWeb', async () => {
         if (editing) throw Error(ui('입력창의 변경사항을 먼저 적용하거나 취소해 주세요.'));
@@ -506,14 +534,21 @@ else {
         const file = result.filePath.toLowerCase().endsWith('.json')
           ? result.filePath
           : result.filePath + '.json';
-        atomicWrite(file, serializeDocument(document.project));
-        return true;
+        return fileAccess.write(file, () => {
+          atomicWrite(file, serializeDocument(document.project));
+          return true;
+        });
       });
       await window.loadURL(APP_URL);
       try {
         const recovery = document.recovery();
         if (recovery?.dirty) {
           document.restore(recovery);
+          try {
+            fileAccess.restore(recovery.file);
+          } catch {
+            /* Save will request a new folder grant. */
+          }
           await dialog.showMessageBox(window, {
             type: 'info',
             message: ui(
@@ -522,6 +557,7 @@ else {
           });
         } else if (recovery?.file) {
           try {
+            fileAccess.restore(recovery.file);
             document.open(recovery.file);
           } catch {
             document.restore({ ...recovery, file: null, savedHash: null, dirty: true });

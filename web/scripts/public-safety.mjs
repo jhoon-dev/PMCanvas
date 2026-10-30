@@ -78,6 +78,9 @@ const fileExtensions = new Set([
   'msixbundle',
   'msixupload',
   'certsigningrequest',
+  'desktop',
+  'mas',
+  'provisionprofile',
 ]);
 
 export function exampleHost(host) {
@@ -155,7 +158,9 @@ export function publicPathProblem(file) {
   )
     return 'PRIVATE_CERTIFICATE';
   if (
-    /\.(?:key|pem|p8|p12|pfx|cer|certSigningRequest|mobileprovision|crt|dump|bak|zip)$/i.test(file)
+    /\.(?:key|pem|p8|p12|pfx|cer|certSigningRequest|mobileprovision|provisionprofile|crt|dump|bak|zip)$/i.test(
+      file,
+    )
   )
     return 'PRIVATE_OR_ARCHIVE_FILE';
   return null;

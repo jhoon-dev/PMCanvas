@@ -15,7 +15,8 @@ export function createUpdateUI({ api, root = document, ui, settings = {}, onOpen
   }
   function render(next = value) {
     value = next;
-    const store = value.channel === 'microsoft-store';
+    const macStore = value.channel === 'mac-app-store';
+    const store = value.channel === 'microsoft-store' || macStore;
     const waiting = ['checking', 'downloading'].includes(value.status);
     $('#currentVersion').textContent = ui('현재 버전: ') + (value.currentVersion || '—');
     $('#lastUpdateCheck').textContent = value.checkedAt
@@ -27,7 +28,9 @@ export function createUpdateUI({ api, root = document, ui, settings = {}, onOpen
     $('#checkUpdates').disabled = waiting || applying;
     $('#installUpdate').textContent = ui(
       store
-        ? 'Microsoft Store에서 업데이트'
+        ? macStore
+          ? 'Mac App Store에서 업데이트'
+          : 'Microsoft Store에서 업데이트'
         : value.status === 'downloaded'
           ? '설치 파일 열기'
           : '업데이트 다운로드',
@@ -37,7 +40,9 @@ export function createUpdateUI({ api, root = document, ui, settings = {}, onOpen
     $('#openRelease').hidden = store || value.error === 'verification';
     $('#updateInstructions').textContent = ui(
       store
-        ? 'Microsoft Store에서 업데이트합니다. 변경사항을 저장한 뒤 진행하세요.'
+        ? macStore
+          ? 'Mac App Store에서 업데이트합니다. 변경사항을 저장한 뒤 진행하세요.'
+          : 'Microsoft Store에서 업데이트합니다. 변경사항을 저장한 뒤 진행하세요.'
         : '프로젝트를 저장하고 앱을 종료한 뒤 설치를 마무리하세요. 프로젝트 파일과 PC 설정은 유지됩니다.',
     );
     let status;
@@ -56,7 +61,9 @@ export function createUpdateUI({ api, root = document, ui, settings = {}, onOpen
       );
     else if (value.status === 'unsupported')
       status = ui(
-        'Store에서 업데이트 상태를 확인하지 못했습니다. Microsoft Store에서 직접 확인할 수 있습니다.',
+        macStore
+          ? 'Mac App Store에서 업데이트를 확인할 수 있습니다.'
+          : 'Store에서 업데이트 상태를 확인하지 못했습니다. Microsoft Store에서 직접 확인할 수 있습니다.',
       );
     else if (value.available)
       status = value.version
@@ -127,7 +134,10 @@ export function createUpdateUI({ api, root = document, ui, settings = {}, onOpen
     applying = true;
     render();
     try {
-      if (value.channel === 'microsoft-store' || value.status === 'downloaded')
+      if (
+        ['microsoft-store', 'mac-app-store'].includes(value.channel) ||
+        value.status === 'downloaded'
+      )
         await api.applyUpdate();
       else render(await api.downloadUpdate());
     } catch (error) {

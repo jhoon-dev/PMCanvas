@@ -23,7 +23,11 @@ export class UpdateManager {
     });
     this.value = {
       status: 'idle',
-      channel: service.url.startsWith('ms-windows-store:') ? 'microsoft-store' : 'github',
+      channel: service.url.startsWith('ms-windows-store:')
+        ? 'microsoft-store'
+        : service.url.startsWith('macappstore:')
+          ? 'mac-app-store'
+          : 'github',
       currentVersion: version,
       url: service.url,
       available: false,
@@ -92,7 +96,7 @@ export class UpdateManager {
     if (
       !this.release?.available ||
       !this.release.downloadAvailable ||
-      this.value.channel === 'microsoft-store'
+      ['microsoft-store', 'mac-app-store'].includes(this.value.channel)
     )
       return Promise.reject(Error('No compatible update installer.'));
     this.set({ status: 'downloading', error: null, progress: { received: 0, total: 0 } });

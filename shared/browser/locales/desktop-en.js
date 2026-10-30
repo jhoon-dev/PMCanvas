@@ -1,5 +1,14 @@
 // Authored interface text only; project names, notes and imported values are never translated.
 export default {
+  'Mac App Store에서 업데이트': 'Update in Mac App Store',
+  'Mac App Store에서 업데이트합니다. 변경사항을 저장한 뒤 진행하세요.':
+    'Updates are installed through Mac App Store. Save your changes before continuing.',
+  'Mac App Store에서 업데이트를 확인할 수 있습니다.': 'Check for updates in Mac App Store.',
+  '파일을 안전하게 저장하려면 대상 폴더를 선택해 주세요.':
+    'Select the destination folder to save files safely.',
+  '저장할 파일이 있는 폴더를 선택해 주세요.': 'Select the folder containing the destination file.',
+  '파일 접근 권한을 복원하지 못했습니다. 파일을 다시 열어 주세요.':
+    'Could not restore file access. Open the file again.',
   '업데이트의 발행자를 확인하지 못했습니다. 설치를 중단했습니다. 나중에 다시 확인해 주세요.':
     'Could not verify the update publisher. Installation was stopped. Check again later.',
   '다운로드 또는 검증에 실패했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.':

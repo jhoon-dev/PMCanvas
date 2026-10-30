@@ -29,6 +29,7 @@ desktop/app/
 *.pem
 *.cer
 *.mobileprovision
+*.provisionprofile
 PMCanvas-MacSigning-*/
 *.certSigningRequest
 *.dpapi
