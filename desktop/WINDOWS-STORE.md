@@ -55,7 +55,9 @@ npm run dist:win
 
 현재 고정된 electron-builder의 안정적인 unpacked 패키징과 체크섬이 고정된 Windows SDK MakeAppx를 사용합니다. MSIX를 단순히 확장자만 바꿔 만들지 않습니다. SDK의 manifest/pack 검증, MSIX 추출 후 전체 payload 비교, ASAR 원본 커밋 검사, 네이티브 앱 실행을 통과해야 제출 목록을 만듭니다. 기존 출력 폴더는 덮어쓰지 않습니다.
 
-Store 패키지 버전은 앱의 세 필드 `[major, minor, patch]`를 네 필드 `[major+1, minor, patch, 0]`으로 변환합니다. 예를 들어 앱 `0.7.4`는 패키지 필드 `[1, 7, 4, 0]`입니다. 실제 manifest에는 점으로 연결해 기록합니다. Store의 첫 숫자 0 금지·네 번째 숫자 0 예약 규칙을 지키며 앱 정식 버전도 증가 순서를 유지합니다. [Microsoft 패키지 버전 규칙](https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/msix/app-package-requirements)
+Store 패키지 버전은 앱의 세 필드 `[major, minor, patch]`와 `PM_STORE_BUILD_NUMBER`를 네 필드 `[major+1, minor, patch+buildNumber, 0]`으로 변환합니다. 기본 빌드 번호는 0이므로 기존 매핑을 유지합니다. 제출 CI는 워크플로 실행 번호 `github.run_number`를 사용합니다. 예를 들어 앱 `0.8.3`의 빌드 70은 패키지 필드 `[1, 8, 73, 0]`입니다. 앱 표시 버전은 바뀌지 않습니다. Store의 첫 숫자 0 금지·네 번째 숫자 0 예약 규칙을 지키며 각 필드는 65535 이하여야 합니다. [Microsoft 패키지 버전 규칙](https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/msix/app-package-requirements)
+
+같은 앱 버전의 패키지를 교체할 때는 이전 실행을 재실행하지 말고 **새 Run workflow**를 시작해 더 큰 빌드 번호를 받으세요. 로컬 제출은 기존 업로드보다 큰 패키지 버전이 되도록 `PM_STORE_BUILD_NUMBER`를 지정합니다. 동일한 전체 패키지 이름에 다른 파일을 올리면 Partner Center가 거부합니다. 실제 패키지 버전과 빌드 번호는 `store-manifest.json`에도 기록합니다.
 
 ## 4. Partner Center 제출과 공개
 

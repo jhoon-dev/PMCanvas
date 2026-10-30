@@ -21,17 +21,24 @@ export function storeConfiguration(env = process.env) {
   return { identityName, publisher, publisherDisplayName, productId, displayName };
 }
 
-export function storeVersion(version) {
+export function storeVersion(version, buildNumber = 0) {
   if (!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(version))
     throw Error('A stable three-part application version is required.');
   const parts = version.split('.').map(Number);
-  // Store requires a nonzero major and reserves the fourth field. This mapping stays monotonic.
+  if (
+    !/^(0|[1-9]\d*)$/.test(String(buildNumber)) ||
+    !Number.isSafeInteger(Number(buildNumber)) ||
+    String(Number(buildNumber)) !== String(buildNumber)
+  )
+    throw Error('Store build number must be a nonnegative safe integer.');
+  // Store reserves the fourth field; use the third field for repeated application builds.
   parts[0]++;
+  parts[2] += Number(buildNumber);
   if (parts.some((value) => value > 65535)) throw Error('MSIX version component exceeds 65535.');
   return parts.join('.') + '.0';
 }
 
-export function storeManifest(config, version) {
+export function storeManifest(config, version, buildNumber = 0) {
   const xml = (text) =>
     String(text).replace(
       /[&<>"']/g,
@@ -44,7 +51,7 @@ export function storeManifest(config, version) {
  xmlns:virtualization="http://schemas.microsoft.com/appx/manifest/virtualization/windows10"
  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
  IgnorableNamespaces="uap desktop6 virtualization rescap">
- <Identity Name="${xml(config.identityName)}" Publisher="${xml(config.publisher)}" Version="${storeVersion(version)}" ProcessorArchitecture="x64"/>
+ <Identity Name="${xml(config.identityName)}" Publisher="${xml(config.publisher)}" Version="${storeVersion(version, buildNumber)}" ProcessorArchitecture="x64"/>
  <Properties>
   <DisplayName>${xml(config.displayName || 'PM Canvas Desktop')}</DisplayName>
   <PublisherDisplayName>${xml(config.publisherDisplayName)}</PublisherDisplayName>
