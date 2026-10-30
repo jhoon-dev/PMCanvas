@@ -20,11 +20,16 @@ test('release packaging rejects ignored generated tampering and verifies the exa
     dependencies: { fixture: '1.0.0' },
     build: {
       files: ['package.json', 'main.mjs', 'app/renderer.js', 'app/build-info.json'],
+      win: { icon: 'build/icon.ico' },
+      mac: { icon: 'build/icon-mac.png' },
     },
   };
   fs.writeFileSync(path.join(desktop, 'package.json'), JSON.stringify(pkg));
   fs.writeFileSync(path.join(desktop, 'main.mjs'), 'export const version=1;\n');
   fs.writeFileSync(path.join(desktop, 'ui/renderer.js'), 'console.log("canonical");\n');
+  fs.mkdirSync(path.join(desktop, 'build'));
+  fs.writeFileSync(path.join(desktop, 'build/icon.ico'), 'canonical Windows icon');
+  fs.writeFileSync(path.join(desktop, 'build/icon-mac.png'), 'canonical Mac icon');
   fs.writeFileSync(path.join(root, '.gitignore'), 'desktop/app/\npayload/\n*.asar\n');
   const git = (...args) =>
     execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
@@ -35,6 +40,16 @@ test('release packaging rejects ignored generated tampering and verifies the exa
   const provenance = { version: pkg.version, commit, development: false, dirty: false };
   const payload = path.join(root, 'payload');
   preparePackage(root, payload, pkg, provenance, commit);
+  assert.equal(
+    fs.readFileSync(path.join(payload, 'build/icon.ico'), 'utf8'),
+    'canonical Windows icon',
+  );
+  assert.equal(
+    fs.readFileSync(path.join(payload, 'build/icon-mac.png'), 'utf8'),
+    'canonical Mac icon',
+  );
+  // Build resources are staged for the builder, not shipped in the app archive.
+  fs.rmSync(path.join(payload, 'build'), { recursive: true });
   let archive = path.join(root, 'original.asar');
   await asar.createPackage(payload, archive);
   assert.equal(verifyPackage(archive, { root, commit }).commit, commit);
@@ -46,7 +61,13 @@ test('release packaging rejects ignored generated tampering and verifies the exa
   assert.throws(() => verifyPackage(archive, { root }), /Packaged source differs/);
   // A subsequent prepare cannot inherit the generated payload, even with a dirty working input.
   fs.writeFileSync(path.join(desktop, 'ui/renderer.js'), 'uncommitted working source');
+  fs.writeFileSync(path.join(desktop, 'build/icon.ico'), 'uncommitted Windows icon');
   preparePackage(root, payload, pkg, provenance, commit);
+  assert.equal(
+    fs.readFileSync(path.join(payload, 'build/icon.ico'), 'utf8'),
+    'canonical Windows icon',
+  );
+  fs.rmSync(path.join(payload, 'build'), { recursive: true });
   archive = path.join(root, 'isolated.asar');
   await asar.createPackage(payload, archive);
   verifyPackage(archive, { root, commit });

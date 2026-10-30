@@ -15,6 +15,10 @@ import {
 
 const inspect = (file, text) => inspectPublicFile(file, Buffer.from(text));
 
+test('icon documentation recognizes ICO filenames without treating them as private domains', () => {
+  assert.deepEqual(inspect('desktop/build/ICONS.md', '`build/icon.ico` is the Windows icon.'), []);
+});
+
 test('privacy documentation permits the official Microsoft policy host but rejects lookalike hosts', () => {
   assert.deepEqual(
     inspect('desktop/PRIVACY.md', 'https://privacy.microsoft.com/privacystatement'),

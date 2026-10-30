@@ -6,6 +6,7 @@ const allowed = new Set([
   'planning-ui.js',
   'bulk-ui.js',
   'desktop.css',
+  'icon.png',
   'shared/engine.js',
   'shared/business-clock.js',
   'shared/planning.js',

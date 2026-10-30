@@ -59,13 +59,11 @@ body {
   color: #243354;
 }
 .brand-symbol {
-  background: #416be8;
-  border-radius: 12px;
-  color: white;
-  display: grid;
-  place-items: center;
-  width: 36px;
+  display: block;
+  flex-shrink: 0;
+  width: 38px;
   height: 38px;
+  object-fit: contain;
 }
 .desktop-brand small {
   display: block;

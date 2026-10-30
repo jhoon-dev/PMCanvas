@@ -11,6 +11,7 @@
   },
   "scripts": {
     "prepare:app": "node scripts/prepare.mjs",
+    "prepare:icons": "electron scripts/prepare-icons.cjs",
     "signing:setup": "node scripts/setup-mac-signing.mjs",
     "start": "npm run prepare:app && electron .",
     "test": "node --test test/*.test.mjs",
@@ -70,6 +71,7 @@
       "app/planning-ui.js",
       "app/bulk-ui.js",
       "app/desktop.css",
+      "app/icon.png",
       "app/shared/engine.js",
       "app/shared/business-clock.js",
       "app/shared/planning.js",
@@ -94,6 +96,7 @@
     ],
     "asar": true,
     "win": {
+      "icon": "build/icon.ico",
       "target": "dir",
       "artifactName": "PMCanvas-Desktop-${version}-Windows-${arch}.${ext}"
     },
@@ -105,6 +108,7 @@
       "include": "build/installer.nsh"
     },
     "mac": {
+      "icon": "build/icon-mac.png",
       "appId": "app.jhoon-dev.pmcanvas",
       "target": [
         "dmg",
