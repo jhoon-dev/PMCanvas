@@ -108,6 +108,29 @@ function empty(title, body, action = 'task', label = ui('첫 업무 등록')) {
   );
 }
 
+function projectStart(p, taskAction = 'task') {
+  if (p._role === 'viewer')
+    return ui(
+      '<section class="project-start panel"><h2>등록된 업무가 없습니다</h2><p>업무가 등록되면 이곳에서 진행 현황을 확인할 수 있습니다.</p></section>',
+    );
+  return (
+    '<section class="project-start panel" aria-labelledby="projectStartTitle">' +
+    ui(
+      '<span class="eyebrow">GET STARTED</span><h2 id="projectStartTitle">첫 업무부터 시작해 보세요</h2><p>담당자를 정하고, 업무를 등록하고, 완료한 작업을 체크하세요.</p><ol class="start-steps"><li><span class="step-number" aria-hidden="true">1</span><div><strong>함께할 사람</strong><p>참여인력은 나중에 추가해도 됩니다.</p>',
+    ) +
+    (p.members.length
+      ? '<span class="badge green">' + ui('등록됨') + '</span>'
+      : btn(ui('＋ 참여인력 추가'), 'member', 'small')) +
+    ui(
+      '</div></li><li><span class="step-number" aria-hidden="true">2</span><div><strong>첫 번째 업무</strong><p>이름과 일정, 체크할 세부 작업을 입력하세요.</p>',
+    ) +
+    btn(ui('첫 업무 등록'), taskAction, 'primary small') +
+    ui(
+      '</div></li><li><span class="step-number" aria-hidden="true">3</span><div><strong>하루의 완료 기록</strong><p>완료한 작업을 체크하면 진척률이 계산됩니다.</p></div></li></ol></section>',
+    )
+  );
+}
+
 export {
   palette,
   icon,
@@ -123,6 +146,7 @@ export {
   pageHead,
   dateToolbar,
   empty,
+  projectStart,
 };
 
 const field = (label, name, value = '', type = 'text', extra = '') =>

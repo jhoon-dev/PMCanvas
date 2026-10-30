@@ -25,7 +25,12 @@ export function editorForm(
   type,
   p,
   id = '',
-  { currentDate = today(), uid = () => crypto.randomUUID() } = {},
+  {
+    currentDate = today(),
+    uid = () => crypto.randomUUID(),
+    extraFields = '',
+    expandDetails = false,
+  } = {},
 ) {
   let body = '',
     title = '';
@@ -74,9 +79,7 @@ export function editorForm(
         'text',
         ui('required maxlength="200" placeholder="예: 회원 관리 기능 개발"'),
       ) +
-      ui(
-        '<div class="form-grid"><label class="field">담당자<select name="owner"><option value="">미지정</option>',
-      ) +
+      ui('<label class="field">담당자<select name="owner"><option value="">미지정</option>') +
       p.members
         .map(
           (m) =>
@@ -91,15 +94,26 @@ export function editorForm(
             '</option>',
         )
         .join('') +
-      '</select></label>' +
-      field(ui('단계 / 분류'), 'phase', t.phase, 'text', 'maxlength="50" list="phases"') +
-      ui(
-        '</div><datalist id="phases"><option value="기획">기획</option><option value="설계">설계</option><option value="디자인">디자인</option><option value="개발">개발</option><option>QA</option><option value="오픈">오픈</option></datalist><div class="form-grid">',
-      ) +
+      '</select></label><div class="form-grid">' +
       field(ui('예상 시작일'), 'start', t.start, 'date', 'required') +
       field(ui('예상 종료일'), 'end', t.end, 'date', 'required') +
       ui(
-        '</div><label class="field">선행 업무 <span class="optional">선택</span><select name="predecessor"><option value="">없음</option>',
+        '</div><div class="items-title"><strong>세부 작업 체크리스트</strong><span>예상 공수 (h)</span></div><div id="itemEditors">',
+      ) +
+      t.items.map(itemEditor).join('') +
+      ui(
+        '</div><button type="button" id="addItem" class="button ghost add-item">＋ 세부 작업 추가</button><p class="form-hint">작업을 실제로 완료했을 때 체크합니다. 세부 작업의 예상 시간이 진척률의 가중치가 됩니다.</p>',
+      ) +
+      '<details class="task-details" ' +
+      (expandDetails || t.predecessor || t.memo ? 'open' : '') +
+      '>' +
+      ui(
+        '<summary>분류 · 선행 업무 · 메모<span>선택 설정</span></summary><div class="task-details-body">',
+      ) +
+      extraFields +
+      field(ui('단계 / 분류'), 'phase', t.phase, 'text', 'maxlength="50" list="phases"') +
+      ui(
+        '<datalist id="phases"><option value="기획">기획</option><option value="설계">설계</option><option value="디자인">디자인</option><option value="개발">개발</option><option>QA</option><option value="오픈">오픈</option></datalist><label class="field">선행 업무 <span class="optional">선택</span><select name="predecessor"><option value="">없음</option>',
       ) +
       p.tasks
         .filter((x) => x.id !== id)
@@ -115,16 +129,10 @@ export function editorForm(
         )
         .join('') +
       ui(
-        '</select><small>선행 업무가 끝난 다음 근무일에 시작합니다.</small></label><div class="items-title"><strong>세부 작업 체크리스트</strong><span>예상 공수 (h)</span></div><div id="itemEditors">',
-      ) +
-      t.items.map(itemEditor).join('') +
-      ui(
-        '</div><button type="button" id="addItem" class="button ghost add-item">＋ 세부 작업 추가</button><label class="field">메모 <span class="optional">선택</span><textarea name="memo" rows="2" maxlength="2000">',
+        '</select><small>선행 업무가 끝난 다음 근무일에 시작합니다.</small></label><label class="field">메모 <span class="optional">선택</span><textarea name="memo" rows="2" maxlength="2000">',
       ) +
       esc(t.memo || '') +
-      ui(
-        '</textarea></label><p class="form-hint">작업을 실제로 완료했을 때 체크합니다. 세부 작업의 예상 시간이 진척률의 가중치가 됩니다.</p>',
-      );
+      '</textarea></label></div></details>';
   }
 
   return { title, body };
@@ -238,7 +246,10 @@ export function createProjectEditor({
     $('#dialogTitle').textContent = form.title;
     $('#dialogBody').innerHTML = body;
     $('#editorDialog').showModal();
-    setTimeout(() => $('#dialogBody input')?.focus(), 50);
+    setTimeout(() => {
+      $('#dialogBody input')?.focus({ preventScroll: true });
+      $('#dialogBody').scrollTop = 0;
+    }, 50);
   }
   $('#editorForm').addEventListener('submit', async (e) => {
     e.preventDefault();

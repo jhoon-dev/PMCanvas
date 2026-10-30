@@ -6,13 +6,13 @@
     BlinkMacSystemFont,
     'Segoe UI',
     sans-serif;
-  color: #223447;
-  background: #f6f8fb;
+  color: #26384d;
+  background: #f5f7fb;
   font-synthesis: none;
   --navy: #142b41;
   --blue: #3774e9;
-  --muted: #8996a5;
-  --border: #e9edf2;
+  --muted: #62748a;
+  --border: #e2e8f0;
   --green: #249c82;
   --amber: #d38d36;
   --red: #cc6d65;
@@ -20,9 +20,20 @@
 * {
   box-sizing: border-box;
 }
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
 body {
   margin: 0;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.6;
 }
 button,
@@ -369,12 +380,15 @@ main {
   color: #253b51;
 }
 .page-head p {
-  font-size: 11px;
-  color: #8b98a6;
+  font-size: 13px;
+  color: var(--muted);
+  max-width: 70ch;
 }
 .head-actions {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
 }
 .button {
   display: inline-flex;
@@ -382,13 +396,13 @@ main {
   justify-content: center;
   gap: 7px;
   border: 1px solid #dde4ec;
-  border-radius: 6px;
+  border-radius: 8px;
   background: #fff;
   padding: 9px 15px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
-  min-height: 35px;
+  min-height: 38px;
 }
 .button:hover {
   border-color: #b4c4d8;
@@ -420,8 +434,8 @@ main {
 }
 .button.small {
   padding: 5px 9px;
-  min-height: 30px;
-  font-size: 10px;
+  min-height: 34px;
+  font-size: 12px;
 }
 .button.small .icon {
   width: 14px;
@@ -1576,11 +1590,30 @@ dialog::backdrop {
 #dialogBody {
   padding: 24px 28px 2px;
 }
+#editorDialog {
+  overflow: hidden;
+}
+#editorDialog > form {
+  display: flex;
+  flex-direction: column;
+  max-height: inherit;
+}
+#editorDialog .dialog-head,
+#editorDialog .dialog-actions,
+#editorDialog .dialog-foot,
+#editorDialog #formError {
+  flex-shrink: 0;
+}
+#editorDialog #dialogBody {
+  min-height: 0;
+  overflow-y: auto;
+}
 .field {
   display: block;
-  font-size: 11px;
+  min-width: 0;
+  font-size: 13px;
   font-weight: 500;
-  color: #6e8299;
+  color: #52677e;
   margin-bottom: 18px;
 }
 .field input,
@@ -1593,10 +1626,10 @@ dialog::backdrop {
   padding: 10px 11px;
   border-radius: 6px;
   margin-top: 7px;
-  font-size: 12px;
+  font-size: 14px;
   color: #425b77;
   outline: none;
-  min-height: 39px;
+  min-height: 42px;
 }
 .field input:focus,
 .field select:focus,
@@ -1609,16 +1642,20 @@ dialog::backdrop {
   resize: vertical;
   min-height: 68px;
 }
+.field input,
+.field select {
+  min-width: 0;
+}
 .field small {
   display: block;
-  color: #9cabbc;
-  font-size: 9px;
+  color: #64748b;
+  font-size: 11px;
   margin-top: 6px;
   font-weight: 400;
 }
 .form-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
 }
 .optional {
@@ -1651,8 +1688,8 @@ dialog::backdrop {
   display: none;
 }
 .form-hint {
-  font-size: 10px;
-  color: #98aabe;
+  font-size: 12px;
+  color: #64748b;
   margin-bottom: 20px;
   line-height: 1.8;
 }
@@ -1660,17 +1697,160 @@ dialog::backdrop {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 11px;
-  color: #748ba6;
+  font-size: 13px;
+  color: #52677e;
   margin-bottom: 9px;
 }
 .items-title strong {
   font-weight: 500;
 }
 .items-title span {
-  font-size: 9px;
+  font-size: 11px;
   margin-right: 35px;
-  color: #9cabbc;
+  color: #64748b;
+}
+.task-details {
+  margin: 8px 0 22px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #f8fafc;
+}
+.task-details > summary {
+  cursor: pointer;
+  padding: 14px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #405875;
+}
+.task-details > summary span {
+  margin-left: 10px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 400;
+}
+.task-details-body {
+  padding: 4px 16px 0;
+}
+.filter-result {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.menu-label {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  padding: 10px 12px 4px;
+}
+.menu-label:not(:first-child) {
+  border-top: 1px solid #edf0f5;
+  margin-top: 6px;
+}
+.action-menu {
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+}
+.action-menu > summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.action-menu > summary::-webkit-details-marker {
+  display: none;
+}
+.menu-popover {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  width: 270px;
+  max-width: calc(100vw - 40px);
+  max-height: 65vh;
+  overflow: auto;
+  padding: 8px;
+  background: #fff;
+  border: 1px solid #dce4ee;
+  border-radius: 10px;
+  box-shadow: 0 10px 34px #17314a20;
+  z-index: 50;
+}
+.menu-popover .button {
+  display: flex;
+  justify-content: flex-start;
+  text-align: left;
+  width: 100%;
+  border: 0;
+  box-shadow: none;
+  padding: 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  white-space: normal;
+}
+.menu-popover .button:hover {
+  background: #f1f5fb;
+}
+.project-start {
+  padding: 30px;
+  margin: 28px 0;
+}
+.project-start h2 {
+  font-size: 22px;
+  color: #253b51;
+  margin: 8px 0;
+}
+.project-start p {
+  color: var(--muted);
+  font-size: 13px;
+}
+.start-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+  padding: 24px 0 0;
+  margin: 24px 0 0;
+  border-top: 1px solid var(--border);
+  list-style: none;
+}
+.start-steps li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+}
+.step-number {
+  display: grid;
+  place-items: center;
+  flex: 0 0 30px;
+  height: 30px;
+  background: #edf3ff;
+  color: #3064cf;
+  border-radius: 9px;
+  font-weight: 650;
+}
+.start-steps strong {
+  display: block;
+  margin: 3px 0 6px;
+}
+.start-steps .button,
+.start-steps .badge {
+  margin-top: 14px;
+}
+@media (max-width: 1100px) {
+  .start-steps {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+}
+@media (max-width: 700px) {
+  .project-start {
+    padding: 22px;
+  }
+  .task-details > summary span {
+    display: block;
+    margin: 4px 0 0 16px;
+  }
 }
 .item-editor {
   display: flex;
@@ -1683,7 +1863,7 @@ dialog::backdrop {
   border: 1px solid #e0e7f0;
   border-radius: 5px;
   padding: 9px 10px;
-  font-size: 11px;
+  font-size: 13px;
   color: #4c6683;
   outline: none;
 }

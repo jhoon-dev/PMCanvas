@@ -9,6 +9,7 @@
     <script type="module" src="./renderer.js"></script>
   </head>
   <body>
+    <a class="skip-link" href="#content">본문으로 건너뛰기</a>
     <div class="desktop-shell">
       <aside class="desktop-sidebar">
         <div class="desktop-brand">
@@ -51,7 +52,7 @@
               title="프로젝트 변경 실행 취소 · Ctrl+Alt+Z"
               disabled
             >
-              실행 취소
+              <span aria-hidden="true">↶</span><span class="sr-only">실행 취소</span>
             </button>
             <button
               class="button small"
@@ -59,16 +60,19 @@
               title="프로젝트 변경 다시 실행 · Ctrl+Alt+Y"
               disabled
             >
-              다시 실행
+              <span aria-hidden="true">↷</span><span class="sr-only">다시 실행</span>
             </button>
             <details class="action-menu">
               <summary class="button small">파일 옵션</summary>
               <div class="menu-popover">
+                <span class="menu-label">프로젝트 파일</span>
                 <button class="button" data-command="saveAs">다른 이름으로 저장</button>
                 <button class="button" data-command="exportWeb">웹 JSON 내보내기</button>
+                <span class="menu-label">Excel</span>
                 <button class="button" data-command="exportExcel">Excel 내보내기</button>
                 <button class="button" data-command="importExcel">Excel 가져오기</button>
                 <button class="button" data-command="exportTemplate">Excel 입력 양식 저장</button>
+                <span class="menu-label">환경설정</span>
                 <button class="button" data-command="about">앱 정보</button>
                 <button class="button" data-command="appSettings">앱 설정</button>
                 <button class="button" data-command="timeZone">업무 기준 시간대</button>

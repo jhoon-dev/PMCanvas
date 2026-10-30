@@ -715,3 +715,69 @@ test('500개 업무 입력·검색·간트 렌더링', async ({ page }) => {
   await expect(page.locator('.wbs-state')).toHaveText('저장됨');
   await page.screenshot({ path: test.info().outputPath('large-project.png') });
 });
+
+test('간결한 시작 안내·업무 상세·필터 초기화는 기존 입력과 완료 기록을 보존', async ({ page }) => {
+  const session = await login(page);
+  const p = await createProject(page, session, { name: '쉬운 업무 입력', tasks: [], members: [] });
+  await selectProject(page, p, 'overview');
+  await expect(page.locator('.project-start')).toContainText('첫 업무부터 시작해 보세요');
+  await expect(page.locator('.metric-grid')).toHaveCount(0);
+  await page.getByRole('button', { name: '첫 업무 등록', exact: true }).click();
+  await page.locator('[data-cell=name]').fill('사용성 점검');
+  await page.locator('[data-cell=name]').press('Tab');
+  await page.locator('[data-wbs-action=save]').click();
+  await expect(page.locator('.wbs-state')).toHaveText('저장됨');
+  await page.locator('[data-wbs-detail]').click();
+  await expect(page.locator('.task-details')).not.toHaveAttribute('open');
+  await expect(page.locator('[name=name]')).toBeFocused();
+  await expect(page.locator('[name=predecessor]')).toBeHidden();
+  await page.screenshot({ path: test.info().outputPath('simple-task.png'), fullPage: true });
+  await page.locator('.task-details summary').click();
+  await page.locator('[name=phase]').fill('사용성');
+  await page.locator('[name=memo]').fill('보존할 메모 <내용>');
+  await page.locator('.task-details summary').click();
+  await page.locator('#submitButton').click();
+  await expect(page.locator('#editorDialog')).not.toBeVisible();
+  await page.locator('[data-wbs-detail]').click();
+  await expect(page.locator('.task-details')).toHaveAttribute('open');
+  await expect(page.locator('[name=memo]')).toHaveValue('보존할 메모 <내용>');
+  await expect(page.locator('[name=phase]')).toHaveValue('사용성');
+  expect(await page.locator('#dialogBody').evaluate((el) => el.scrollTop)).toBe(0);
+  const saveButton = await page.locator('#submitButton').boundingBox();
+  expect(saveButton.y + saveButton.height).toBeLessThanOrEqual(page.viewportSize().height);
+  await page.setViewportSize({ width: 390, height: 844 });
+  const mobileSave = await page.locator('#submitButton').boundingBox();
+  expect(mobileSave.y + mobileSave.height).toBeLessThanOrEqual(844);
+  expect(await page.locator('#dialogBody').evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(
+    true,
+  );
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({
+    path: test.info().outputPath('task-details-mobile.png'),
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.screenshot({ path: test.info().outputPath('task-details.png'), fullPage: true });
+  await page.locator('#closeDialog').click();
+  await page.locator('[data-cell=name]').fill('저장 전 입력');
+  await page.locator('[data-cell=name]').press('Tab');
+  await page.locator('#wbsQuery').fill('찾을 수 없는 업무');
+  await expect(page.locator('[data-cell=name]')).toHaveCount(0);
+  await page.getByRole('button', { name: '필터 초기화', exact: true }).click();
+  await expect(page.locator('#wbsQuery')).toBeFocused();
+  await expect(page.locator('[data-cell=name]')).toHaveValue('저장 전 입력');
+  await expect(page.locator('.wbs-state')).toHaveText('저장하지 않은 변경');
+  await page.locator('[data-wbs-action=save]').click();
+  await expect(page.locator('.wbs-state')).toHaveText('저장됨');
+  await page.locator('[data-view=daily]').click();
+  await page.locator('[data-daily-mode=project]').click();
+  await page.locator('[data-check-item]').check();
+  await expect(page.locator('.check-task-progress strong')).toHaveText('100%');
+  await page.locator('[data-view=overview]').click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({
+    path: test.info().outputPath('simple-overview-mobile.png'),
+    fullPage: true,
+  });
+});

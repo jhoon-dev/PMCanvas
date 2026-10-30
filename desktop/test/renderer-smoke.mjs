@@ -73,11 +73,25 @@ try {
   await page.getByRole('button', { name: '새 프로젝트 만들기', exact: true }).click();
   await page.locator('[name="name"]').fill('PC 출시 프로젝트');
   await page.getByRole('button', { name: '적용', exact: true }).click();
+  await page.getByRole('button', { name: '프로젝트 현황', exact: true }).click();
+  await page.getByText('첫 업무부터 시작해 보세요', { exact: true }).waitFor();
+  assert.equal(await page.locator('.desktop-summary-grid').count(), 0);
+  mkdirSync(path.resolve('test-results'), { recursive: true });
+  await page.screenshot({
+    path: path.resolve('test-results/ux-desktop-start.png'),
+    fullPage: true,
+  });
   await page.getByRole('button', { name: '＋ 참여인력 추가', exact: true }).first().click();
   await page.locator('[name="name"]').fill('김담당');
   await page.getByRole('button', { name: '적용', exact: true }).click();
   await page.getByRole('button', { name: '업무 · 일정', exact: true }).click();
   await page.getByRole('button', { name: '＋ 업무 추가', exact: true }).click();
+  assert.equal(await page.locator('.task-details').getAttribute('open'), null);
+  assert.equal(
+    await page.locator('[name="name"]').evaluate((el) => el === document.activeElement),
+    true,
+  );
+  assert.equal(await page.locator('[name="predecessor"]').isVisible(), false);
   await page.locator('[name="name"]').fill('데스크톱 개발 <완료>');
   await page.locator('[name="start"]').fill('2026-10-19');
   await page.locator('[name="end"]').fill('2026-10-30');
@@ -86,9 +100,17 @@ try {
   await page.getByRole('button', { name: '＋ 세부 작업 추가', exact: true }).click();
   await page.locator('[name="itemTitle"]').nth(1).fill('패키징');
   await page.locator('[name="itemHours"]').nth(1).fill('18');
+  await page.screenshot({ path: path.resolve('test-results/ux-desktop-task.png'), fullPage: true });
   await page.getByRole('button', { name: '적용', exact: true }).click();
   await page.getByRole('button', { name: '완료 체크', exact: true }).click();
   await page.locator('#reportDate').fill('2026-10-21');
+  assert.equal(
+    await page
+      .locator('[data-check]')
+      .first()
+      .evaluate((el) => getComputedStyle(el).opacity),
+    '1',
+  );
   await page.locator('[data-check]').first().check();
   await page.getByRole('button', { name: '프로젝트 현황', exact: true }).click();
   await page.locator('#reportDate').fill('2026-10-21');
@@ -106,7 +128,10 @@ try {
   await page.getByRole('button', { name: '업무 · 일정', exact: true }).click();
   await page.locator('#search').fill('없는 업무');
   await page.getByText('표시할 업무가 없습니다.', { exact: true }).waitFor();
-  await page.locator('#search').fill('');
+  const beforeReset = document.revision;
+  await page.getByRole('button', { name: '필터 초기화', exact: true }).click();
+  assert.equal(document.revision, beforeReset);
+  assert.equal(await page.locator('#search').inputValue(), '');
   await page.getByRole('button', { name: '데스크톱 개발 <완료>', exact: true }).click();
   await page.locator('[name="end"]').fill('2026-10-18');
   await page.getByRole('button', { name: '적용', exact: true }).click();
@@ -143,6 +168,7 @@ try {
   await page.getByRole('button', { name: 'WBS · 기준 계획', exact: true }).click();
   await page.getByRole('button', { name: '＋ 업무 추가', exact: true }).click();
   await page.locator('[name="name"]').fill('하위 업무');
+  await page.locator('.task-details summary').click();
   await page.locator('[name="parentId"]').selectOption(document.project.tasks[0].id);
   await page.locator('[name="start"]').fill('2026-10-19');
   await page.locator('[name="end"]').fill('2026-10-30');
@@ -292,6 +318,10 @@ try {
   const savedBytes = readFileSync(path.join(temporary, 'Project.pmcanvas'));
   await page.getByRole('button', { name: '완료 체크', exact: true }).click();
   await page.locator('[data-check]').first().uncheck();
+  await page.screenshot({
+    path: path.resolve('test-results/ux-desktop-completion.png'),
+    fullPage: true,
+  });
   assert.equal(document.project.tasks[0].items[0].doneDate, null);
   await page.getByRole('button', { name: '실행 취소', exact: true }).click();
   await page.getByText('파일에 저장됨', { exact: true }).waitFor();
@@ -395,6 +425,14 @@ try {
   });
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.getByRole('button', { name: '프로젝트 현황', exact: true }).click();
+  await page.locator('.action-menu > summary').click();
+  await page.locator('[data-command="saveAs"]').focus();
+  await page.keyboard.press('Escape');
+  assert.equal(await page.locator('.action-menu').getAttribute('open'), null);
+  assert.equal(
+    await page.locator('.action-menu > summary').evaluate((el) => el === document.activeElement),
+    true,
+  );
   await page.screenshot({ path: screenshot, fullPage: true });
   assert.deepEqual(errors, []);
   console.log(

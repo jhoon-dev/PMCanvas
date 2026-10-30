@@ -25,7 +25,18 @@ import {
 } from './planning-ui.js';
 import { setParent, captureBaseline } from './shared/planning.js';
 import { bulkProposal, bulkPreviewHtml } from './bulk-ui.js';
-import { pct, num, person, meter, badge, pageHead, btn, empty } from './shared/view-ui.js';
+import {
+  pct,
+  num,
+  person,
+  meter,
+  badge,
+  pageHead,
+  btn,
+  empty,
+  icon,
+  projectStart,
+} from './shared/view-ui.js';
 
 const api = window.desktop;
 const appSettings = (await api.settings?.()) || {};
@@ -142,7 +153,9 @@ function filtered(p) {
 }
 function controls(p, search = true) {
   return (
-    '<div class="desktop-controls">' +
+    '<div class="desktop-controls' +
+    (search ? '' : ' date-only') +
+    '">' +
     (search
       ? ui(
           '<input type="search" id="search" aria-label="업무 검색" placeholder="업무 검색" value="',
@@ -168,7 +181,19 @@ function controls(p, search = true) {
     reportDate +
     '" max="' +
     today() +
-    '"></label></div>'
+    '"></label>' +
+    (search
+      ? '<span class="filter-result">' +
+        ui('검색 결과 ') +
+        filtered(p).length +
+        ui(' / 전체 ') +
+        p.tasks.length +
+        '</span>' +
+        (query || owner
+          ? ui('<button class="button small ghost" data-reset-filters>필터 초기화</button>')
+          : '')
+      : '') +
+    '</div>'
   );
 }
 function taskTable(p, s, tasks = p.tasks) {
@@ -246,13 +271,15 @@ function gantt(p, tasks) {
   );
 }
 function overview(p, s) {
+  const heading = pageHead(
+    'PROJECT OVERVIEW',
+    p.name,
+    p.description || ui('오늘의 기록으로 프로젝트의 다음 일정을 확인하세요.'),
+    btn(ui('프로젝트 설정'), 'settings') + btn(ui('＋ 업무 추가'), 'task', 'primary'),
+  );
+  if (!p.tasks.length) return heading + projectStart(p);
   return (
-    pageHead(
-      'PROJECT OVERVIEW',
-      p.name,
-      p.description || ui('오늘의 기록으로 프로젝트의 다음 일정을 확인하세요.'),
-      btn(ui('프로젝트 설정'), 'settings') + btn(ui('＋ 업무 추가'), 'task', 'primary'),
-    ) +
+    heading +
     controls(p, false) +
     '<section class="desktop-summary-grid">' +
     ui('<article class="desktop-metric"><small>실제 진척률</small><strong>') +
@@ -373,12 +400,16 @@ function daily(p) {
               '</div></article>',
           )
           .join('')
-      : empty(
-          ui('체크할 업무가 없습니다'),
-          ui('업무와 세부 작업을 먼저 추가해 주세요.'),
-          'task',
-          ui('업무 추가'),
-        ))
+      : query || owner
+        ? ui(
+            '<div class="empty-state"><h3>검색 결과가 없습니다</h3><p>검색어나 담당자 필터를 바꿔 보세요.</p><button class="button" data-reset-filters>필터 초기화</button></div>',
+          )
+        : empty(
+            ui('체크할 업무가 없습니다'),
+            ui('업무와 세부 작업을 먼저 추가해 주세요.'),
+            'task',
+            ui('업무 추가'),
+          ))
   );
 }
 function reportsView(p, s) {
@@ -585,13 +616,17 @@ async function openEditor(type, id = '') {
                 : ui('현재 업무 이름·계층·일정·공수를 보관합니다.')) +
               ui(' 프로젝트 파일에 보관하려면 적용 후 저장하세요.</p>'),
           }
-        : editorForm(type, state.project, id);
+        : editorForm(type, state.project, id, {
+            extraFields: type === 'task' ? parentField(state.project, id) : '',
+            expandDetails: Boolean(state.project.tasks.find((task) => task.id === id)?.parentId),
+          });
   $('#dialogTitle').textContent = form.title;
-  $('#dialogBody').innerHTML = (type === 'task' ? parentField(state.project, id) : '') + form.body;
+  $('#dialogBody').innerHTML = form.body;
   $('#formError').textContent = '';
   $('#deleteButton').hidden = !id || !['task', 'member'].includes(type);
   $('#editorDialog').showModal();
-  $('#dialogBody input')?.focus();
+  $('#dialogBody input')?.focus({ preventScroll: true });
+  $('#dialogBody').scrollTop = 0;
 }
 async function closeEditor() {
   if (busy) return;
@@ -728,8 +763,19 @@ async function command(name) {
   if (name === 'new' && result) await openEditor('settings');
 }
 document.addEventListener('click', (event) => {
+  document.querySelectorAll('.action-menu[open]').forEach((menu) => {
+    if (!menu.contains(event.target)) menu.open = false;
+  });
   const target = event.target.closest('button, [data-command]');
   if (!target || busy) return;
+  if (target.hasAttribute('data-reset-filters')) {
+    query = '';
+    owner = '';
+    selected.clear();
+    render();
+    $('#search')?.focus();
+    return;
+  }
   if (target.dataset.bulk) {
     void openBulk(target.dataset.bulk);
     return;
@@ -786,6 +832,16 @@ document.addEventListener('click', (event) => {
   }
   if (['member', 'task', 'settings', 'baseline', 'schedule'].includes(target.dataset.action))
     void openEditor(target.dataset.action);
+});
+document.addEventListener('keydown', (event) => {
+  if (event.key !== 'Escape') return;
+  document.querySelectorAll('.action-menu[open]').forEach((menu) => {
+    if (menu.contains(document.activeElement)) {
+      menu.open = false;
+      menu.querySelector('summary')?.focus();
+      event.preventDefault();
+    }
+  });
 });
 document.addEventListener('input', (event) => {
   if (event.target.id !== 'search') return;
@@ -1022,6 +1078,17 @@ $('#timeZoneForm').onsubmit = async (event) => {
 };
 document.documentElement.lang = getLanguage();
 localizeStatic(document.documentElement);
+const navigationIcons = {
+  overview: 'dashboard',
+  tasks: 'layers',
+  planning: 'calendar',
+  daily: 'check',
+  people: 'users',
+  reports: 'download',
+};
+document.querySelectorAll('.desktop-sidebar [data-view]').forEach((button) => {
+  button.insertAdjacentHTML('afterbegin', icon(navigationIcons[button.dataset.view]));
+});
 $('#languageSelect').value = getLanguage();
 $('#languageSelect').onchange = async (event) => {
   const next = event.target.value;

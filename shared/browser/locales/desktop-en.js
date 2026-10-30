@@ -1,5 +1,27 @@
 // Authored interface text only; project names, notes and imported values are never translated.
 export default {
+  '분류 · 선행 업무 · 메모': 'Category · dependency · notes',
+  '선택 설정': 'Optional',
+  등록됨: 'Added',
+  환경설정: 'Preferences',
+  '프로젝트 파일': 'Project file',
+  '검색 결과 ': 'Matches ',
+  ' / 전체 ': ' / total ',
+  '필터 초기화': 'Clear filters',
+  '검색 결과가 없습니다': 'No matching tasks',
+  '검색어나 담당자 필터를 바꿔 보세요.': 'Try another search or assignee filter.',
+  '첫 업무부터 시작해 보세요': 'Start with your first task',
+  '담당자를 정하고, 업무를 등록하고, 완료한 작업을 체크하세요.':
+    'Choose an assignee, add a task, and check off completed work.',
+  '함께할 사람': 'Your team',
+  '참여인력은 나중에 추가해도 됩니다.': 'You can add team members later.',
+  '첫 번째 업무': 'Your first task',
+  '이름과 일정, 체크할 세부 작업을 입력하세요.': 'Add a name, dates, and a checklist.',
+  '하루의 완료 기록': 'Daily progress',
+  '완료한 작업을 체크하면 진척률이 계산됩니다.': 'Check off completed items to track progress.',
+  '등록된 업무가 없습니다': 'No tasks yet',
+  '업무가 등록되면 이곳에서 진행 현황을 확인할 수 있습니다.':
+    'Progress will appear here once tasks are added.',
   'Microsoft Store 열기': 'Open Microsoft Store',
   '이 앱은 Microsoft Store에서 설치했습니다. 업데이트는 Store에서 관리합니다.':
     'This app was installed from Microsoft Store. Updates are managed by the Store.',

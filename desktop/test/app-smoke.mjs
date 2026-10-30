@@ -189,6 +189,7 @@ try {
   await page.getByRole('button', { name: 'WBS · 기준 계획', exact: true }).click();
   await page.getByRole('button', { name: '＋ 업무 추가', exact: true }).click();
   await page.locator('[name="name"]').fill('Native child');
+  await page.locator('.task-details summary').click();
   await page.locator('[name="parentId"]').selectOption(imported.project.tasks[0].id);
   await page.locator('[name="itemTitle"]').fill('Native WBS work');
   await page.getByRole('button', { name: '적용', exact: true }).click();
