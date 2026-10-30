@@ -10,6 +10,7 @@ import { ExcelImportSession, readExcelFile } from '../excel-session.mjs';
 import { createExcelJobs } from '../excel-jobs.mjs';
 import { performExcelJob } from '../excel-worker.mjs';
 import { suggestMapping } from '../app/shared/excel-import-model.js';
+import { buildReport } from '../reports.mjs';
 
 const project = () => ({
   id: 'desktop-project',
@@ -80,6 +81,43 @@ test('Excel 출력은 날짜·진척률·간트·안전한 문자열을 포함�
   });
   await book.xlsx.load(completion);
   assert.equal(book.worksheets[0].getCell('B2').value.toISOString().slice(0, 10), '2026-10-26');
+});
+
+test('네이티브 Excel과 CSV는 배열 위치와 무관하게 같은 계층 WBS 번호를 출력', async () => {
+  const p = project(),
+    parent = p.tasks[0];
+  p.tasks = [
+    {
+      ...structuredClone(parent),
+      id: 'child',
+      parentId: parent.id,
+      items: [{ id: 'child-item', title: '하위 작업', hours: 4, doneDate: null }],
+    },
+    parent,
+  ];
+  const book = new ExcelJS.Workbook();
+  await book.xlsx.load(
+    await performExcelJob('export', {
+      project: p,
+      options: { kind: 'wbs', at: '2026-10-26' },
+    }),
+  );
+  for (const name of ['WBS', '세부 작업'])
+    assert.deepEqual(
+      book
+        .getWorksheet(name)
+        .getRows(2, 2)
+        .map((row) => row.getCell(1).value),
+      ['1.1', '1'],
+    );
+  const csv = buildReport(p, { kind: 'wbs', at: '2026-10-26' }).csv;
+  assert.deepEqual(
+    csv
+      .split('\r\n')
+      .slice(1, 3)
+      .map((line) => line.split(',')[2]),
+    ['"1.1"', '"1"'],
+  );
 });
 
 test('네이티브 Excel 가져오기는 미리보기·확인 후에만 적용하고 원본 파일·완료 기록 보존', async (t) => {

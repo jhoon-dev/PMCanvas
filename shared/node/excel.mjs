@@ -225,7 +225,7 @@ export async function buildWorkbook(
   for (const t of tasks)
     for (const item of t.items) {
       const r = row(details, [
-        project.tasks.indexOf(t) + 1,
+        tree.get(t.id).number,
         t.name,
         item.title,
         item.hours,

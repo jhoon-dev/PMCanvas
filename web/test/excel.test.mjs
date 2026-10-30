@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import ExcelJS from 'exceljs';
 import { projectWorkbook } from '../server/excel.mjs';
+import { wbsRows } from '../public/reports.js';
+import { forecast } from '../public/engine.js';
 const task = (id, start = '2026-10-19', end = '2026-10-23') => ({
   id,
   name: '=HYPERLINK("test")',
@@ -48,4 +50,29 @@ test('장기 간트는 120칸 이내로 축약하고 모든 업무의 끝을 포
   const s = book.getWorksheet('간트');
   assert.ok(s.columnCount <= 122);
   assert.equal(s.getCell(2, s.columnCount).fill.fgColor.argb, 'FF238B68');
+});
+
+test('계층 WBS 번호는 필터링된 Excel·세부 작업·CSV에서도 전체 프로젝트 기준으로 일치', async () => {
+  const p = {
+    ...project,
+    tasks: [task('root'), { ...task('child'), parentId: 'root' }, task('second')],
+  };
+  // Array position and hierarchy order need not match after importing or reparenting.
+  p.tasks = [p.tasks[1], p.tasks[0], p.tasks[2]];
+  for (const language of ['ko', 'en']) {
+    const book = new ExcelJS.Workbook();
+    await book.xlsx.load(await projectWorkbook(p, '2026-10-23', ['child', 'second'], { language }));
+    const numbers = (name) =>
+      book
+        .getWorksheet(name)
+        .getRows(2, 2)
+        .map((row) => row.getCell(1).value);
+    assert.deepEqual(numbers('WBS'), ['1.1', '2']);
+    assert.deepEqual(numbers(language === 'en' ? 'Checklist item' : '세부 작업'), ['1.1', '2']);
+  }
+  const rows = wbsRows(p, '2026-10-23', forecast(p, '2026-10-23'), [p.tasks[0], p.tasks[2]]);
+  assert.deepEqual(
+    rows.slice(1).map((row) => row[2]),
+    ['1.1', '2'],
+  );
 });

@@ -20,20 +20,34 @@ export class DraftStore {
     const now = Date.now();
     for (const storage of [globalThis.localStorage, globalThis.sessionStorage]) {
       if (!storage) continue;
-      for (const key of Object.keys(storage).filter((k) => k.startsWith(prefix)))
+      for (const key of Object.keys(storage).filter((k) => k.startsWith(prefix))) {
+        let value;
         try {
-          const value = JSON.parse(storage.getItem(key));
-          if (value.version === 1) {
-            value.version = 2;
-            value.expiresAt = Date.parse(value.savedAt) + ttl;
-            if (value.expiresAt > now)
-              globalThis.sessionStorage?.setItem(key, JSON.stringify(value));
-            storage.removeItem(key);
-          } else if (!Number.isFinite(value.expiresAt) || value.expiresAt <= now)
-            storage.removeItem(key);
+          value = JSON.parse(storage.getItem(key));
         } catch {
           storage.removeItem(key);
+          continue;
         }
+        if (value?.version === 1) {
+          value.version = 2;
+          value.expiresAt = Date.parse(value.savedAt) + ttl;
+          if (!(value.expiresAt > now)) {
+            storage.removeItem(key);
+            continue;
+          }
+          const target = globalThis.sessionStorage;
+          if (!target) continue;
+          try {
+            target.setItem(key, JSON.stringify(value));
+          } catch {
+            // A failed migration is retryable; it does not make the original invalid.
+            continue;
+          }
+          if (target !== storage) storage.removeItem(key);
+        } else if (!Number.isFinite(value?.expiresAt) || value.expiresAt <= now) {
+          storage.removeItem(key);
+        }
+      }
     }
   }
   static clearUser(id) {
@@ -44,13 +58,41 @@ export class DraftStore {
   }
   static setPersistent(id, on) {
     const old = new DraftStore(id),
-      keys = Object.keys(old.storage).filter((k) => k.startsWith(prefix + id + ':'));
-    globalThis.localStorage.setItem('pmcanvas:draft-persist:' + id, on ? 'yes' : 'no');
-    const target = on ? globalThis.localStorage : globalThis.sessionStorage;
-    for (const key of keys) {
-      if (target !== old.storage) {
-        target.setItem(key, old.storage.getItem(key));
+      target = on ? globalThis.localStorage : globalThis.sessionStorage,
+      entries =
+        target === old.storage
+          ? []
+          : Object.keys(old.storage)
+              .filter((key) => key.startsWith(prefix + id + ':'))
+              .map((key) => ({
+                key,
+                value: old.storage.getItem(key),
+                previous: target.getItem(key),
+              })),
+      copied = [];
+    try {
+      for (const entry of entries) {
+        target.setItem(entry.key, entry.value);
+        copied.push(entry);
+      }
+      // Only switch readers after every draft has a complete copy in the target.
+      globalThis.localStorage.setItem('pmcanvas:draft-persist:' + id, on ? 'yes' : 'no');
+    } catch (error) {
+      for (const { key, previous } of copied.reverse()) {
+        try {
+          if (previous === null) target.removeItem(key);
+          else target.setItem(key, previous);
+        } catch {
+          // The unchanged preference still selects the untouched source copies.
+        }
+      }
+      throw error;
+    }
+    for (const { key } of entries) {
+      try {
         old.storage.removeItem(key);
+      } catch {
+        // The switch succeeded; leftover source copies retain their original expiry.
       }
     }
   }
@@ -61,12 +103,13 @@ export class DraftStore {
     this.storage.setItem(
       this.key(base.id),
       JSON.stringify({
-        version: 2,
+        version: 3,
         projectId: base.id,
         userId: this.userId,
         revision: draft._revision,
         savedAt: new Date(this.now()).toISOString(),
         expiresAt: this.now() + ttl,
+        base,
         draft,
         pending: [...pending.values()],
       }),
@@ -81,10 +124,14 @@ export class DraftStore {
       return null;
     }
     if (
-      value.version !== 2 ||
+      ![2, 3].includes(value.version) ||
       value.userId !== this.userId ||
       value.projectId !== id ||
       value.draft?.id !== id ||
+      (value.version === 3 &&
+        (value.base?.id !== id ||
+          value.base._revision !== value.revision ||
+          value.draft._revision !== value.revision)) ||
       !Array.isArray(value.pending) ||
       value.pending.length > 4000
     )

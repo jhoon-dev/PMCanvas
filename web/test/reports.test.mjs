@@ -55,7 +55,7 @@ test('WBS 출력은 보고일의 가중 진척과 전체 프로젝트에서 계�
     f = forecast(p, '2026-10-21'),
     rows = wbsRows(p, '2026-10-21', f, [p.tasks[1]]);
   assert.equal(rows.length, 2);
-  assert.equal(rows[1][2], '02');
+  assert.equal(rows[1][2], '2');
   assert.equal(rows[1][12], 50);
   assert.equal(rows[1][14], f.tasks.t2.end);
   assert.equal(rows[1][17], '요구사항');

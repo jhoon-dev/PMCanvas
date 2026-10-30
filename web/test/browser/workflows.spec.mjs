@@ -658,6 +658,121 @@ test('동시 수정은 비교·선택 후 저장하며 서버의 완료 기록�
   await other.close();
 });
 
+test('새로고침으로 복구한 초안은 원래 버전과 비교해 충돌·서버 메모·완료 기록을 보존', async ({
+  page,
+}) => {
+  const session = await login(page),
+    p = await createProject(page, session, { name: '복구 병합 검증' });
+  await selectProject(page, p);
+  await page.locator('[data-cell=name]').fill('복구한 내 이름');
+  await page.locator('[data-cell=name]').press('Tab');
+  const server = structuredClone(p);
+  server.tasks[0].name = '다른 기기에서 바꾼 이름';
+  server.tasks[0].memo = '서버에서 보존할 메모';
+  server.tasks[0].items[0].doneDate = today();
+  expect(
+    (
+      await page.request.put(api + 'projects/' + p.id, {
+        headers: { Origin: origin, 'X-CSRF-Token': session.csrf },
+        data: { project: server, revision: p._revision },
+      })
+    ).ok(),
+  ).toBe(true);
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.reload();
+  await expect(page.locator('#authGate')).toBeHidden();
+  if (await page.locator('#projectSelect').isVisible())
+    await page.locator('#projectSelect').selectOption(p.id);
+  else await page.locator('#projectList [data-project="' + p.id + '"]').click();
+  await expect(page.locator('.wbs-recovery')).toBeVisible();
+  await page.locator('[data-wbs-action=recover]').click();
+  await expect(page.locator('[data-cell=name]')).toHaveValue('복구한 내 이름');
+  await page.locator('[data-wbs-action=save]').click();
+  await expect(page.locator('.merge-dialog')).toBeVisible();
+  await expect(page.locator('.merge-field')).toHaveCount(1);
+  await page.locator('.merge-dialog input[value=mine]').check();
+  await page.locator('#conflictForm .primary').click();
+  await page.locator('[data-wbs-action=save]').click();
+  await expect(page.locator('.wbs-state')).toHaveText('저장됨');
+  const result = (await (await page.request.get(api + 'projects/' + p.id)).json()).project;
+  expect(result.tasks[0].name).toBe('복구한 내 이름');
+  expect(result.tasks[0].memo).toBe(server.tasks[0].memo);
+  expect(result.tasks[0].items[0].doneDate).toBe(today());
+  await expect(page.locator('.wbs-recovery')).toHaveCount(0);
+});
+
+test('초안 보관 전환의 저장 공간 오류는 체크박스·기존 초안을 유지하고 새로고침 후 복구', async ({
+  page,
+}) => {
+  const session = await login(page),
+    p = await createProject(page, session, { name: '보관 실패 복구' });
+  await selectProject(page, p);
+  await page.locator('[data-cell=name]').fill('공간 부족에도 보존할 이름');
+  await page.locator('[data-cell=name]').press('Tab');
+  await page.evaluate(() => {
+    const original = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (key, value) {
+      if (this === localStorage && key.startsWith('pmcanvas:draft:v1:'))
+        throw new DOMException('Storage full', 'QuotaExceededError');
+      return original.call(this, key, value);
+    };
+  });
+  await page.locator('#accountButton').click();
+  await page.locator('#draftPersist').click();
+  await expect(page.locator('#draftPersist')).not.toBeChecked();
+  await expect(page.locator('#toast')).toContainText('초안 보관 설정을 바꾸지 못했습니다');
+  const stored = await page.evaluate(
+    ({ user, project }) => ({
+      preference: localStorage.getItem('pmcanvas:draft-persist:' + user),
+      draft: JSON.parse(sessionStorage.getItem('pmcanvas:draft:v1:' + user + ':' + project)),
+    }),
+    { user: session.user.id, project: p.id },
+  );
+  expect(stored.preference).not.toBe('yes');
+  expect(stored.draft.draft.tasks[0].name).toBe('공간 부족에도 보존할 이름');
+  await page.locator('#closeInfo').click();
+  page.once('dialog', (dialog) => dialog.accept());
+  await selectProject(page, p);
+  await page.locator('[data-wbs-action=recover]').click();
+  await expect(page.locator('[data-cell=name]')).toHaveValue('공간 부족에도 보존할 이름');
+  await page.locator('[data-wbs-action=save]').click();
+  await expect(page.locator('.wbs-state')).toHaveText('저장됨');
+});
+
+test('같은 탭에서 변환한 구형 초안은 새로고침 후 복구·저장이 가능', async ({ page }) => {
+  const session = await login(page),
+    p = await createProject(page, session, { name: '구형 초안 이관' });
+  await selectProject(page, p);
+  // Seed before the next app boot, after the current page's clean-draft cleanup.
+  await page.addInitScript(
+    ({ user, project }) => {
+      const draft = structuredClone(project);
+      draft.tasks[0].name = '구형 초안의 입력';
+      sessionStorage.setItem(
+        'pmcanvas:draft:v1:' + user + ':' + project.id,
+        JSON.stringify({
+          version: 1,
+          projectId: project.id,
+          userId: user,
+          revision: project._revision,
+          savedAt: new Date().toISOString(),
+          draft,
+          pending: [],
+        }),
+      );
+    },
+    { user: session.user.id, project: p },
+  );
+  await selectProject(page, p);
+  await expect(page.locator('.wbs-recovery')).toBeVisible();
+  await page.locator('[data-wbs-action=recover]').click();
+  await expect(page.locator('[data-cell=name]')).toHaveValue('구형 초안의 입력');
+  await page.locator('[data-wbs-action=save]').click();
+  await expect(page.locator('.wbs-state')).toHaveText('저장됨');
+  const saved = (await (await page.request.get(api + 'projects/' + p.id)).json()).project;
+  expect(saved.tasks[0].name).toBe('구형 초안의 입력');
+});
+
 test('영어 UI·언어 유지·사용자 데이터 보존·미저장 언어 전환 차단', async ({ page }) => {
   await page.goto('./');
   await page.locator('#loginForm .language-select').selectOption('en');

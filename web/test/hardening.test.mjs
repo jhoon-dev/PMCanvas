@@ -212,7 +212,7 @@ test('복구 초안 8시간 후 만료, 원문 영구 보관 금지', () => {
     };
   let now = 1000;
   const s = new DraftStore('u', storage, () => now);
-  s.write({ id: 'p' }, { id: 'p', _revision: 1, name: 'private' }, new Map());
+  s.write({ id: 'p', _revision: 1 }, { id: 'p', _revision: 1, name: 'private' }, new Map());
   assert.ok(s.read('p'));
   now += 8 * 60 * 60 * 1000 + 1;
   assert.equal(s.read('p'), null);
