@@ -5,13 +5,14 @@ import os from 'node:os';
 import path from 'node:path';
 import { Readable } from 'node:stream';
 import { EventEmitter } from 'node:events';
-import { createHash } from 'node:crypto';
+import { createHash, generateKeyPairSync } from 'node:crypto';
+import { signUpdateManifest, verifyUpdateManifest } from '../update-signatures.mjs';
 import { DesktopPreferences } from '../preferences.mjs';
 import { UpdateManager } from '../update-manager.mjs';
 import { StoreUpdateService, UpdateService, selectUpdate, STORE_UPDATES } from '../updates.mjs';
 import { checkStoreUpdates } from '../store-updates.mjs';
 import {
-  downloadInstaller,
+  downloadInstaller as realDownloadInstaller,
   verifyInstaller,
   checksumValue,
   assetUrl,
@@ -33,6 +34,25 @@ const update = {
   downloadUrl,
   checksumUrl: downloadUrl + '.sha256',
 };
+const testKey = generateKeyPairSync('ed25519');
+const envelope = signUpdateManifest(
+  {
+    schema: 1,
+    product: 'pmcanvas-desktop',
+    version: update.version,
+    commit: 'a'.repeat(40),
+    assets: [{ name: fileName, size: payload.length, sha256: digest(payload) }],
+  },
+  testKey.privateKey,
+);
+const testKeys = {
+  [JSON.parse(envelope).keyId]: testKey.publicKey.export({ type: 'spki', format: 'pem' }),
+};
+const downloadInstaller = (u, d, options) =>
+  realDownloadInstaller(u, d, {
+    ...options,
+    verify: (bytes, context) => verifyUpdateManifest(bytes, { ...context, keys: testKeys }),
+  });
 function temp(t) {
   const base = fs.realpathSync(os.tmpdir());
   const directory = fs.mkdtempSync(path.join(base, 'pmcanvas-updates-test-'));
@@ -50,6 +70,11 @@ function source({
   checkName = fileName,
 } = {}) {
   return async (url) => {
+    if (url.endsWith('/update-manifest.json')) {
+      const stream = Readable.from([envelope]);
+      stream.headers = {};
+      return stream;
+    }
     const check = url.endsWith('.sha256');
     const stream = Readable.from([check ? Buffer.from(checksum + '  ' + checkName + '\n') : bytes]);
     stream.headers = check ? {} : { 'content-length': String(length) };

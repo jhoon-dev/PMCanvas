@@ -1116,3 +1116,5 @@ document.addEventListener('close', () => refreshDate(), true);
 setInterval(() => refreshDate(), 30000);
 accept(await api.snapshot());
 await updateUI.initialise();
+if (appSettings.recovery)
+  toast(ui('설정 오류를 복구해 실행했습니다. 앱 설정에서 내용을 확인해 주세요.'));

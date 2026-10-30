@@ -122,6 +122,23 @@ try {
   });
   await page.locator('#installUpdate').click();
   await page.waitForFunction(() => window.calls.installs === 1);
+  await page.evaluate(() =>
+    window.publishUpdate({ ...window.update, status: 'error', error: 'verification' }),
+  );
+  assert.equal(await page.locator('#openRelease').isVisible(), false);
+  assert.equal(await page.locator('#installUpdate').textContent(), '업데이트 다운로드');
+  await page
+    .getByText(
+      '업데이트의 발행자를 확인하지 못했습니다. 설치를 중단했습니다. 나중에 다시 확인해 주세요.',
+      {
+        exact: true,
+      },
+    )
+    .waitFor();
+  await page.locator('#installUpdate').click();
+  await page.waitForFunction(() => window.update.status === 'downloaded');
+  assert.equal(await page.evaluate(() => window.calls.downloads), 2);
+  assert.equal(await page.evaluate(() => window.calls.installs), 1);
   await page.screenshot({ path: 'test-results/desktop-update-settings.png', fullPage: true });
   await page.setViewportSize({ width: 1000, height: 720 });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
@@ -145,7 +162,7 @@ try {
   assert.equal(await page.locator('#openRelease').isVisible(), false);
   assert.equal(await page.locator('#installUpdate').textContent(), 'Microsoft Store에서 업데이트');
   await page.locator('#installUpdate').click();
-  assert.equal(await page.evaluate(() => window.calls.downloads), 1);
+  assert.equal(await page.evaluate(() => window.calls.downloads), 2);
   await page.locator('#closeUpdate').click();
   await page.evaluate(() => {
     localStorage.setItem('pmcanvas.language', 'en');

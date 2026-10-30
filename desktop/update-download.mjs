@@ -4,6 +4,8 @@ import path from 'node:path';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
+import { verifyUpdateManifest, UPDATE_MANIFEST } from './update-signatures.mjs';
+import { cleanupUpdateCache, cachedInstaller } from './update-cache.mjs';
 
 export const MAX_INSTALLER_BYTES = 1024 * 1024 * 1024;
 const assetBase = 'https://github.com/jhoon-dev/PMCanvas/releases/download/desktop-v';
@@ -101,7 +103,7 @@ export async function verifyInstaller(file, expected, expectedSize) {
 export async function downloadInstaller(
   update,
   directory,
-  { open = openReleaseAsset, onProgress = () => {} } = {},
+  { open = openReleaseAsset, onProgress = () => {}, verify = verifyUpdateManifest } = {},
 ) {
   if (
     !update.available ||
@@ -112,6 +114,21 @@ export async function downloadInstaller(
   )
     throw Error('No compatible update installer.');
   assetUrl(update.downloadUrl);
+  const signed = await open(assetBase + update.version + '/' + UPDATE_MANIFEST);
+  const signedChunks = [];
+  let signedSize = 0;
+  for await (const chunk of signed) {
+    signedSize += chunk.length;
+    if (signedSize > 65536) {
+      signed.destroy();
+      throw Error('Update manifest is too large.');
+    }
+    signedChunks.push(Buffer.from(chunk));
+  }
+  const authorized = verify(Buffer.concat(signedChunks), {
+    version: update.version,
+    fileName: update.fileName,
+  });
   const check = await open(update.checksumUrl);
   const checkChunks = [];
   let checkSize = 0;
@@ -124,21 +141,35 @@ export async function downloadInstaller(
     checkChunks.push(Buffer.from(chunk));
   }
   const expected = checksumValue(Buffer.concat(checkChunks), update.fileName);
+  if (expected !== authorized.sha256)
+    throw Object.assign(Error('Checksum is not authorized by the update publisher.'), {
+      code: 'UPDATE_UNTRUSTED',
+    });
   await fs.promises.mkdir(directory, { recursive: true, mode: 0o700 });
   const parent = await fs.promises.lstat(directory);
   if (!parent.isDirectory() || parent.isSymbolicLink()) throw Error('Invalid update cache.');
+  const cached = await cachedInstaller(directory, update.fileName, (file) =>
+    verifyInstaller(file, authorized.sha256, authorized.size),
+  );
+  if (cached) {
+    await cleanupUpdateCache(directory, { keep: [cached] });
+    return { file: cached, sha256: authorized.sha256, size: authorized.size };
+  }
+  await cleanupUpdateCache(directory, { reserve: authorized.size });
   const folder = await fs.promises.mkdtemp(path.join(directory, 'download-'));
   await fs.promises.chmod(folder, 0o700);
   const file = path.join(folder, update.fileName),
     partial = file + '.partial';
+  const active = path.join(folder, '.active');
   let complete = false;
   try {
+    await fs.promises.writeFile(active, '', { flag: 'wx', mode: 0o600 });
     const input = await open(update.downloadUrl, { timeout: 600000 });
     const declared = input.headers?.['content-length'];
     const total = declared === undefined ? 0 : Number(declared);
     if (
       declared !== undefined &&
-      (!Number.isSafeInteger(total) || total <= 0 || total > MAX_INSTALLER_BYTES)
+      (!Number.isSafeInteger(total) || total !== authorized.size || total > MAX_INSTALLER_BYTES)
     ) {
       input.destroy();
       throw Error('Invalid installer size.');
@@ -148,7 +179,7 @@ export async function downloadInstaller(
     const guard = new Transform({
       transform(chunk, _encoding, callback) {
         received += chunk.length;
-        if (received > MAX_INSTALLER_BYTES || (total && received > total))
+        if (received > authorized.size || (total && received > total))
           return callback(Error('Installer is too large.'));
         hash.update(chunk);
         onProgress({ received, total });
@@ -158,13 +189,25 @@ export async function downloadInstaller(
     await pipeline(input, guard, fs.createWriteStream(partial, { flags: 'wx', mode: 0o600 }), {
       signal: AbortSignal.timeout(600000),
     });
-    if (!received || (total && total !== received) || !sameHash(hash.digest('hex'), expected))
-      throw Error('Installer checksum mismatch.');
+    if (
+      received !== authorized.size ||
+      (total && total !== received) ||
+      !sameHash(hash.digest('hex'), expected)
+    )
+      throw Object.assign(Error('Installer checksum mismatch.'), { code: 'UPDATE_UNTRUSTED' });
     await fs.promises.rename(partial, file);
+    await fs.promises.unlink(active);
+    await cleanupUpdateCache(directory, { keep: [file] });
     complete = true;
     return { file, sha256: expected, size: received };
   } finally {
     if (!complete) {
+      await fs.promises.unlink(active).catch((error) => {
+        if (error.code !== 'ENOENT') throw error;
+      });
+      await fs.promises.unlink(file).catch((error) => {
+        if (error.code !== 'ENOENT') throw error;
+      });
       await fs.promises.unlink(partial).catch((error) => {
         if (error.code !== 'ENOENT') throw error;
       });

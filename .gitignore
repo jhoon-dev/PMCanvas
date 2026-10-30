@@ -31,3 +31,4 @@ desktop/app/
 *.mobileprovision
 PMCanvas-MacSigning-*/
 *.certSigningRequest
+*.dpapi

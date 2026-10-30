@@ -53,7 +53,17 @@ try {
   const runtime = await application.evaluate(({ app }) => ({
     packaged: app.isPackaged,
     userData: app.getPath('userData'),
+    electron: process.versions.electron,
+    node: process.versions.node,
   }));
+  assert.equal(
+    runtime.electron,
+    JSON.parse(readFileSync(path.join(root, 'package.json'))).devDependencies.electron,
+  );
+  assert.ok(
+    runtime.node.localeCompare('24.22.1', undefined, { numeric: true }) >= 0,
+    'The bundled Node security baseline must be current.',
+  );
   assert.equal(
     realpathSync(runtime.userData),
     realpathSync(temporary),
@@ -452,6 +462,32 @@ try {
   );
   assert.equal(afterRestart.canUndo, false);
   assert.equal(afterRestart.canRedo, false);
+  checkpoint('damaged-preferences');
+  const savedProjectFile = readFileSync(path.join(temporary, 'Native.pmcanvas'));
+  for (const corrupted of [
+    '{invalid JSON',
+    JSON.stringify({ timeZone: 'Bad/Zone', checkUpdatesOnStart: false }),
+  ]) {
+    await application.close();
+    writeFileSync(path.join(temporary, 'preferences.json'), corrupted);
+    application = await launch();
+    const recovered = await application.firstWindow({ timeout: 15000 });
+    await recovered.getByText('Native desktop', { exact: true }).first().waitFor();
+    const settings = await recovered.evaluate(() => window.desktop.settings());
+    assert.equal(settings.timeZone, 'Asia/Seoul');
+    assert.equal(settings.checkUpdatesOnStart, false);
+    assert.equal(settings.recovery.backupCreated, true);
+    assert.deepEqual(
+      (await recovered.evaluate(() => window.desktop.snapshot())).project,
+      finalProject,
+    );
+    assert.equal(readFileSync(path.join(temporary, 'preferences.json'), 'utf8'), corrupted);
+    assert.deepEqual(readFileSync(path.join(temporary, 'Native.pmcanvas')), savedProjectFile);
+    await recovered.getByText('파일 옵션', { exact: true }).click();
+    await recovered.locator('[data-command=appSettings]').click();
+    assert.equal(await recovered.locator('#settingsRecovery').isVisible(), true);
+    await recovered.locator('#closeUpdate').click();
+  }
   console.log(
     'PASS: native isolation, reports, WBS, schedule, history/menu, bulk copy/delete/revision guard, save/restart',
   );

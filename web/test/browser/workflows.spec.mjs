@@ -781,3 +781,46 @@ test('간결한 시작 안내·업무 상세·필터 초기화는 기존 입력�
     fullPage: true,
   });
 });
+
+for (const kind of ['project', 'task'])
+  test('편집창 새로고침 보호: ' + kind, async ({ page }) => {
+    const session = await login(page),
+      p = await createProject(page, session, { name: '편집 보호 ' + kind });
+    await selectProject(page, p, kind === 'project' ? 'overview' : 'tasks');
+    if (kind === 'project') {
+      await page.getByText('프로젝트 관리', { exact: true }).click();
+      await page.locator('[data-action=settings]').click();
+    } else await page.locator('[data-wbs-detail]').first().click();
+    const input = page.locator('#dialogBody [name=name]'),
+      original = await input.inputValue();
+    const protectedByGuard = () =>
+      page.evaluate(() => {
+        const event = new Event('beforeunload', { cancelable: true });
+        window.dispatchEvent(event);
+        return event.defaultPrevented;
+      });
+    expect(await protectedByGuard()).toBe(false);
+    await input.fill(original + ' 변경');
+    expect(await protectedByGuard()).toBe(true);
+    await input.fill(original);
+    expect(await protectedByGuard()).toBe(false);
+    if (kind === 'task') {
+      await page.locator('#addItem').click();
+      expect(await protectedByGuard()).toBe(true);
+      await page.locator('.remove-item').last().click();
+      expect(await protectedByGuard()).toBe(false);
+    }
+    await input.fill(original + ' 보존할 입력');
+    const confirmation = page.waitForEvent('dialog');
+    await page.evaluate(() => {
+      setTimeout(() => location.reload(), 0);
+    });
+    const dialog = await confirmation;
+    expect(dialog.type()).toBe('beforeunload');
+    await dialog.dismiss();
+    await expect(input).toHaveValue(original + ' 보존할 입력');
+    await page.locator('#cancelDialog').click();
+    expect(await protectedByGuard()).toBe(false);
+    const server = (await (await page.request.get(api + 'projects/' + p.id)).json()).project;
+    expect(server).toEqual(p);
+  });

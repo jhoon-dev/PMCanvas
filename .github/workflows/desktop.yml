@@ -204,6 +204,7 @@ jobs:
   release:
     if: always() && github.event_name == 'workflow_dispatch' && inputs.publish && needs.plan.result == 'success' && (needs.install.result == 'success' || inputs.release_run != '')
     needs: [plan, install]
+    environment: desktop-update-signing
     runs-on: ubuntu-latest
     timeout-minutes: 25
     permissions:
@@ -223,6 +224,7 @@ jobs:
           PM_RELEASE_RUN_ID: ${{ inputs.release_run }}
           PM_RELEASE_MODE: ${{ needs.plan.outputs.mode }}
           PM_RELEASE_PLATFORM: ${{ inputs.platform }}
+          PM_UPDATE_SIGNING_KEY: ${{ secrets.PM_UPDATE_SIGNING_KEY }}
   signed:
     name: signed (${{ matrix.os }}, ${{ matrix.target }})
     if: github.event_name == 'workflow_dispatch' && inputs.signed && inputs.release_run == ''

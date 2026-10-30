@@ -5,6 +5,14 @@ export function createUpdateUI({ api, root = document, ui, settings = {}, onOpen
     applying = false;
   let auto = settings.checkUpdatesOnStart !== false;
   const dismissed = new Set();
+  if (settings.recovery) {
+    $('#settingsRecovery').hidden = false;
+    $('#settingsRecovery').textContent = ui(
+      settings.recovery.backupCreated
+        ? '설정 오류를 복구해 실행했습니다. 원본 설정 사본은 이 PC에 보관했습니다. 시간대와 업데이트 설정을 확인해 주세요.'
+        : '설정을 읽지 못해 기본값으로 실행했습니다. 원본 파일은 유지됩니다. 설정을 저장하려면 파일 접근 권한과 크기를 확인해 주세요.',
+    );
+  }
   function render(next = value) {
     value = next;
     const store = value.channel === 'microsoft-store';
@@ -26,7 +34,7 @@ export function createUpdateUI({ api, root = document, ui, settings = {}, onOpen
     );
     $('#installUpdate').disabled =
       waiting || applying || (!store && !(value.available && value.downloadAvailable));
-    $('#openRelease').hidden = store;
+    $('#openRelease').hidden = store || value.error === 'verification';
     $('#updateInstructions').textContent = ui(
       store
         ? 'Microsoft Store에서 업데이트합니다. 변경사항을 저장한 뒤 진행하세요.'
@@ -40,9 +48,11 @@ export function createUpdateUI({ api, root = document, ui, settings = {}, onOpen
       status = ui('다운로드와 검증을 완료했습니다. 설치 파일을 열어 업데이트하세요.');
     else if (value.status === 'error')
       status = ui(
-        value.error === 'download'
-          ? '다운로드 또는 검증에 실패했습니다. 다시 다운로드하거나 공식 페이지를 이용해 주세요.'
-          : '업데이트를 확인하지 못했습니다. 네트워크 연결을 확인하거나 나중에 다시 시도해 주세요.',
+        value.error === 'verification'
+          ? '업데이트의 발행자를 확인하지 못했습니다. 설치를 중단했습니다. 나중에 다시 확인해 주세요.'
+          : value.error === 'download'
+            ? '다운로드 또는 검증에 실패했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.'
+            : '업데이트를 확인하지 못했습니다. 네트워크 연결을 확인하거나 나중에 다시 시도해 주세요.',
       );
     else if (value.status === 'unsupported')
       status = ui(
