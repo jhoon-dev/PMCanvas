@@ -222,6 +222,7 @@ test('historical dates stay fixed; midnight never replaces an open editor and de
 test('English screens persist selection, protect open or unsaved edits, preserve Korean project data and hide unselected bulk actions', async () => {
   const { browser, page, errors, getProject } = await harness('en');
   try {
+    await page.getByRole('button', { name: 'Open', exact: true }).waitFor();
     await page.getByText('File options', { exact: true }).click();
     await page.getByRole('button', { name: 'Privacy policy', exact: true }).waitFor();
     await page.getByText('File options', { exact: true }).click();
