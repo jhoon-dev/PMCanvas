@@ -18,8 +18,13 @@ final class AppUITests: XCTestCase {
         XCTAssertTrue(name.waitForExistence(timeout: 5))
         name.tap()
         name.typeText("iPhone persistence check")
+        // WKWebView's accessory toolbar covers the form actions while typing.
+        // Dismiss it through the same native Done control available to users.
+        let keyboardDone = app.toolbars.buttons["Done"]
+        XCTAssertTrue(keyboardDone.waitForExistence(timeout: 5))
+        keyboardDone.tap()
         web.buttons["저장"].tap()
-        XCTAssertTrue(web.staticTexts["iPhone persistence check"].waitForExistence(timeout: 10))
+        XCTAssertTrue(web.staticTexts["iPhone persistence check"].waitForExistence(timeout: 10), app.debugDescription)
 
         let overview = XCTAttachment(screenshot: app.screenshot())
         overview.name = "iPhone project overview"
