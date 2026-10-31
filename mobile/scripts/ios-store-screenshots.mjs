@@ -161,6 +161,18 @@ try {
     'PASS: native ' + device + ' Store screenshots, project creation and relaunch persistence.',
   );
 } catch (error) {
+  if (fs.existsSync(result))
+    try {
+      run('xcrun', [
+        'xcresulttool',
+        'export',
+        'attachments',
+        '--path',
+        result,
+        '--output-path',
+        path.join(output, 'failure-attachments'),
+      ]);
+    } catch {}
   if (simulator)
     try {
       run('xcrun', ['simctl', 'io', simulator, 'screenshot', path.join(output, 'failure.png')]);

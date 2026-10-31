@@ -1,9 +1,41 @@
 import XCTest
 
 final class AppUITests: XCTestCase {
+    private var storeApp: XCUIApplication?
+
+    override func tearDown() {
+        if let app = storeApp, testRun?.hasSucceeded == false {
+            let shot = XCTAttachment(screenshot: app.screenshot())
+            shot.name = "Store failure state"
+            shot.lifetime = .keepAlways
+            add(shot)
+            let tree = XCTAttachment(string: app.debugDescription)
+            tree.name = "Store failure accessibility"
+            tree.lifetime = .keepAlways
+            add(tree)
+        }
+        super.tearDown()
+    }
+
     private func dismissKeyboard(_ app: XCUIApplication) {
-        let done = app.toolbars.buttons["Done"]
-        if done.waitForExistence(timeout: 5) { done.tap() }
+        let done = app.buttons["Done"]
+        if done.exists { done.tap() }
+        else {
+            let hide = app.keyboards.buttons["Hide keyboard"]
+            if hide.exists { hide.tap() }
+        }
+    }
+
+    private func enter(_ text: String, in field: XCUIElement, app: XCUIApplication) {
+        XCTAssertTrue(field.waitForExistence(timeout: 10))
+        field.tap()
+        // Opening the software keyboard changes the web dialog's frame. Resolve
+        // the field again after the keyboard appears before dispatching text.
+        _ = app.keyboards.firstMatch.waitForExistence(timeout: 5)
+        field.tap()
+        field.typeText(text)
+        XCTAssertEqual(field.value as? String, text, app.debugDescription)
+        dismissKeyboard(app)
     }
 
     private func keepStoreScreenshot(_ app: XCUIApplication, _ name: String) {
@@ -20,6 +52,7 @@ final class AppUITests: XCTestCase {
         continueAfterFailure = false
         XCUIDevice.shared.orientation = .portrait
         let app = XCUIApplication()
+        storeApp = app
         app.launch()
         let web = app.webViews.firstMatch
         let create = web.buttons["＋ 새 프로젝트"]
@@ -31,15 +64,15 @@ final class AppUITests: XCTestCase {
         let projectName = "Autumn Release Plan"
         let name = web.textFields.firstMatch
         XCTAssertTrue(name.waitForExistence(timeout: 10))
-        name.tap(); name.typeText(projectName); dismissKeyboard(app)
+        enter(projectName, in: name, app: app)
         web.buttons["저장"].tap()
         XCTAssertTrue(web.staticTexts[projectName].waitForExistence(timeout: 10))
 
         web.links["더보기"].tap()
         web.buttons["＋ 추가"].tap()
-        let person = web.textFields.firstMatch
+        let person = web.textFields["이름"]
         XCTAssertTrue(person.waitForExistence(timeout: 5))
-        person.tap(); person.typeText("Alex"); dismissKeyboard(app)
+        enter("Alex", in: person, app: app)
         web.buttons["저장"].tap()
         XCTAssertTrue(web.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Alex")).firstMatch.waitForExistence(timeout: 10))
 
@@ -48,12 +81,12 @@ final class AppUITests: XCTestCase {
             web.buttons.matching(NSPredicate(format: "label == %@", "＋ 업무 추가")).firstMatch.tap()
             let title = web.textFields.matching(NSPredicate(format: "placeholderValue == %@", "예: 회원 관리 기능 개발")).firstMatch
             XCTAssertTrue(title.waitForExistence(timeout: 5))
-            title.tap(); title.typeText(task); dismissKeyboard(app)
+            enter(task, in: title, app: app)
             let item = web.textFields["세부 작업 이름"]
             XCTAssertTrue(item.waitForExistence(timeout: 5))
-            item.tap(); item.typeText(detail); dismissKeyboard(app)
+            enter(detail, in: item, app: app)
             web.buttons["저장"].tap()
-            XCTAssertTrue(web.buttons[task].waitForExistence(timeout: 10))
+            XCTAssertTrue(web.buttons[task].waitForExistence(timeout: 10), app.debugDescription)
         }
         keepStoreScreenshot(app, "tasks")
         web.links["완료 체크"].tap()
