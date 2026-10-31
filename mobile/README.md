@@ -86,7 +86,7 @@ npm run test:ios
 
 CI는 브라우저 검증과 개발용 Android APK 빌드, Mac에서 iPhone 시뮬레이터의 XCTest 실행 및 서명 전 기기용 아카이브를 수행합니다. iPhone 테스트는 앱 실행, 개인정보처리방침, 프로젝트 생성, 앱 종료·재실행 후 저장 복원을 확인하며 자신이 만든 시뮬레이터만 정리합니다. `PMCanvas-iPhone-verification-NOT-for-submission` 아티팩트에 시뮬레이터 앱·서명 전 기기 아카이브·XCTest 결과를 ZIP으로 보존합니다. 이 파일은 서명된 IPA나 Store 제출본이 아닙니다. Store 배포 전 실제 iPhone과 Android에서 파일 선택·공유·키보드·백그라운드 복귀·업그레이드 후 데이터 보존을 추가로 확인하세요.
 
-아이콘 원본은 `assets/icon.svg`입니다. 아이콘과 시작 화면을 바꾸려면 Chromium 설치 후 `npm run prepare:icons`를 실행합니다. 생성된 네이티브 PNG는 소스 관리하며 일반 앱 빌드에는 브라우저 도구가 필요하지 않습니다.
+아이콘 원본은 데스크톱과 동일한 `../desktop/build/icon.ico`입니다. Chromium 설치 후 `npm run prepare:icons`를 실행하면 iPhone·Android의 실행 아이콘과 시작 화면, 앱 내부 로고, 웹 파비콘을 같은 원본으로 갱신합니다. 생성된 PNG는 소스 관리하며 일반 앱 빌드에는 브라우저 도구가 필요하지 않습니다.
 
 2026-10-30 Windows에서 모델·저장소 테스트 8개, Android Chromium·iPhone WebKit 시나리오 8개, 포맷·공개 파일·의존성 검사와 개발용 Android APK 빌드를 통과했습니다. 생성한 APK의 앱 ID·서명과 최신 화면 번들 일치도 확인했습니다. 2026-10-31 [Mac CI의 iPhone 네이티브 검증](https://github.com/jhoon-dev/PMCanvas/actions/runs/41157141725)에서 실제 시뮬레이터의 개인정보처리방침·프로젝트 생성·종료 후 복원 테스트와 기기용 아카이브 빌드를 통과했습니다. 양쪽 플랫폼의 실제 기기 동작과 Store 서명·업로드는 아직 검증하지 않았습니다.
 

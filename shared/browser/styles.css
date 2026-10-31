@@ -129,25 +129,11 @@ h3 {
   font-weight: 500;
 }
 .brand-mark {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  transform: skewY(-14deg);
-}
-.brand-mark i {
   display: block;
-  background: #77a7ff;
-  border-radius: 2px;
-  width: 6px;
-  height: 25px;
-}
-.brand-mark i:nth-child(2) {
-  height: 17px;
-  background: #4a82df;
-}
-.brand-mark i:nth-child(3) {
-  height: 10px;
-  background: #bad5ff;
+  width: 38px;
+  height: 38px;
+  object-fit: contain;
+  flex-shrink: 0;
 }
 .side-label {
   display: flex;
