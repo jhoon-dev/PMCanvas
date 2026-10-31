@@ -4,9 +4,47 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { macStoreConfiguration } from '../scripts/mac-store-policy.mjs';
+import { copyEmbeddedProfile, assertPublicMacApp } from '../scripts/mac-store-permissions.mjs';
 import { MacStoreUpdateService, MAC_STORE_UPDATES } from '../updates.mjs';
 import { UpdateManager } from '../update-manager.mjs';
 import { MacFileAccess } from '../mac-file-access.mjs';
+
+test(
+  'MAS embeds a readable profile without changing the private source permissions',
+  { skip: process.platform === 'win32' },
+  (t) => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'pmcanvas-mas-modes-'));
+    t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+    fs.chmodSync(directory, 0o700);
+    const source = path.join(directory, 'private.provisionprofile');
+    fs.writeFileSync(source, 'synthetic profile', { mode: 0o600 });
+    const embedded = copyEmbeddedProfile(source, directory);
+    assert.equal(fs.statSync(source).mode & 0o777, 0o600);
+    assert.equal(fs.statSync(embedded).mode & 0o777, 0o644);
+    assert.equal(fs.statSync(directory).mode & 0o777, 0o700);
+    assert.equal(fs.readFileSync(embedded, 'utf8'), 'synthetic profile');
+    assert.throws(() => copyEmbeddedProfile(source, directory), /EEXIST/);
+  },
+);
+
+test(
+  'MAS rejects unreadable bundle files and untraversable directories before upload',
+  { skip: process.platform === 'win32' },
+  (t) => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'pmcanvas-mas-modes-'));
+    t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+    fs.chmodSync(directory, 0o755);
+    const contents = path.join(directory, 'Contents');
+    fs.mkdirSync(contents, { mode: 0o755 });
+    const profile = path.join(contents, 'embedded.provisionprofile');
+    fs.writeFileSync(profile, 'synthetic profile', { mode: 0o600 });
+    assert.throws(() => assertPublicMacApp(directory), /embedded\.provisionprofile/);
+    fs.chmodSync(profile, 0o644);
+    assert.doesNotThrow(() => assertPublicMacApp(directory));
+    fs.chmodSync(contents, 0o700);
+    assert.throws(() => assertPublicMacApp(directory), /Contents/);
+  },
+);
 
 test('MAS requires dedicated distribution credentials; verification cannot produce a signed submission', () => {
   const pkg = {
