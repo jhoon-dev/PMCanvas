@@ -572,7 +572,7 @@ main.with-navigation {
 }
 .filters select {
   padding: 10px 8px;
-  font-size: 13px;
+  font-size: 16px;
 }
 .search-box {
   display: flex;
@@ -590,7 +590,7 @@ main.with-navigation {
 .search-box input {
   border: 0;
   padding: 12px 8px;
-  font-size: 14px;
+  font-size: 16px;
   background: transparent;
 }
 .notice {
@@ -617,7 +617,7 @@ main.with-navigation {
 }
 .daily-options input[type='date'] {
   width: 150px;
-  font-size: 13px;
+  font-size: 16px;
   padding: 9px;
 }
 .switch-label {
@@ -836,7 +836,7 @@ body:has(dialog[open]) {
 }
 .form-grid input[type='date'] {
   padding: 10px 7px;
-  font-size: 13px;
+  font-size: 16px;
 }
 .items-title {
   display: flex;
@@ -857,7 +857,8 @@ body:has(dialog[open]) {
   margin-bottom: 10px;
 }
 .item-editor input {
-  font-size: 14px;
+  /* Smaller editable text triggers automatic zoom in iPhone WKWebView. */
+  font-size: 16px;
   padding: 12px 8px;
 }
 .item-editor > span {
