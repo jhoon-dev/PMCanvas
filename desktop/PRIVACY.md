@@ -1,6 +1,7 @@
 # PM Canvas 앱 개인정보처리방침 / Privacy policy
 
-시행일 / Effective date: 2026-10-31  
+시행일 / Effective date: 2026-10-31
+
 개발자 / Publisher: JIN HOON KIM
 
 이 페이지의 본문은 Windows·macOS용 PM Canvas Desktop의 방침입니다. iPhone·Android용 PM Canvas Mobile의 방침은 [모바일 개인정보처리방침](../mobile/PRIVACY.md)에서 확인할 수 있으며 앱 안에서도 오프라인으로 제공됩니다. 모바일 앱은 프로젝트를 기기에 저장하며 개발자 서버로 자동 수집·전송하지 않습니다. 사용자가 내보내기·공유 대상으로 선택한 서비스는 해당 서비스의 방침에 따라 파일을 처리합니다.
