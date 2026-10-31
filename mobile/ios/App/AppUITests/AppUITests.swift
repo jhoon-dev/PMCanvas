@@ -33,8 +33,12 @@ final class AppUITests: XCTestCase {
 
         app.terminate()
         app.launch()
-        let savedProject = app.webViews.buttons.matching(NSPredicate(format: "label CONTAINS %@", "iPhone persistence check")).firstMatch
-        XCTAssertTrue(savedProject.waitForExistence(timeout: 20), "Committed project disappeared after relaunch")
+        let relaunchedWeb = app.webViews.firstMatch
+        // A fresh WebContent process can start after native launch has idled.
+        // Check page readiness separately so a slow boot is not reported as data loss.
+        XCTAssertTrue(relaunchedWeb.buttons["＋ 새 프로젝트"].waitForExistence(timeout: 60), "Bundled iPhone screen did not load after relaunch: \(app.debugDescription)")
+        let savedProject = relaunchedWeb.buttons.matching(NSPredicate(format: "label CONTAINS %@", "iPhone persistence check")).firstMatch
+        XCTAssertTrue(savedProject.waitForExistence(timeout: 20), "Committed project disappeared after relaunch: \(app.debugDescription)")
         savedProject.tap()
         XCTAssertTrue(app.webViews.staticTexts["iPhone persistence check"].waitForExistence(timeout: 10))
         let restored = XCTAttachment(screenshot: app.screenshot())
