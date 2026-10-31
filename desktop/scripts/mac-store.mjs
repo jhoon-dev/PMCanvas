@@ -6,6 +6,7 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { macStoreConfiguration } from './mac-store-policy.mjs';
+import { copyEmbeddedProfile, assertPublicMacApp } from './mac-store-permissions.mjs';
 import { preparePackage, sourceBytes } from './package-source.mjs';
 import { releaseSource } from './release-policy.mjs';
 import { checkPublicRepository, requirePublicSafety } from '../../web/scripts/public-safety.mjs';
@@ -82,6 +83,8 @@ try {
     fs.writeFileSync(path.join(staging, file), sourceBytes(root, file, commit));
   }
   fs.symlinkSync(path.join(desktop, 'node_modules'), path.join(staging, 'node_modules'), 'dir');
+  if (!verify)
+    config.mas.provisioningProfile = copyEmbeddedProfile(process.env.PM_MAS_PROFILE, staging);
   fs.mkdirSync(output, { recursive: true });
   const configFile = path.join(staging, 'builder.json');
   fs.writeFileSync(configFile, JSON.stringify({ ...config, directories: { output } }));
@@ -107,6 +110,7 @@ try {
     { stdio: 'inherit', env },
   );
   const appPath = path.join(output, 'mas-universal', pkg.build.productName + '.app');
+  assertPublicMacApp(appPath);
   run(
     process.execPath,
     [

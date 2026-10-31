@@ -7,7 +7,7 @@
   "android": { "allowMixedContent": false },
   "plugins": {
     "SystemBars": {
-      "style": "DARK",
+      "style": "LIGHT",
       "insetsHandling": "css",
       "initialViewportFitValueHint": "cover"
     }
