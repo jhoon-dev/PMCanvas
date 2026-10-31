@@ -94,7 +94,7 @@ App Store Connect의 [PM Canvas](https://appstoreconnect.apple.com/apps/68290983
 
 ## iOS App Store 제출용 빌드
 
-`iOS App Store` 워크플로우는 iPhone 6.9인치와 iPad 13인치 시뮬레이터에서 실제 UI로 프로젝트·참여인력·업무를 만들고, 완료 체크와 재실행 복원을 확인한 뒤 스크린샷 4장씩을 생성합니다. 원본 화면을 리사이즈하거나 합성하지 않고 투명도 없는 JPEG로 인코딩합니다.
+`iOS App Store` 워크플로우는 Dynamic Island 지원 iPhone 중형 디스플레이와 iPad 13인치 시뮬레이터에서 실제 UI로 프로젝트·참여인력·업무를 만들고, 완료 체크와 재실행 복원을 확인한 뒤 스크린샷 4장씩을 생성합니다. [Apple의 현재 필수 스크린샷 규격](https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications/)에 맞춰 원본 화면을 리사이즈하거나 합성하지 않고 투명도 없는 JPEG로 인코딩합니다.
 
 검증한 변경을 main에 반영한 후 `gh workflow run ios-app-store.yml --ref main -f upload=true`로 제출용 빌드를 실행합니다. main 전용 `desktop-mac-store` 환경의 기존 Apple Distribution 인증서·업로드 키와 `IOS_PROVISION_PROFILE_BASE64`를 사용합니다. 별도 인증서나 더 높은 API 권한을 만들지 않습니다. API 키의 Developer 권한으로 프로파일 생성이 허용되지 않으면 Account Holder/Admin이 개발자 사이트에서 생성하고 기존 배포 환경에 등록합니다.
 

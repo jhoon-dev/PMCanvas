@@ -36,8 +36,8 @@ try {
     );
   const selected =
     device === 'iphone'
-      ? choices.find((d) => /iPhone 17 Pro Max/.test(d.name)) ||
-        choices.find((d) => /iPhone.*Pro Max/.test(d.name))
+      ? choices.find((d) => d.name === 'iPhone 17 Pro') ||
+        choices.find((d) => /^iPhone (?:16|15) Pro$/.test(d.name))
       : choices.find((d) => /iPad (?:Pro|Air).*13-inch|iPad Pro.*12\.9/.test(d.name));
   if (!selected) throw Error('An App Store screenshot size simulator is not installed.');
   simulator = run(
@@ -127,8 +127,7 @@ try {
     );
     const width = Number(dimensions.match(/pixelWidth: (\d+)/)?.[1]),
       height = Number(dimensions.match(/pixelHeight: (\d+)/)?.[1]);
-    const allowed =
-      device === 'iphone' ? ['1260x2736', '1290x2796', '1320x2868'] : ['2064x2752', '2048x2732'];
+    const allowed = device === 'iphone' ? ['1179x2556', '1206x2622'] : ['2064x2752', '2048x2732'];
     if (!allowed.includes(width + 'x' + height))
       throw Error('Native screenshot has an unsupported App Store size.');
     screenshots.push({
