@@ -857,7 +857,9 @@ test('간결한 시작 안내·업무 상세·필터 초기화는 기존 입력�
   await expect(page.locator('.task-details')).toHaveAttribute('open');
   await expect(page.locator('[name=memo]')).toHaveValue('보존할 메모 <내용>');
   await expect(page.locator('[name=phase]')).toHaveValue('사용성');
-  expect(await page.locator('#dialogBody').evaluate((el) => el.scrollTop)).toBe(0);
+  await expect
+    .poll(() => page.locator('#dialogBody').evaluate((el) => el.scrollTop))
+    .toBe(0);
   const saveButton = await page.locator('#submitButton').boundingBox();
   expect(saveButton.y + saveButton.height).toBeLessThanOrEqual(page.viewportSize().height);
   await page.setViewportSize({ width: 390, height: 844 });
