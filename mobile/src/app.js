@@ -177,7 +177,7 @@ function filters(p) {
   return `<div class="filters"><label class="search-box">${icon('layers')}<input id="search" type="search" placeholder="업무 검색" aria-label="업무 검색" value="${esc(query)}"></label><select id="owner" aria-label="담당자 필터"><option value="">전체 담당자</option>${p.members.map((m) => `<option value="${esc(m.id)}" ${owner === m.id ? 'selected' : ''}>${esc(m.name)}</option>`).join('')}</select></div>`;
 }
 function tasks(p, daily) {
-  return `${daily ? `<div class="notice">완료한 세부 작업을 체크하면 진척률이 바뀝니다.</div><div class="daily-options"><label>완료일<input type="date" id="completionDate" aria-label="완료일" value="${completionDate}" max="${today()}" required></label><label class="switch-label"><input id="onlyOpen" type="checkbox" ${onlyOpen ? 'checked' : ''}>할 일만</label></div>` : `<div class="section-heading"><p>전체 업무 ${p.tasks.length}개</p>${button('＋ 업무 추가', 'add-task', 'primary')}</div>`}${filters(p)}<div id="taskList" class="task-list">${taskList(p, daily)}</div>`;
+  return `${daily ? `<div class="notice">완료한 세부 작업을 체크하면 진척률이 바뀝니다.</div><div class="daily-options"><label>완료일<input type="date" id="completionDate" aria-label="완료일" value="${esc(completionDate)}" max="${today()}" required></label><label class="switch-label"><input id="onlyOpen" type="checkbox" ${onlyOpen ? 'checked' : ''}>할 일만</label></div>` : `<div class="section-heading"><p>전체 업무 ${p.tasks.length}개</p>${button('＋ 업무 추가', 'add-task', 'primary')}</div>`}${filters(p)}<div id="taskList" class="task-list">${taskList(p, daily)}</div>`;
 }
 function taskList(p, daily) {
   const tasks = filtered(p).filter(
