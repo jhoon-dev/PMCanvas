@@ -305,6 +305,17 @@ $('#editor').addEventListener('cancel', (event) => {
 $('#closeEditor').onclick = $('#cancelEditor').onclick = () => {
   if (!busy) closeEditor();
 };
+if (Capacitor.getPlatform() === 'android') {
+  // Keep the IME open until the button action. Blurring on pointer-down can
+  // resize the dialog before pointer-up and swallow Save, Delete or Cancel.
+  $('#editor').addEventListener('pointerdown', (event) => {
+    if (
+      event.target.closest('.dialog-actions button, #closeEditor') &&
+      document.activeElement?.matches('input, textarea, select')
+    )
+      event.preventDefault();
+  });
+}
 $('#editorBody').addEventListener('click', (event) => {
   if (event.target.closest('#addItem')) {
     if ($('#itemEditors').children.length >= 200)
