@@ -72,6 +72,7 @@ function errorText(error) {
 async function run(action) {
   if (busy) return;
   busy = true;
+  $('#content').setAttribute('aria-busy', 'true');
   const controls = [
     ...document.querySelectorAll('button:not(:disabled), input[type="checkbox"]:not(:disabled)'),
   ];
@@ -84,6 +85,7 @@ async function run(action) {
     toast(errorText(error));
   } finally {
     busy = false;
+    $('#content').setAttribute('aria-busy', 'false');
     controls.forEach((element) => {
       if (element.isConnected) element.disabled = false;
     });

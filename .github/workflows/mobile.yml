@@ -55,7 +55,6 @@ jobs:
           if-no-files-found: error
           retention-days: 14
   ios:
-    needs: verify
     runs-on: macos-latest
     timeout-minutes: 25
     steps:

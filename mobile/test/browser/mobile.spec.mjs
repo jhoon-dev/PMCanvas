@@ -96,6 +96,7 @@ test('create, edit, check, reopen offline, undo and export a project on a phone'
   await expect(page.locator('.hero-progress strong')).toHaveText('0%');
   await page.getByRole('link', { name: '더보기', exact: true }).click();
   await page.getByRole('button', { name: '↷ 다시 실행', exact: true }).click();
+  await expect(page.locator('#content')).toHaveAttribute('aria-busy', 'false');
   await page.context().setOffline(false);
   await page.reload();
   await page.getByRole('link', { name: '현황', exact: true }).click();
