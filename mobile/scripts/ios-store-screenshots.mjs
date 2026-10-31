@@ -74,6 +74,7 @@ try {
     'ios/App/App.xcodeproj',
     '-scheme',
     'App',
+    '-onlyUsePackageVersionsFromResolvedFile',
     '-sdk',
     'iphonesimulator',
     '-destination',

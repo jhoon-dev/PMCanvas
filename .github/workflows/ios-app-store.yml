@@ -35,6 +35,16 @@ jobs:
       - run: npm test
       - run: node scripts/ios-signature.mjs --self-test
       - run: npm run build && npx cap sync ios
+      - name: Resolve the native package graph before capture
+        run: xcodebuild -resolvePackageDependencies -onlyUsePackageVersionsFromResolvedFile -project ios/App/App.xcodeproj -scheme App -clonedSourcePackagesDirPath build/StoreDerivedData-${{ matrix.device }}/SourcePackages
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always() && matrix.device == 'iphone'
+        with:
+          name: PMCanvas-iOS-dependency-resolution
+          path: mobile/ios/**/Package.resolved
+          if-no-files-found: error
+          retention-days: 14
+      - run: node scripts/check-ios-source.mjs
       - run: node scripts/ios-store-screenshots.mjs ${{ matrix.device }}
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
@@ -68,7 +78,7 @@ jobs:
           PM_IOS_CSC_PASSWORD: ${{ secrets.MAS_CSC_KEY_PASSWORD }}
           PM_IOS_PROFILE_BASE64: ${{ secrets.IOS_PROVISION_PROFILE_BASE64 }}
       - name: Validate and upload to App Store Connect
-        run: node scripts/upload-ios-store.mjs
+        run: node scripts/check-ios-source.mjs && node scripts/upload-ios-store.mjs
         env:
           ASC_KEY_BASE64: ${{ secrets.ASC_KEY_BASE64 }}
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
