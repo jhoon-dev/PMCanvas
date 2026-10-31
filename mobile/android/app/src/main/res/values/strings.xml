@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">PM Canvas</string>
+    <string name="title_activity_main">PM Canvas</string>
+    <string name="package_name">dev.jhoon.pmcanvas</string>
+    <string name="custom_url_scheme">dev.jhoon.pmcanvas</string>
+</resources>

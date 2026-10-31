@@ -91,6 +91,9 @@ jobs:
         working-directory: desktop
       - run: npm run test:app
         working-directory: desktop
+      - run: node scripts/store-screenshots.mjs
+        if: runner.os == 'macOS'
+        working-directory: desktop
       - run: npm run pack
         if: runner.os == 'Windows'
         working-directory: desktop

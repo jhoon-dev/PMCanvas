@@ -1,11 +1,12 @@
 # PM Canvas
 
-웹과 데스크톱을 동등한 제품으로 분리한 저장소입니다.
+웹·데스크톱·모바일을 별도 제품으로 관리하는 저장소입니다.
 
 | 경로       | 역할                                     | 실행·설치 안내                                                                      |
 | ---------- | ---------------------------------------- | ----------------------------------------------------------------------------------- |
 | `web/`     | Node.js·PostgreSQL 기반 설치형 웹 앱     | [웹 README](web/README.md)                                                          |
 | `desktop/` | Windows·macOS용 오프라인 앱              | [데스크톱 README](desktop/README.md)                                                |
+| `mobile/`  | iPhone·Android용 오프라인 앱             | [모바일 README](mobile/README.md)                                                   |
 | `shared/`  | 계산 엔진·프로젝트 검증·재사용 화면 모듈 | [공통 코드 안내](shared/README.md)                                                  |
 | `.github/` | 제품별 CI·빌드 워크플로                  | [웹 검증](.github/workflows/ci.yml), [데스크톱 빌드](.github/workflows/desktop.yml) |
 
@@ -34,19 +35,35 @@ Windows와 macOS는 동일한 소스를 사용하며 각 OS에서 설치 파일�
 
 Windows는 [Microsoft Store 제출용 MSIX](desktop/WINDOWS-STORE.md)를 준비하고, Mac은 [Developer ID 인증서 발급·공증·GitHub Secrets 설정](desktop/MAC-SETUP.md) 후 서명된 DMG/ZIP을 배포합니다. 실제 Store 등록과 Apple 인증서 발급은 계정 소유자의 설정이 필요합니다.
 
+## 모바일
+
+```sh
+cd mobile
+npm ci
+npm run dev
+```
+
+Capacitor 기반의 iPhone·Android 앱입니다. 프로젝트·참여인력·업무 편집, 완료 체크, 공수 기반 진척률과 예상 완료일, 기기 자동 저장, 실행 취소·다시 실행, 프로젝트 파일 가져오기·공유와 CSV 보고서를 지원합니다. 웹·데스크톱의 프로젝트 파일을 새 사본으로 가져올 수 있습니다. 서버 자동 동기화는 포함하지 않습니다.
+
+`npm run android`로 Android Studio를 열고, Mac에서는 `npm run ios`로 Xcode를 엽니다. `npm run android:apk`는 개발용 APK를 만듭니다. 플랫폼 요구 사항과 검증 범위는 [모바일 README](mobile/README.md)를 확인하세요.
+
 ## 개발
 
 저장소 루트에서 사용할 수 있는 명령입니다.
 
-| 명령                    | 대상                                    |
-| ----------------------- | --------------------------------------- |
-| `npm run web:start`     | 웹 서버                                 |
-| `npm run desktop:start` | 데스크톱 앱                             |
-| `npm run test:web`      | 웹 테스트                               |
-| `npm run test:desktop`  | 공통 모델을 포함한 데스크톱 파일 테스트 |
-| `npm run format:check`  | 양쪽 제품·공통 코드 포맷                |
-| `npm run public:check`  | 전체 저장소의 공개 파일 검사            |
-| `npm run release:web`   | 웹·공통 코드로 구성한 서버 배포 ZIP     |
+| 명령                     | 대상                                    |
+| ------------------------ | --------------------------------------- |
+| `npm run web:start`      | 웹 서버                                 |
+| `npm run desktop:start`  | 데스크톱 앱                             |
+| `npm run mobile:start`   | 모바일 화면 개발 서버                   |
+| `npm run mobile:android` | Android Studio에서 모바일 앱 열기       |
+| `npm run mobile:ios`     | Xcode에서 모바일 앱 열기 (Mac)          |
+| `npm run test:web`       | 웹 테스트                               |
+| `npm run test:desktop`   | 공통 모델을 포함한 데스크톱 파일 테스트 |
+| `npm run test:mobile`    | 모바일 모델·저장소 테스트               |
+| `npm run format:check`   | 양쪽 제품·공통 코드 포맷                |
+| `npm run public:check`   | 전체 저장소의 공개 파일 검사            |
+| `npm run release:web`    | 웹·공통 코드로 구성한 서버 배포 ZIP     |
 
 화면·실제 Electron 통합 검증 도구는 `web/`의 Playwright 개발 의존성을 사용합니다. 데스크톱의 런타임·패키징은 웹 서버에 의존하지 않습니다.
 
