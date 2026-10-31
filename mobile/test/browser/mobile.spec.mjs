@@ -154,7 +154,7 @@ test('small screens, malicious text and failed writes keep a usable editor', asy
   value.project.name = '<img src=x onerror=alert(1)>';
   await importProject(page, value);
   await expect(page.getByRole('heading', { name: value.project.name })).toBeVisible();
-  expect(await page.locator('img').count()).toBe(0);
+  await expect(page.locator('#content img')).toHaveCount(0);
   await page.getByRole('link', { name: '업무', exact: true }).click();
   await page.getByRole('button', { name: '배포 확인', exact: true }).click();
   await page.locator('[name="name"]').fill('저장되지 않을 변경');

@@ -141,26 +141,11 @@ p {
   margin-top: 4px;
 }
 .brand-mark {
-  display: grid;
-  place-items: center;
+  display: block;
   width: 37px;
   height: 37px;
-  position: relative;
-  color: #fff;
-  background: #5368dd;
-  border-radius: 11px;
-  font-size: 25px;
-  font-weight: 700;
-}
-.brand-mark span {
-  width: 9px;
-  height: 9px;
-  position: absolute;
-  right: 5px;
-  bottom: 5px;
-  border: 2px solid #fff;
-  border-top: none;
-  border-left: none;
+  object-fit: contain;
+  flex-shrink: 0;
 }
 .offline-label {
   color: #727e91;
