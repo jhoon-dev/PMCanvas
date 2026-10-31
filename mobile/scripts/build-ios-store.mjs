@@ -159,6 +159,7 @@ try {
     'App',
     '-configuration',
     'Release',
+    '-onlyUsePackageVersionsFromResolvedFile',
     '-destination',
     'generic/platform=iOS',
     '-derivedDataPath',
