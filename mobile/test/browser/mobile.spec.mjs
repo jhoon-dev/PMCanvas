@@ -112,6 +112,8 @@ test('create, edit, check, reopen offline, undo and export a project on a phone'
   await page.getByRole('button', { name: '시간대 변경', exact: true }).click();
   await page.locator('[name="timeZone"]').fill('UTC');
   await page.getByRole('button', { name: '저장', exact: true }).click();
+  await expect(page.locator('#editor')).not.toBeVisible();
+  await expect(page.locator('.date-caption')).toContainText('UTC');
   await page.reload();
   await expect(page.locator('.date-caption')).toContainText('UTC');
   await noOverflow(page);

@@ -1,6 +1,7 @@
 # PM Canvas Mobile 개인정보처리방침 / Privacy policy
 
-시행일 / Effective date: 2026-10-31  
+시행일 / Effective date: 2026-10-31
+
 개발자 / Publisher: JIN HOON KIM
 
 ## 한국어
