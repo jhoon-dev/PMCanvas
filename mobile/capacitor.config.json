@@ -1,0 +1,15 @@
+{
+  "appId": "dev.jhoon.pmcanvas",
+  "appName": "PM Canvas",
+  "webDir": "dist",
+  "backgroundColor": "#f5f6fa",
+  "ios": { "contentInset": "never" },
+  "android": { "allowMixedContent": false },
+  "plugins": {
+    "SystemBars": {
+      "style": "DARK",
+      "insetsHandling": "css",
+      "initialViewportFitValueHint": "cover"
+    }
+  }
+}

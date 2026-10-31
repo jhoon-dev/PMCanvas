@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "PM Canvas web and desktop repository",
+  "description": "PM Canvas web, desktop and mobile repository",
   "engines": {
     "node": ">=22.18.0"
   },
@@ -12,10 +12,15 @@
     "web:start": "npm --prefix web start",
     "web:demo": "npm --prefix web run demo",
     "desktop:start": "npm --prefix desktop start",
+    "mobile:start": "npm --prefix mobile run dev",
+    "mobile:android": "npm --prefix mobile run android",
+    "mobile:ios": "npm --prefix mobile run ios",
+    "mobile:build": "npm --prefix mobile run build",
     "test:web": "npm --prefix web test",
     "test:desktop": "npm --prefix desktop test",
-    "test": "npm run test:web && npm run test:desktop",
-    "format:check": "npm --prefix web run format:check && node web/node_modules/prettier/bin/prettier.cjs --check desktop shared package.json .github/workflows",
+    "test:mobile": "npm --prefix mobile test",
+    "test": "npm run test:web && npm run test:desktop && npm run test:mobile",
+    "format:check": "npm --prefix web run format:check && node web/node_modules/prettier/bin/prettier.cjs --check desktop shared package.json .github/workflows mobile/src mobile/test mobile/scripts mobile/docs mobile/*.json mobile/*.mjs mobile/index.html mobile/README.md",
     "public:check": "npm --prefix web run public:check",
     "release:web": "npm --prefix web run release"
   }

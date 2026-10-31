@@ -32,6 +32,8 @@ const documentationHosts = new Set([
   'docs.openssl.org',
   'nodejs.org',
   'registry.npmjs.org',
+  'capacitorjs.com',
+  'policies.google.com',
 ]);
 const fileExtensions = new Set([
   'js',
@@ -82,6 +84,16 @@ const fileExtensions = new Set([
   'desktop',
   'mas',
   'provisionprofile',
+  'apk',
+  'aab',
+  'xcprivacy',
+  'svg',
+  'ipa',
+  'xcarchive',
+  'xcresult',
+  'xcscheme',
+  'swift',
+  'pbxproj',
 ]);
 
 export function exampleHost(host) {

@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#f5f6fa" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'"
+    />
+    <title>PM Canvas Mobile</title>
+    <script type="module" src="/src/app.js"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#content">본문으로 건너뛰기</a>
+    <header class="app-header">
+      <a class="brand" href="#projects" aria-label="PM Canvas 프로젝트 목록"
+        ><span aria-hidden="true" class="brand-mark">P<span></span></span
+        ><span>PM Canvas<small>MOBILE WORKSPACE</small></span></a
+      >
+      <span class="offline-label"><i></i>오프라인</span>
+    </header>
+    <main id="content" tabindex="-1">
+      <p class="loading" role="status">프로젝트를 불러오고 있습니다…</p>
+    </main>
+    <nav id="navigation" class="bottom-nav" aria-label="주 메뉴" hidden></nav>
+    <dialog id="editor" aria-labelledby="editorTitle">
+      <form id="editorForm">
+        <div class="dialog-head">
+          <h2 id="editorTitle"></h2>
+          <button type="button" id="closeEditor" class="icon-button" aria-label="입력 취소">
+            ×
+          </button>
+        </div>
+        <div id="editorBody"></div>
+        <p id="formError" class="error" role="alert"></p>
+        <div class="dialog-actions">
+          <button type="button" id="deleteItem" class="button danger" hidden>삭제</button
+          ><span></span><button type="button" id="cancelEditor" class="button">취소</button
+          ><button id="submitEditor" class="button primary">저장</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="privacyDialog" aria-labelledby="privacyTitle">
+      <div class="dialog-head">
+        <h2 id="privacyTitle">개인정보처리방침</h2>
+        <button
+          type="button"
+          id="closePrivacy"
+          class="icon-button"
+          aria-label="개인정보처리방침 닫기"
+        >
+          ×
+        </button>
+      </div>
+      <div id="privacyBody" class="privacy-content"></div>
+    </dialog>
+    <dialog id="confirmation" aria-labelledby="confirmTitle">
+      <form method="dialog">
+        <h2 id="confirmTitle">삭제할까요?</h2>
+        <p id="confirmText"></p>
+        <div class="dialog-actions">
+          <button class="button" value="cancel" autofocus>취소</button
+          ><button class="button danger" value="delete">삭제</button>
+        </div>
+      </form>
+    </dialog>
+    <input id="importFile" type="file" accept=".pmcanvas,.json,application/json" hidden />
+    <div id="toast" role="status" hidden></div>
+  </body>
+</html>

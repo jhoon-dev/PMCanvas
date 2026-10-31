@@ -8,7 +8,7 @@ App Store Connect의 신규 앱 등록이 **계약 업데이트** 안내로 차�
 
 ## 앱과 서명 자료
 
-1. [Certificates, Identifiers & Profiles](https://developer.apple.com/account/resources/identifiers/list)에서 명시적 App ID **`app.jhoon-dev.pmcanvas`**, 설명 **PM Canvas Desktop**을 등록합니다. 다른 ID로 등록하면 패키지 설정의 `build` → `mac` → `appId`도 일치시켜야 합니다.
+1. [Certificates, Identifiers & Profiles](https://developer.apple.com/account/resources/identifiers/list)에서 명시적 App ID **`dev.jhoon.pmcanvas`**, 설명 **PM Canvas Desktop**을 등록합니다. 다른 ID로 등록하면 패키지 설정의 `build` → `mac` → `appId`도 일치시켜야 합니다.
 2. App Store Connect → 앱 → 신규 앱: 플랫폼 **macOS**, 이름 **PM Canvas Desktop**, 기본 언어 **한국어**, 위 Bundle ID, SKU **PMCanvasDesktopMac**으로 생성합니다. 이름이 이미 사용 중이면 사용할 수 있는 이름을 정합니다.
 3. **Apple Distribution**(또는 Mac App Distribution) 앱 서명 인증서와 **Mac Installer Distribution / 3rd Party Mac Developer Installer** 설치 패키지 인증서를 발급합니다. 개인 키를 포함한 P12를 각각 내보냅니다. Developer ID Application·Installer 인증서는 이 Store 경로에 사용하지 않습니다.
 4. 위 App ID와 앱 서명 인증서에 연결한 **Mac App Store Connect 배포 프로비저닝 프로파일**을 발급합니다. 개발·Developer ID 프로파일을 사용하지 않습니다.
