@@ -123,6 +123,8 @@ export function createHandler({
     ['/index.html', 'index.html'],
     ...[
       'app.js',
+      'icon.png',
+      'LICENSE.electron.txt',
       'project-editor.js',
       'report-ui.js',
       'admin-ui.js',
@@ -341,7 +343,11 @@ export function createHandler({
           ? 'text/javascript'
           : file.endsWith('.css')
             ? 'text/css'
-            : 'text/html';
+            : file.endsWith('.png')
+              ? 'image/png'
+              : file.endsWith('.txt')
+                ? 'text/plain'
+                : 'text/html';
         res.writeHead(200, {
           'Content-Type': type + '; charset=utf-8',
           'Content-Length': body.length,

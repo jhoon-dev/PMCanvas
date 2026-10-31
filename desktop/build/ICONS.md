@@ -9,6 +9,12 @@ Run `npm run prepare:icons` in `desktop` to derive the sidebar image, Mac icon
 and Windows Store tile images from its original 256 pixel PNG. No new artwork
 is drawn. All desktop distribution channels use these same source images.
 
+The iPhone, Android and web icons also derive from this same ICO. Run
+`npm run prepare:icons` in `mobile` to refresh their launcher icons, launch
+screens, in-app brand image and web favicon. iOS uses an opaque background;
+Android's adaptive foreground keeps the complete symbol within its safe area.
+Do not reintroduce a separate P monogram or web logo.
+
 The artwork is supplied with Electron. Its copyright and license are preserved
 in `LICENSE.electron.txt` in packaged distributions and below.
 
