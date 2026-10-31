@@ -90,7 +90,8 @@ final class AppUITests: XCTestCase {
         }
         keepStoreScreenshot(app, "tasks")
         web.links["완료 체크"].tap()
-        let check = web.checkBoxes.matching(NSPredicate(format: "label CONTAINS %@", "Review navigation")).firstMatch
+        // WKWebView exposes HTML checkboxes as native accessibility switches.
+        let check = web.switches.matching(NSPredicate(format: "label CONTAINS %@", "Review navigation")).firstMatch
         XCTAssertTrue(check.waitForExistence(timeout: 10), app.debugDescription)
         check.tap()
         keepStoreScreenshot(app, "checklist")
