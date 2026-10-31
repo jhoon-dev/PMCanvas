@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import { execFile } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 import { _android as android } from 'playwright';
 import { expect as playwrightExpect } from '@playwright/test';
 
@@ -19,8 +21,19 @@ const apk =
 const steps = [],
   errors = [],
   consoleErrors = [];
-const bootTimeout = Number(process.env.PM_ANDROID_BOOT_TIMEOUT_MS || 180000);
-let device, page, projectId, environment;
+const bootTimeout = Number(process.env.PM_ANDROID_BOOT_TIMEOUT_MS || 600000);
+let device, page, projectId, environment, apkData, serial, previousIme;
+const runFile = promisify(execFile);
+const sdk =
+  process.env.ANDROID_HOME ||
+  process.env.ANDROID_SDK_ROOT ||
+  (process.env.LOCALAPPDATA && path.join(process.env.LOCALAPPDATA, 'Android/Sdk'));
+const adb = sdk
+  ? path.join(sdk, 'platform-tools', process.platform === 'win32' ? 'adb.exe' : 'adb')
+  : 'adb';
+async function adbShell(...args) {
+  return (await runFile(adb, ['-s', serial, 'shell', ...args], { timeout: 15000 })).stdout.trim();
+}
 const quote = (value) => "'" + value.replaceAll("'", "'\\''") + "'";
 
 await mkdir(output, { recursive: true });
@@ -36,18 +49,35 @@ async function step(label, operation) {
     throw error;
   }
 }
+async function fillField(locator, value) {
+  await locator.fill('');
+  await expect(locator).toHaveValue('');
+  if (value) await locator.fill(value);
+  await locator.press('Tab');
+  await expect(locator).toHaveValue(value);
+}
 async function attach() {
   page = await (await device.webView({ pkg: appId }, { timeout: 60000 })).page();
-  page.setDefaultTimeout(20000);
+  page.setDefaultTimeout(60000);
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('console', (message) => {
     if (message.type() === 'error') consoleErrors.push(message.text());
   });
   await expect(page.getByRole('button', { name: '＋ 새 프로젝트', exact: true })).toBeVisible();
   assert.equal(await page.evaluate(() => window.Capacitor.getPlatform()), 'android');
+  environment.userAgent = await page.evaluate(() => navigator.userAgent);
 }
-async function screenshot(label) {
+async function screenshot(label, { webView = true } = {}) {
   await mkdir(output, { recursive: true });
+  if (
+    webView &&
+    page &&
+    !page.isClosed() &&
+    (await page.evaluate(() => document.visibilityState)) === 'visible'
+  ) {
+    // Flush the WebView compositor before capturing the Android surface.
+    await page.screenshot({ path: path.join(output, label + '-webview.png') });
+  }
   await device.screenshot({ path: path.join(output, label + '.png') });
 }
 async function readExport(extension) {
@@ -61,7 +91,7 @@ async function nativeHierarchy(label) {
   const file = '/sdcard/pmcanvas-native-smoke.xml';
   let timeout;
   try {
-    await Promise.race([
+    const result = await Promise.race([
       device.shell('uiautomator dump ' + file),
       new Promise((_, reject) => {
         timeout = setTimeout(
@@ -70,6 +100,11 @@ async function nativeHierarchy(label) {
         );
       }),
     ]);
+    if (!/UI hier\w+ dumped to/.test(result.toString())) {
+      // Android can briefly expose no accessibility root while opening a native activity.
+      await writeFile(path.join(output, label + '-dump.txt'), result.toString());
+      return '';
+    }
   } finally {
     clearTimeout(timeout);
   }
@@ -80,19 +115,38 @@ async function nativeHierarchy(label) {
 async function back() {
   await device.shell('input keyevent KEYCODE_BACK');
 }
+async function stopApp() {
+  await device.shell(`am force-stop ${appId}`);
+  await expect.poll(() => device.webViews().filter((view) => view.pkg() === appId).length).toBe(0);
+}
+async function waitForNative(label, pattern) {
+  let xml;
+  await expect
+    .poll(async () => (xml = await nativeHierarchy(label)), { timeout: 90000 })
+    .toMatch(pattern);
+  return xml;
+}
 async function nativeTap(selector) {
-  const xml = await nativeHierarchy('native-navigation');
-  const nodes = [...xml.matchAll(/<node\b[^>]*>/g)].map(([tag]) =>
-    Object.fromEntries(
-      [...tag.matchAll(/([\w-]+)="([^"]*)"/g)].map(([, key, value]) => [key, value]),
-    ),
-  );
-  const matches = nodes.filter((node) =>
-    Object.entries(selector).every(([key, value]) =>
-      value instanceof RegExp ? value.test(node[key] || '') : node[key] === value,
-    ),
-  );
-  assert.equal(matches.length, 1, `Expected one native control: ${JSON.stringify(selector)}`);
+  let matches;
+  await expect
+    .poll(
+      async () => {
+        const xml = await nativeHierarchy('native-navigation');
+        const nodes = [...xml.matchAll(/<node\b[^>]*>/g)].map(([tag]) =>
+          Object.fromEntries(
+            [...tag.matchAll(/([\w-]+)="([^"]*)"/g)].map(([, key, value]) => [key, value]),
+          ),
+        );
+        matches = nodes.filter((node) =>
+          Object.entries(selector).every(([key, value]) =>
+            value instanceof RegExp ? value.test(node[key] || '') : node[key] === value,
+          ),
+        );
+        return matches.length;
+      },
+      { timeout: 60000 },
+    )
+    .toBe(1);
   const bounds = matches[0].bounds.match(/\[(\d+),(\d+)\]\[(\d+),(\d+)\]/);
   assert.ok(bounds, 'The native control must have screen bounds.');
   const [, left, top, right, bottom] = bounds.map(Number);
@@ -102,87 +156,99 @@ async function nativeTap(selector) {
 }
 
 try {
-  const devices = await android.devices({ omitDriverInstall: true });
-  const candidates = devices.filter(
-    (entry) =>
-      entry.serial().startsWith('emulator-') &&
-      (!process.env.PM_ANDROID_SERIAL || entry.serial() === process.env.PM_ANDROID_SERIAL),
-  );
+  const listed = (await runFile(adb, ['devices'])).stdout;
+  const candidates = [...listed.matchAll(/^(emulator-\d+)\s+device\s*$/gm)]
+    .map((match) => match[1])
+    .filter((entry) => !process.env.PM_ANDROID_SERIAL || entry === process.env.PM_ANDROID_SERIAL);
   assert.equal(
     candidates.length,
     1,
     'Start one Android emulator, or set PM_ANDROID_SERIAL to its serial.',
   );
-  device = candidates[0];
-  device.setDefaultTimeout(30000);
-  const version = (await device.shell('getprop ro.build.version.release')).toString().trim();
+  serial = candidates[0];
+  const version = await adbShell('getprop', 'ro.build.version.release');
+  apkData = await readFile(apk);
   environment = {
     android: version,
-    sdk: (await device.shell('getprop ro.build.version.sdk')).toString().trim(),
-    fingerprint: (await device.shell('getprop ro.build.fingerprint')).toString().trim(),
-    apkSha256: createHash('sha256')
-      .update(await readFile(apk))
-      .digest('hex'),
+    sdk: await adbShell('getprop', 'ro.build.version.sdk'),
+    fingerprint: await adbShell('getprop', 'ro.build.fingerprint'),
+    apkSha256: createHash('sha256').update(apkData).digest('hex'),
   };
-  console.log(`Device: ${device.serial()} / ${device.model()} / Android ${version}`);
+  console.log(`Device: ${serial} / Android ${version}`);
   await step('wait for Android system startup to finish', async () => {
     await expect
-      .poll(async () => (await device.shell('getprop sys.boot_completed')).toString().trim(), {
+      .poll(() => adbShell('getprop', 'sys.boot_completed'), {
         timeout: bootTimeout,
         intervals: [1000, 2000, 5000],
       })
       .toBe('1');
     await expect
-      .poll(async () => (await device.shell('getprop init.svc.bootanim')).toString().trim(), {
+      .poll(() => adbShell('getprop', 'init.svc.bootanim'), {
         timeout: bootTimeout,
         intervals: [1000, 2000, 5000],
       })
       .toBe('stopped');
   });
+  previousIme = await adbShell('settings', 'get', 'secure', 'show_ime_with_hard_keyboard');
+  await adbShell('settings', 'put', 'secure', 'show_ime_with_hard_keyboard', '0');
+  // WebView discovery polls the guest frequently; start it only after OS startup.
+  device = (await android.devices({ omitDriverInstall: true })).find(
+    (entry) => entry.serial() === serial,
+  );
+  assert.ok(device, 'The selected emulator must remain connected after boot.');
+  device.setDefaultTimeout(30000);
   await device.shell('input keyevent KEYCODE_WAKEUP');
   await step('install and launch the real APK', async () => {
-    await device.installApk(await readFile(apk));
-    await device.shell(`am force-stop ${appId}`);
+    await device.installApk(apkData);
+    await stopApp();
     const launch = (await device.shell(`am start -W -n ${appId}/.MainActivity`)).toString();
     assert.doesNotMatch(launch, /Error|Exception/, launch);
     await attach();
     await screenshot('01-projects');
   });
-  await step('create a project and member in the native WebView', async () => {
-    await page.getByRole('button', { name: '＋ 새 프로젝트', exact: true }).click();
-    await page.locator('[name="name"]').fill(name);
-    await page.locator('[name="description"]').fill('Android 에뮬레이터 기능 검증');
-    await page.getByRole('button', { name: '저장', exact: true }).click();
-    await expect(page.getByRole('heading', { name, exact: true })).toBeVisible();
-    projectId = page.url().split('/').at(-1);
-    await page.getByRole('link', { name: '더보기', exact: true }).click();
-    await page.getByRole('button', { name: '＋ 추가', exact: true }).click();
-    await page.locator('[name="name"]').fill('모바일 담당자');
-    await page.getByRole('button', { name: '저장', exact: true }).click();
-    await expect(page.getByText('모바일 담당자', { exact: true })).toBeVisible();
-    await page.locator('.member-row').filter({ hasText: '모바일 담당자' }).click();
-    await page.locator('[name="role"]').fill('Android QA');
-    await page.locator('[name="hours"]').fill('6');
-    await page.locator('[name="allocation"]').fill('80');
-    await page.getByRole('button', { name: '저장', exact: true }).click();
-    await expect(page.locator('.member-row')).toContainText('Android QA');
-    await expect(page.locator('.member-row')).toContainText('6h / 일 · 80%');
-  });
+  await step(
+    'create a durable project, immediately restart, then create and edit a member',
+    async () => {
+      await page.getByRole('button', { name: '＋ 새 프로젝트', exact: true }).click();
+      await fillField(page.locator('[name="name"]'), name);
+      await fillField(page.locator('[name="description"]'), 'Android 에뮬레이터 기능 검증');
+      await page.getByRole('button', { name: '저장', exact: true }).click();
+      await expect(page.getByRole('heading', { name, exact: true })).toBeVisible();
+      projectId = page.url().split('/').at(-1);
+      await stopApp();
+      await device.shell(`am start -n ${appId}/.MainActivity`);
+      await attach();
+      await page.getByRole('button', { name: new RegExp(name) }).click();
+      await expect(page.getByRole('heading', { name, exact: true })).toBeVisible();
+      await page.getByRole('link', { name: '더보기', exact: true }).click();
+      await page.getByRole('button', { name: '＋ 추가', exact: true }).click();
+      await fillField(page.locator('[name="name"]'), '모바일 담당자');
+      await page.getByRole('button', { name: '저장', exact: true }).click();
+      await expect(page.getByText('모바일 담당자', { exact: true })).toBeVisible();
+      await page.locator('.member-row').filter({ hasText: '모바일 담당자' }).click();
+      await fillField(page.locator('[name="role"]'), 'Android QA');
+      await fillField(page.locator('[name="hours"]'), '6');
+      await fillField(page.locator('[name="allocation"]'), '80');
+      await page.getByRole('button', { name: '저장', exact: true }).click();
+      await expect(page.locator('.member-row')).toContainText('Android QA');
+      await expect(page.locator('.member-row')).toContainText('6h / 일 · 80%');
+    },
+  );
   await step('create and edit a task with a weighted checklist', async () => {
     await page.getByRole('link', { name: '업무', exact: true }).click();
     await page
       .locator('.section-heading')
       .getByRole('button', { name: '＋ 업무 추가', exact: true })
       .click();
-    await page.locator('[name="name"]').fill('Android 주요 기능');
-    await page.locator('[name="itemTitle"]').fill('프로젝트 저장');
-    await page.locator('[name="itemHours"]').fill('2');
+    await fillField(page.locator('[name="name"]'), 'Android 주요 기능');
+    await fillField(page.locator('[name="itemTitle"]'), '프로젝트 저장');
+    await fillField(page.locator('[name="itemHours"]'), '2');
     await page.getByRole('button', { name: '＋ 세부 작업 추가', exact: true }).click();
-    await page.locator('[name="itemTitle"]').nth(1).fill('파일 가져오기와 공유');
-    await page.locator('[name="itemHours"]').nth(1).fill('6');
+    await fillField(page.locator('[name="itemTitle"]').nth(1), '파일 가져오기와 공유');
+    await fillField(page.locator('[name="itemHours"]').nth(1), '6');
     await page.getByRole('button', { name: '저장', exact: true }).click();
     await page.getByRole('button', { name: 'Android 주요 기능', exact: true }).click();
-    await page.locator('[name="name"]').fill('Android 주요 기능 검증');
+    await fillField(page.locator('[name="name"]'), 'Android 주요 기능 검증');
     await page.getByRole('button', { name: '저장', exact: true }).click();
     await expect(
       page.getByRole('button', { name: 'Android 주요 기능 검증', exact: true }),
@@ -196,9 +262,9 @@ try {
     await expect(page.locator('[data-item]:checked')).toHaveCount(1);
     await screenshot('02-checklist');
     await page.getByRole('link', { name: '업무', exact: true }).click();
-    await page.getByRole('searchbox', { name: '업무 검색' }).fill('없는 업무');
+    await fillField(page.getByRole('searchbox', { name: '업무 검색' }), '없는 업무');
     await expect(page.getByRole('heading', { name: '검색 결과가 없습니다' })).toBeVisible();
-    await page.getByRole('searchbox', { name: '업무 검색' }).fill('');
+    await fillField(page.getByRole('searchbox', { name: '업무 검색' }), '');
     const ownerId = await page.locator('#owner option').nth(1).getAttribute('value');
     await page.getByLabel('담당자 필터').selectOption(ownerId);
     await expect(page.locator('.task-card')).toHaveCount(1);
@@ -229,9 +295,14 @@ try {
   await step('Android Back cancels editing without losing the saved project', async () => {
     await page.getByRole('link', { name: '업무', exact: true }).click();
     await page.getByRole('button', { name: 'Android 주요 기능 검증', exact: true }).click();
-    await page.locator('[name="name"]').fill('취소할 수정');
+    await fillField(page.locator('[name="name"]'), '취소할 수정');
     await back();
-    if (await page.locator('#editor').isVisible()) await back();
+    try {
+      await expect(page.locator('#editor')).not.toBeVisible({ timeout: 3000 });
+    } catch {
+      // If the software keyboard consumed Back, the second press closes the editor.
+      await back();
+    }
     await expect(page.locator('#editor')).not.toBeVisible();
     await expect(
       page.getByRole('button', { name: 'Android 주요 기능 검증', exact: true }),
@@ -240,7 +311,7 @@ try {
     await expect(page.getByRole('heading', { name: '나의 프로젝트' })).toBeVisible();
   });
   await step('force-stop and relaunch restore persisted project and completion', async () => {
-    await device.shell(`am force-stop ${appId}`);
+    await stopApp();
     await device.shell(`am start -n ${appId}/.MainActivity`);
     await attach();
     await page.getByRole('button', { name: new RegExp(name) }).click();
@@ -251,9 +322,9 @@ try {
     async () => {
       await page.getByRole('link', { name: '더보기', exact: true }).click();
       await page.getByRole('button', { name: '프로젝트 내보내기', exact: true }).click();
-      const xml = await nativeHierarchy('04-share');
+      const xml = await waitForNative('04-share', /chooser|resolver/i);
       assert.match(xml, /chooser|resolver/i, 'Android share UI must be visible.');
-      await screenshot('04-share');
+      await screenshot('04-share', { webView: false });
       const backup = JSON.parse(await readExport('.pmcanvas'));
       assert.equal(backup.format, 'pm-canvas-project');
       assert.equal(backup.project.name, name);
@@ -267,9 +338,9 @@ try {
   );
   await step('native CSV sharing writes a report', async () => {
     await page.getByRole('button', { name: '업무 보고서 CSV', exact: true }).click();
-    const xml = await nativeHierarchy('05-csv-share');
+    const xml = await waitForNative('05-csv-share', /chooser|resolver/i);
     assert.match(xml, /chooser|resolver/i);
-    await screenshot('05-csv-share');
+    await screenshot('05-csv-share', { webView: false });
     const listing = (await device.shell(`run-as ${appId} ls cache/exports`)).toString();
     const file = listing
       .split(/\r?\n/)
@@ -291,10 +362,11 @@ try {
       '/sdcard/Download/PMCanvas-Native-Smoke.pmcanvas',
     );
     await page.getByRole('button', { name: '프로젝트 가져오기', exact: true }).click();
-    await nativeHierarchy('06-picker-initial');
-    await screenshot('06-picker-initial');
+    await waitForNative('06-picker-initial', /documentsui/i);
+    await screenshot('06-picker-initial', { webView: false });
     await nativeTap({ 'content-desc': /Show roots|Open navigation drawer|루트 표시|탐색 창 열기/ });
-    await nativeTap({ text: /^(Downloads|다운로드)$/ });
+    await nativeTap({ text: /^(Downloads|다운로드)$/, 'resource-id': 'android:id/title' });
+    await screenshot('06-picker-downloads', { webView: false });
     await nativeTap({ text: 'PMCanvas-Native-Smoke.pmcanvas', enabled: 'true' });
     await expect(page.locator('.hero-progress strong')).toHaveText('25%');
     const importedId = page.url().split('/').at(-1);
@@ -322,6 +394,7 @@ try {
     await page.locator('#confirmation').getByRole('button', { name: '삭제', exact: true }).click();
     await expect(page.locator('.project-card').filter({ hasText: name })).toHaveCount(1);
     await page.locator('.project-card').filter({ hasText: name }).click();
+    assert.equal(page.url().split('/').at(-1), projectId, 'The original project must remain.');
     await expect(page.locator('.hero-progress strong')).toHaveText('25%');
     await screenshot('08-original-preserved');
   });
@@ -330,8 +403,26 @@ try {
   console.error(error.stack);
   process.exitCode = 1;
   if (device) {
-    await screenshot('failure').catch(() => {});
+    await screenshot('failure', { webView: false }).catch(() => {});
     await nativeHierarchy('failure').catch(() => {});
+  }
+  if (page && !page.isClosed()) {
+    await writeFile(
+      path.join(output, 'page-state.json'),
+      JSON.stringify(
+        await page.evaluate(() => ({
+          url: location.href,
+          text: document.body.innerText,
+          invalidFields: [...document.querySelectorAll(':invalid')].map((element) => ({
+            name: element.name,
+            value: element.value,
+            message: element.validationMessage,
+          })),
+        })),
+        null,
+        2,
+      ),
+    ).catch(() => {});
   }
 } finally {
   await mkdir(output, { recursive: true });
@@ -342,7 +433,7 @@ try {
         appId,
         project: name,
         apk,
-        serial: device?.serial(),
+        serial,
         model: device?.model(),
         environment,
         steps,
@@ -354,5 +445,12 @@ try {
     ) + '\n',
   );
   await device?.close();
+  if (previousIme !== undefined) {
+    await (
+      previousIme === 'null'
+        ? adbShell('settings', 'delete', 'secure', 'show_ime_with_hard_keyboard')
+        : adbShell('settings', 'put', 'secure', 'show_ime_with_hard_keyboard', previousIme)
+    ).catch(() => {});
+  }
   console.log('Android test artifacts: ' + output);
 }

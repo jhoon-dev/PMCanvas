@@ -80,7 +80,7 @@ npm run sync
 npm run test:ios
 ```
 
-실제 Android 에뮬레이터 검증을 다시 실행하려면 `npx playwright install android` 후, 정상 부팅한 테스트용 에뮬레이터에서 `npm run test:android`를 실행합니다. 여러 대가 연결되어 있으면 `PM_ANDROID_SERIAL`로 선택합니다. 스크립트는 개발용 APK를 설치하고 별도의 검증용 프로젝트를 만듭니다. 이번 실행의 환경 문제와 아직 검증하지 못한 항목은 [Android 에뮬레이터 검증 기록](docs/validation/android-emulator-2026-10-30.md)을 확인하세요.
+실제 Android 에뮬레이터 검증은 빌드한 APK와 Android SDK를 준비한 뒤 `npm run test:android`로 실행합니다. 여러 대가 연결되어 있으면 `PM_ANDROID_SERIAL`로 선택합니다. 스크립트는 개발용 APK를 설치하고 별도의 검증용 프로젝트를 만듭니다. WebView와 Android SDK 입력·파일 선택기를 사용하므로 별도 Playwright Android 드라이버 설치는 필요하지 않습니다. Windows의 전용 AVD 실행 스크립트와 부팅 설정은 [2026-10-31 Android 검증 기록](docs/validation/android-emulator-2026-10-31.md)에 설명했습니다.
 
 모델·저장소 테스트는 파일 호환성, WBS·기준 계획 유지, 잘못된 입력, 완료 체크, 삭제 시 연결 정리, 재연결 복원, 동시 수정 충돌과 트랜잭션 실패를 검사합니다. 브라우저 테스트는 Android 크기의 Chromium과 iPhone 크기의 WebKit에서 생성·편집·체크·복원·내보내기·가져오기·삭제 취소·작은 화면·저장 충돌을 검사합니다. 브라우저 에뮬레이션은 실제 기기 검증을 대체하지 않습니다.
 
@@ -91,3 +91,5 @@ CI는 브라우저 검증과 개발용 Android APK 빌드, Mac에서 iPhone 시�
 2026-10-30 Windows에서 모델·저장소 테스트 8개, Android Chromium·iPhone WebKit 시나리오 8개, 포맷·공개 파일·의존성 검사와 개발용 Android APK 빌드를 통과했습니다. 생성한 APK의 앱 ID·서명과 최신 화면 번들 일치도 확인했습니다. 2026-10-31 [Mac CI의 iPhone 네이티브 검증](https://github.com/jhoon-dev/PMCanvas/actions/runs/41157141725)에서 실제 시뮬레이터의 개인정보처리방침·프로젝트 생성·종료 후 복원 테스트와 기기용 아카이브 빌드를 통과했습니다. 양쪽 플랫폼의 실제 기기 동작과 Store 서명·업로드는 아직 검증하지 않았습니다.
 
 App Store Connect의 [PM Canvas](https://appstoreconnect.apple.com/apps/6829098378/distribution)는 `dev.jhoon.pmcanvas`로 등록했으며 macOS 0.8.3과 iOS 0.1.0을 한 앱 레코드에서 관리합니다. iOS 제품 설명은 초안 상태이며 App Review에 제출하거나 게시하지 않았습니다.
+
+2026-10-31에는 부팅 설정을 조정한 Android 15 에뮬레이터에서 실제 APK의 전체 12단계 검증을 통과했습니다. 저장 직후와 완료 기록 변경 후의 강제 종료·복원, 편집·진척률·오프라인 실행 취소·뒤로 가기, 네이티브 공유·파일 선택·가져오기·삭제를 확인했습니다. [결과와 환경 설정](docs/validation/android-emulator-2026-10-31.md)을 참고하세요.

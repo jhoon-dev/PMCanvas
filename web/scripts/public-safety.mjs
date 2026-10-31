@@ -33,6 +33,9 @@ const documentationHosts = new Set([
   'nodejs.org',
   'registry.npmjs.org',
   'capacitorjs.com',
+  'developer.android.com',
+  'developer.chrome.com',
+  'android.googlesource.com',
   'policies.google.com',
 ]);
 const fileExtensions = new Set([
@@ -93,6 +96,7 @@ const fileExtensions = new Set([
   'xcresult',
   'xcscheme',
   'swift',
+  'java',
   'pbxproj',
 ]);
 
