@@ -64,6 +64,15 @@ try {
     'build/iPhoneTests.xcresult',
     'test',
   ]);
+  run('xcrun', [
+    'xcresulttool',
+    'export',
+    'attachments',
+    '--path',
+    'build/iPhoneTests.xcresult',
+    '--output-path',
+    'build/iPhone-test-attachments',
+  ]);
   run('xcodebuild', [
     ...common,
     '-configuration',
@@ -91,6 +100,7 @@ try {
       'PMCanvas-iPhone-simulator.zip',
     ],
     [path.join(build, 'iPhoneTests.xcresult'), 'PMCanvas-iPhone-native-tests.zip'],
+    [path.join(build, 'iPhone-test-attachments'), 'PMCanvas-iPhone-screenshots.zip'],
   ])
     run('ditto', ['-c', '-k', '--keepParent', source, path.join(build, name)]);
   fs.writeFileSync(

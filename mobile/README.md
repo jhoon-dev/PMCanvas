@@ -88,4 +88,6 @@ CI는 브라우저 검증과 개발용 Android APK 빌드, Mac에서 iPhone 시�
 
 아이콘 원본은 `assets/icon.svg`입니다. 아이콘과 시작 화면을 바꾸려면 Chromium 설치 후 `npm run prepare:icons`를 실행합니다. 생성된 네이티브 PNG는 소스 관리하며 일반 앱 빌드에는 브라우저 도구가 필요하지 않습니다.
 
-2026-10-30 Windows에서 모델·저장소 테스트 8개, Android Chromium·iPhone WebKit 시나리오 8개, 포맷·공개 파일·의존성 검사와 개발용 Android APK 빌드를 통과했습니다. 생성한 APK의 앱 ID·서명과 최신 화면 번들 일치도 확인했습니다. iOS 네이티브 빌드와 양쪽 플랫폼의 실제 기기 동작은 아직 검증하지 않았습니다.
+2026-10-30 Windows에서 모델·저장소 테스트 8개, Android Chromium·iPhone WebKit 시나리오 8개, 포맷·공개 파일·의존성 검사와 개발용 Android APK 빌드를 통과했습니다. 생성한 APK의 앱 ID·서명과 최신 화면 번들 일치도 확인했습니다. 2026-10-31 [Mac CI의 iPhone 네이티브 검증](https://github.com/jhoon-dev/PMCanvas/actions/runs/41157141725)에서 실제 시뮬레이터의 개인정보처리방침·프로젝트 생성·종료 후 복원 테스트와 기기용 아카이브 빌드를 통과했습니다. 양쪽 플랫폼의 실제 기기 동작과 Store 서명·업로드는 아직 검증하지 않았습니다.
+
+App Store Connect의 [PM Canvas](https://appstoreconnect.apple.com/apps/6829098378/distribution)는 `dev.jhoon.pmcanvas`로 등록했으며 macOS 0.8.3과 iOS 0.1.0을 한 앱 레코드에서 관리합니다. iOS 제품 설명은 초안 상태이며 App Review에 제출하거나 게시하지 않았습니다.
