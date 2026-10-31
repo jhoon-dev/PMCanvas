@@ -33,6 +33,7 @@ jobs:
       - run: npm run format:check
       - run: npm audit --audit-level=moderate
       - run: npm test
+      - run: node scripts/ios-signature.mjs --self-test
       - run: npm run build && npx cap sync ios
       - run: node scripts/ios-store-screenshots.mjs ${{ matrix.device }}
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

@@ -9,6 +9,7 @@ import xcode from 'xcode';
 import { quietRun, requirePrivateRuntime } from '../../desktop/scripts/mac-signing-core.mjs';
 import { releaseSource } from '../../desktop/scripts/release-policy.mjs';
 import { assertIosProfile, assertIosBundle, iosStoreInputs } from './ios-store-policy.mjs';
+import { inspectAppleSignature } from './ios-signature.mjs';
 
 const mobile = fileURLToPath(new URL('../', import.meta.url));
 const output = path.join(mobile, 'build/app-store');
@@ -215,17 +216,14 @@ try {
   if (!fs.existsSync(path.join(app, 'PrivacyInfo.xcprivacy')))
     throw Error('iOS privacy manifest missing.');
   run('codesign', ['--verify', '--deep', '--strict', '--verbose=2', app]);
-  const entitlements = plist.parse(run('codesign', ['-d', '--entitlements', ':-', app], true));
+  const signature = inspectAppleSignature(app, staging);
+  const { entitlements } = signature;
   if (
     entitlements['application-identifier'] !== expected.team + '.' + expected.bundleId ||
     entitlements['get-task-allow']
   )
     throw Error('Unexpected iOS signing entitlements.');
-  run('codesign', ['-d', '--extract-certificates', path.join(staging, 'signed-cert'), app], true);
-  if (
-    new X509Certificate(fs.readFileSync(path.join(staging, 'signed-cert0'))).fingerprint256 !==
-    certificate.fingerprint256
-  )
+  if (signature.certificate.fingerprint256 !== certificate.fingerprint256)
     throw Error('Exported IPA uses a different signing certificate.');
   const manifest = {
     ...expected,
