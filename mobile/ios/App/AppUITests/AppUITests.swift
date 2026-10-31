@@ -33,9 +33,14 @@ final class AppUITests: XCTestCase {
         // the field again after the keyboard appears before dispatching text.
         _ = app.keyboards.firstMatch.waitForExistence(timeout: 5)
         field.tap()
-        field.typeText(text)
-        XCTAssertEqual(field.value as? String, text, app.debugDescription)
+        // A single rapid key sequence can outrun WKWebView on shared CI hosts.
+        // Let XCTest idle between characters, then commit the keyboard input.
+        for character in text { field.typeText(String(character)) }
         dismissKeyboard(app)
+        let committed = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "value == %@", text), object: field
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [committed], timeout: 10), .completed, app.debugDescription)
     }
 
     private func keepStoreScreenshot(_ app: XCUIApplication, _ name: String) {
