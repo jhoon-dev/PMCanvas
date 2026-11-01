@@ -10,7 +10,7 @@ import {
   shell,
 } from 'electron';
 import path from 'node:path';
-import { unlinkSync, readFileSync } from 'node:fs';
+import { unlinkSync, readFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { DesktopDocument, MAX_BYTES, atomicWrite, serializeDocument } from './document.mjs';
 import { APP_URL, assetPath } from './assets.mjs';
@@ -31,10 +31,14 @@ const metadata = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'
 const PRIVACY_POLICY = 'https://github.com/jhoon-dev/PMCanvas/blob/main/desktop/PRIVACY.md';
 const testing = !app.isPackaged && process.env.PMCANVAS_DESKTOP_TEST === '1';
 // Keep existing recovery, preferences and Chromium storage across the display-name change.
-if (app.isPackaged && !app.commandLine.hasSwitch('user-data-dir'))
-  app.setPath('userData', path.join(app.getPath('appData'), metadata.name));
-if (!app.isPackaged && process.env.PMCANVAS_DESKTOP_DATA)
-  app.setPath('userData', path.resolve(process.env.PMCANVAS_DESKTOP_DATA));
+if (!app.commandLine.hasSwitch('user-data-dir')) {
+  const userData =
+    !app.isPackaged && process.env.PMCANVAS_DESKTOP_DATA
+      ? path.resolve(process.env.PMCANVAS_DESKTOP_DATA)
+      : path.join(app.getPath('appData'), metadata.name);
+  mkdirSync(userData, { recursive: true });
+  app.setPath('userData', userData);
+}
 protocol.registerSchemesAsPrivileged([
   {
     scheme: 'pmcanvas',
