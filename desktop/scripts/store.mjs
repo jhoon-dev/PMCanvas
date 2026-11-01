@@ -153,7 +153,12 @@ try {
       2,
     ) + '\n',
   );
-  if (ciTest) fs.writeFileSync(path.join(output, 'ci-tools.json'), JSON.stringify({ kit }));
+  if (ciTest) {
+    // Lifecycle checks run after the packaging stage has been removed.
+    const ciKit = fs.mkdtempSync(path.join(process.env.RUNNER_TEMP, 'pmcanvas-sdk-'));
+    fs.cpSync(sdk, ciKit, { recursive: true });
+    fs.writeFileSync(path.join(output, 'ci-tools.json'), JSON.stringify({ kit: ciKit }));
+  }
   console.log(
     'PASS: unsigned MSIX verified. Submit production packages to Partner Center for Store signing and certification.',
   );
