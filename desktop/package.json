@@ -3,7 +3,8 @@
   "version": "0.8.3",
   "private": true,
   "description": "Offline project planning for Windows and macOS",
-  "author": "PM Canvas",
+  "author": "jhoon-dev",
+  "productName": "PM Canvas",
   "type": "module",
   "main": "main.mjs",
   "engines": {
@@ -18,10 +19,7 @@
     "test:app": "node test/app-smoke.mjs",
     "pack": "npm run prepare:app && electron-builder --dir",
     "dist:win": "node --env-file-if-exists=.env.msix scripts/store.mjs",
-    "dist:win:legacy": "node --env-file-if-exists=.env.signing scripts/release.mjs win",
     "dist:win:dev": "npm run prepare:app && electron-builder --win nsis --x64 --config.win.signAndEditExecutable=false",
-    "dist:unsigned:win": "node scripts/unsigned.mjs win",
-    "dist:unsigned:mac": "node scripts/unsigned.mjs mac",
     "dist:mac": "node --env-file-if-exists=.env.signing scripts/release.mjs mac",
     "dist:mas": "node --env-file-if-exists=.env.mas scripts/mac-store.mjs",
     "verify:mas": "node scripts/mac-store.mjs --verify",
@@ -40,8 +38,8 @@
     "electron-builder": "26.18.0"
   },
   "build": {
-    "appId": "app.pmcanvas.desktop",
-    "productName": "PM Canvas Desktop",
+    "appId": "app.toolmoa.pmcanvas",
+    "productName": "PM Canvas",
     "directories": {
       "output": "dist"
     },
@@ -105,11 +103,12 @@
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
       "deleteAppDataOnUninstall": false,
-      "include": "build/installer.nsh"
+      "include": "build/installer.nsh",
+      "guid": "df0635bf-66e1-510a-b0e5-9ed63f670162"
     },
     "mac": {
       "icon": "build/icon-mac.png",
-      "appId": "dev.jhoon.pmcanvas",
+      "appId": "app.toolmoa.pmcanvas",
       "target": [
         "dmg",
         "zip"
@@ -132,5 +131,6 @@
     "exceljs": {
       "uuid": "11.1.1"
     }
-  }
+  },
+  "brand": "Toolmoa"
 }

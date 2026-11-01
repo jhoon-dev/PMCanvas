@@ -713,8 +713,13 @@ async function command(name) {
     if (name === 'about') {
       const info = await api.info();
       alert(
-        'PM Canvas Desktop ' +
+        info.displayName +
+          ' ' +
           info.version +
+          '\n' +
+          info.brand +
+          ' · ' +
+          info.developer +
           (info.commit ? '\n' + info.commit.slice(0, 12) : '') +
           (info.development ? '\nDevelopment build' : ''),
       );

@@ -10,7 +10,7 @@ import {
   shell,
 } from 'electron';
 import path from 'node:path';
-import { unlinkSync, readFileSync } from 'node:fs';
+import { unlinkSync, readFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { DesktopDocument, MAX_BYTES, atomicWrite, serializeDocument } from './document.mjs';
 import { APP_URL, assetPath } from './assets.mjs';
@@ -27,10 +27,18 @@ import { UpdateManager } from './update-manager.mjs';
 import { cleanupUpdateCache } from './update-cache.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
+const metadata = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'));
 const PRIVACY_POLICY = 'https://github.com/jhoon-dev/PMCanvas/blob/main/desktop/PRIVACY.md';
 const testing = !app.isPackaged && process.env.PMCANVAS_DESKTOP_TEST === '1';
-if (!app.isPackaged && process.env.PMCANVAS_DESKTOP_DATA)
-  app.setPath('userData', path.resolve(process.env.PMCANVAS_DESKTOP_DATA));
+// Keep existing recovery, preferences and Chromium storage across the display-name change.
+if (!app.commandLine.hasSwitch('user-data-dir')) {
+  const userData =
+    !app.isPackaged && process.env.PMCANVAS_DESKTOP_DATA
+      ? path.resolve(process.env.PMCANVAS_DESKTOP_DATA)
+      : path.join(app.getPath('appData'), metadata.name);
+  mkdirSync(userData, { recursive: true });
+  app.setPath('userData', userData);
+}
 protocol.registerSchemesAsPrivileged([
   {
     scheme: 'pmcanvas',
@@ -72,7 +80,8 @@ else {
     window.setTitle(
       (snapshot.dirty ? '● ' : '') +
         (snapshot.project?.name || 'PM Canvas') +
-        ' — PM Canvas Desktop',
+        ' — ' +
+        metadata.productName,
     );
     window.setDocumentEdited(snapshot.dirty);
     send('desktop:document', snapshot);
@@ -81,7 +90,7 @@ else {
   const message = (error) =>
     dialog.showMessageBox(window, {
       type: 'error',
-      title: 'PM Canvas Desktop',
+      title: metadata.productName,
       message: ui(error.message || String(error)),
     });
   function assertSender(event) {
@@ -396,6 +405,9 @@ else {
           ...JSON.parse(readFileSync(path.join(root, 'app/build-info.json'), 'utf8')),
           version: app.getVersion(),
           platform: process.platform,
+          displayName: metadata.productName,
+          developer: typeof metadata.author === 'string' ? metadata.author : metadata.author.name,
+          brand: metadata.brand,
         }),
         false,
       );
@@ -590,7 +602,7 @@ else {
       console.error('Desktop startup failed:', error.message || String(error));
       await dialog.showMessageBox({
         type: 'error',
-        title: 'PM Canvas Desktop',
+        title: metadata.productName,
         message: error.message || String(error),
       });
       app.quit();

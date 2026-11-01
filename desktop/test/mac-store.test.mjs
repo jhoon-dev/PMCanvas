@@ -50,8 +50,8 @@ test('MAS requires dedicated distribution credentials; verification cannot produ
   const pkg = {
     version: '0.8.3',
     build: {
-      appId: 'app.pmcanvas.desktop',
-      mac: { appId: 'dev.jhoon.pmcanvas', target: ['dmg', 'zip'] },
+      appId: 'test.pmcanvas.desktop',
+      mac: { appId: 'app.toolmoa.pmcanvas', target: ['dmg', 'zip'] },
     },
   };
   assert.throws(() => macStoreConfiguration(pkg, {}), /Configure Mac App Store credentials/);
@@ -66,9 +66,9 @@ test('MAS requires dedicated distribution credentials; verification cannot produ
   };
   const config = macStoreConfiguration(pkg, env);
   assert.equal(config.forceCodeSigning, true);
-  assert.equal(config.appId, 'dev.jhoon.pmcanvas');
-  assert.equal(config.mac.appId, 'dev.jhoon.pmcanvas');
-  assert.equal(pkg.build.appId, 'app.pmcanvas.desktop');
+  assert.equal(config.appId, 'app.toolmoa.pmcanvas');
+  assert.equal(config.mac.appId, 'app.toolmoa.pmcanvas');
+  assert.equal(pkg.build.appId, 'test.pmcanvas.desktop');
   assert.equal(config.mas.bundleVersion, '1');
   assert.equal(config.mas.extendInfo.ElectronTeamID, env.PM_MAS_TEAM_ID);
   assert.equal(config.mas.notarize, false);

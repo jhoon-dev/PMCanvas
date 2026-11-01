@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { assertIosProfile, assertIosBundle, iosStoreInputs } from '../scripts/ios-store-policy.mjs';
 
 const expected = {
-  bundleId: 'dev.jhoon.pmcanvas',
+  bundleId: 'app.toolmoa.pmcanvas',
   team: 'V6445K474Q',
   version: '0.1.0',
   buildNumber: '1.1',

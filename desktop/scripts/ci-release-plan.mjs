@@ -1,5 +1,5 @@
 import fs from 'node:fs';
-import { releasePlan } from './release-policy.mjs';
+import { releasePlan, assertPublicDesktopRelease } from './release-policy.mjs';
 
 const signed = process.env.PM_SIGNED === 'true';
 const unsigned = process.env.PM_UNSIGNED === 'true';
@@ -17,6 +17,7 @@ const plan = releasePlan({
   mode: signed ? 'signed' : 'unsigned',
   platform: process.env.PM_RELEASE_PLATFORM || 'all',
 });
+if (publish) assertPublicDesktopRelease(plan);
 for (const key of ['mode', 'builds', 'installs'])
   fs.appendFileSync(
     process.env.GITHUB_OUTPUT,

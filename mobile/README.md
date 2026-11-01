@@ -1,4 +1,6 @@
-# PM Canvas Mobile
+# PM Canvas — iPhone·Android
+
+Developer **jhoon-dev** · Brand **Toolmoa** · App ID **`app.toolmoa.pmcanvas`** · Display Name **PM Canvas**. [제품 식별·표기 규칙](../README.md#제품-식별표기-규칙)을 따릅니다. iOS·Android의 홈 화면 이름도 `PM Canvas`입니다.
 
 iPhone과 Android에서 사용하는 오프라인 프로젝트 관리 앱입니다. Capacitor 8의 네이티브 프로젝트와 휴대폰 전용 화면을 포함합니다. 공통 계산·검증·편집 코드는 `shared/`에서 가져오며 웹 서버나 Electron에 의존하지 않습니다.
 
@@ -60,7 +62,7 @@ npm ci
 npm run ios
 ```
 
-Xcode에서 App 타깃의 Signing & Capabilities에 본인 Apple Developer Team을 선택하고, 사용할 Bundle Identifier를 지정한 뒤 시뮬레이터나 아이폰으로 실행합니다. iOS Bundle Identifier와 Android application ID는 `dev.jhoon.pmcanvas`이며 [Capacitor 설정](capacitor.config.json)의 `appId`도 같은 값을 사용합니다. Store/TestFlight 배포 전 계정 소유자가 식별자·서명·배포용 프로필을 설정해야 합니다.
+Xcode에서 App 타깃의 Signing & Capabilities에 본인 Apple Developer Team을 선택하고, 사용할 Bundle Identifier를 지정한 뒤 시뮬레이터나 아이폰으로 실행합니다. iOS Bundle Identifier와 Android application ID는 `app.toolmoa.pmcanvas`이며 [Capacitor 설정](capacitor.config.json)의 `appId`도 같은 값을 사용합니다. Store/TestFlight 배포 전 계정 소유자가 식별자·서명·배포용 프로필을 설정해야 합니다.
 
 파일 공유 플러그인의 파일 타임스탬프 사용 사유 `C617.1`을 `App/PrivacyInfo.xcprivacy`에 선언하고 앱 리소스에 포함했습니다. [Capacitor Filesystem 공식 안내](https://capacitorjs.com/docs/apis/filesystem)를 참고하세요. [플랫폼 개발 환경 안내](https://capacitorjs.com/docs/getting-started/environment-setup)도 함께 확인하세요.
 
@@ -94,7 +96,9 @@ CI는 브라우저 검증과 개발용 Android APK 빌드, Mac에서 iPhone 시�
 
 2026-10-30 Windows에서 모델·저장소 테스트 8개, Android Chromium·iPhone WebKit 시나리오 8개, 포맷·공개 파일·의존성 검사와 개발용 Android APK 빌드를 통과했습니다. 생성한 APK의 앱 ID·서명과 최신 화면 번들 일치도 확인했습니다. 2026-10-31 [Mac CI의 iPhone 네이티브 검증](https://github.com/jhoon-dev/PMCanvas/actions/runs/41157141725)에서 실제 시뮬레이터의 개인정보처리방침·프로젝트 생성·종료 후 복원 테스트와 기기용 아카이브 빌드를 통과했습니다. 당시 검증에는 실제 기기와 Store 서명·업로드가 포함되지 않았습니다.
 
-App Store Connect의 [PM Canvas](https://appstoreconnect.apple.com/apps/6829098378/distribution)는 `dev.jhoon.pmcanvas`로 등록했으며 macOS 0.8.3과 iOS 0.1.0을 한 앱 레코드에서 관리합니다. 실제 심사·출시 상태는 App Store Connect에서 확인합니다.
+출시 식별자는 macOS·iOS·Android 모두 `app.toolmoa.pmcanvas`입니다. 2026-11-01 [새 PM Canvas 앱 레코드](https://appstoreconnect.apple.com/apps/6829387538/distribution/info)(Apple ID `6829387538`, SKU `PMCanvas-ToolMoa`)를 iOS·macOS 공통으로 등록했습니다. 이전 앱의 iOS·macOS 심사 제출을 취소하고 앱 레코드를 삭제했으며 새 레코드만 출시 대상으로 사용합니다. 새 식별자의 빌드 업로드·심사 제출·게시는 아직 진행하지 않았습니다. 업로드 전 새 App ID에 맞는 서명·프로비저닝 프로파일을 준비합니다.
+
+10월 30~31일의 네이티브 검증은 변경 전 식별자로 실행한 기록입니다. 과거 결과 JSON과 APK 해시는 그대로 보존하며 새 식별자의 네이티브 검증 결과로 간주하지 않습니다.
 
 ## iOS App Store 제출용 빌드
 

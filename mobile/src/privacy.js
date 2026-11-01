@@ -1,5 +1,5 @@
 export const privacyContent = `
-  <p>PM Canvas Mobile은 계정이나 서버 연결 없이 프로젝트·참여인력·업무·완료 기록을 관리합니다.</p>
+  <p>PM Canvas은 계정이나 서버 연결 없이 프로젝트·참여인력·업무·완료 기록을 관리합니다.</p>
   <h3>기기에 보관하는 정보</h3>
   <p>프로젝트와 업무 기준 시간대는 이 기기의 앱 저장소에 보관합니다. 개발자는 프로젝트, 참여인력 이름, 파일 경로를 자동 수집하지 않습니다. 광고·행동 추적·자동 오류 보고 기능은 없습니다.</p>
   <h3>파일과 공유</h3>
@@ -9,5 +9,5 @@ export const privacyContent = `
   <h3>지원</h3>
   <p>지원 문의는 PM Canvas GitHub Issues에서 받습니다. 공개 게시판이므로 프로젝트 원본, 참여인력 개인정보, 비밀번호나 인증 키를 게시하지 마세요.</p>
   <p><a href="https://github.com/jhoon-dev/PMCanvas/blob/main/mobile/PRIVACY.md" target="_blank" rel="noopener noreferrer">개인정보처리방침 전문</a> · <a href="https://github.com/jhoon-dev/PMCanvas/issues" target="_blank" rel="noopener noreferrer">지원 문의</a></p>
-  <p>시행일: 2026-10-31 · 개발자: JIN HOON KIM</p>
+  <p>시행일: 2026-10-31 · 개발자: jhoon-dev · 브랜드: Toolmoa</p>
 `;

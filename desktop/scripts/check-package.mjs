@@ -8,12 +8,12 @@ if (args.some((arg) => arg !== '--smoke')) throw Error('Usage: check-package.mjs
 const folder = process.env.PM_PACKAGE_DIR || path.join(root, 'dist');
 const options =
   process.platform === 'win32'
-    ? [['win-unpacked', 'resources/app.asar', 'PM Canvas Desktop.exe']]
+    ? [['win-unpacked', 'resources/app.asar', 'PM Canvas.exe']]
     : [
         [
           process.arch === 'arm64' ? 'mac-arm64' : 'mac',
-          'PM Canvas Desktop.app/Contents/Resources/app.asar',
-          'PM Canvas Desktop.app/Contents/MacOS/PM Canvas Desktop',
+          'PM Canvas.app/Contents/Resources/app.asar',
+          'PM Canvas.app/Contents/MacOS/PM Canvas',
         ],
       ];
 for (const [directory, archive, executable] of options) {

@@ -11,7 +11,7 @@ import { expect as playwrightExpect } from '@playwright/test';
 const expect = playwrightExpect.configure({ timeout: 60000 });
 
 const root = fileURLToPath(new URL('../', import.meta.url));
-const appId = 'dev.jhoon.pmcanvas';
+const { appId } = JSON.parse(await readFile(path.join(root, 'capacitor.config.json'), 'utf8'));
 const stamp = new Date().toISOString().replace(/[:.]/g, '-');
 const name = 'PMCanvas-Android-' + stamp;
 const output = path.join(root, 'test-results/android-native', stamp);

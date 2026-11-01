@@ -9,6 +9,7 @@ import {
   assertMainlineCommit,
   editableReleaseDraft,
   releasePlan,
+  assertPublicDesktopRelease,
 } from './release-policy.mjs';
 import { stageReleaseArtifacts } from './release-evidence.mjs';
 import {
@@ -17,7 +18,7 @@ import {
   UPDATE_MANIFEST,
 } from '../update-signatures.mjs';
 
-// Both modes require successful builds and every selected architecture's real installation test.
+// Public GitHub releases are signed/notarized Mac builds; Windows uses Store MSIX.
 if (process.env.GITHUB_ACTIONS !== 'true' || !/^\d+$/.test(process.env.GITHUB_RUN_ID || ''))
   throw Error('An explicitly dispatched GitHub run is required.');
 const root = fileURLToPath(new URL('../../', import.meta.url));
@@ -35,6 +36,7 @@ const plan = releasePlan({
   mode: process.env.PM_RELEASE_MODE || 'unsigned',
   platform: process.env.PM_RELEASE_PLATFORM || 'all',
 });
+assertPublicDesktopRelease(plan);
 const runId = process.env.PM_RELEASE_RUN_ID || process.env.GITHUB_RUN_ID;
 assert.match(runId, /^\d+$/);
 const sourceRun = JSON.parse(gh(['api', 'repos/jhoon-dev/PMCanvas/actions/runs/' + runId]));
@@ -147,17 +149,10 @@ const notes = path.join(stage, 'notes.txt');
 const targets = plan.platforms
   .map((target) => (target === 'win' ? 'Windows x64' : 'Mac Apple Silicon(arm64)·Intel(x64)'))
   .join(', ');
-const trust =
-  plan.mode === 'signed'
-    ? '정식 인증서 서명을 검증했습니다.' +
-      (plan.platforms.includes('mac')
-        ? ' Mac 파일은 Developer ID 서명·Gatekeeper·공증 티켓을 DMG와 ZIP의 앱에서 확인했습니다.'
-        : '')
-    : '정식 인증서 서명·공증 없는 빌드입니다.' +
-      (plan.platforms.includes('mac') ? ' Mac은 실행용 ad-hoc 서명만 적용했습니다.' : '');
+const trust = 'Developer ID 서명·Gatekeeper·공증 티켓을 DMG와 ZIP의 앱에서 확인했습니다.';
 fs.writeFileSync(
   notes,
-  `PM Canvas Desktop ${version}\n\n${targets} 설치 파일과 SHA-256을 제공합니다. ${trust}\n\n` +
+  `PM Canvas ${version}\n\n${targets} 설치 파일과 SHA-256을 제공합니다. ${trust}\n\n` +
     `검증: 선택한 ${evidence.length}개 운영체제/아키텍처에서 0.7.1 설치 → ${version} 업데이트 → 제거 → 재설치를 실제 수행하고 ` +
     '프로젝트·복구·언어·시간대·완료 기록·계층·기준 계획 보존을 확인했습니다. 상세 결과는 install-validation JSON을 확인하세요. ' +
     '프로젝트를 설치 폴더 밖에 저장하고 앱을 종료한 뒤 설치하세요. 파일 옵션 → 앱 설정 → 업데이트 확인에서 새 버전을 확인하고 업데이트를 진행할 수 있습니다.\n',
@@ -170,7 +165,7 @@ if (!release)
     '--target',
     commit,
     '--title',
-    'PM Canvas Desktop ' + version + ' — ' + plan.mode,
+    'PM Canvas ' + version + ' — ' + plan.mode,
     '--notes-file',
     notes,
     '--draft',

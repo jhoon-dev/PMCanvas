@@ -14,7 +14,7 @@ const env = {
 test('Store builds require exact configured Partner Center identities and reject placeholders and injection', () => {
   const config = storeConfiguration(env);
   assert.equal(config.identityName, env.PM_STORE_IDENTITY_NAME);
-  assert.equal(config.displayName, 'PM Canvas Desktop');
+  assert.equal(config.displayName, 'PM Canvas');
   const custom = storeConfiguration({ ...env, PM_STORE_DISPLAY_NAME: 'PM Canvas & Work' });
   assert.match(storeManifest(custom, '0.7.4'), /DisplayName="PM Canvas &amp; Work"/);
   for (const key of Object.keys(env))
@@ -43,7 +43,7 @@ test('MSIX manifest preserves external AppData, escapes identities and uses full
   assert.equal(element('Identity').getAttribute('Publisher'), env.PM_STORE_PUBLISHER);
   assert.equal(element('Identity').getAttribute('Version'), '1.7.4.0');
   assert.equal(element('PublisherDisplayName').textContent, 'Example & Company');
-  assert.equal(element('Application').getAttribute('Executable'), 'app\\PM Canvas Desktop.exe');
+  assert.equal(element('Application').getAttribute('Executable'), 'app\\PM Canvas.exe');
   assert.equal(element('desktop6:FileSystemWriteVirtualization').textContent, 'disabled');
   assert.equal(doc.getElementsByTagName('virtualization:ExcludedDirectory').length, 2);
   assert.match(xml, /Name="unvirtualizedResources"/);

@@ -28,6 +28,7 @@ const documentationHosts = new Set([
   'support.apple.com',
   'account.apple.com',
   'appstoreconnect.apple.com',
+  'partner.microsoft.com',
   'www.apple.com',
   'docs.openssl.org',
   'nodejs.org',
@@ -67,6 +68,7 @@ const fileExtensions = new Set([
   'd',
   'x',
   'exe',
+  'app',
   'asar',
   'ps1',
   'nsh',
@@ -248,12 +250,27 @@ export function inspectPublicFile(file, bytes) {
     const host = match[0].toLowerCase();
     if (
       fileExtensions.has(host.split('.').at(-1)) ||
-      ['blame.ignorerevsfile', 'yyyy.mm.dd'].includes(host)
+      [
+        'blame.ignorerevsfile',
+        'yyyy.mm.dd',
+        'app.toolmoa.pmcanvas',
+        'app.toolmoa.ppm',
+        'build.appid',
+        'build.mac.appid',
+      ].includes(host) ||
+      (host === 'app.toolmoa' &&
+        content.slice(match.index + host.length).startsWith('.{product-id}'))
     )
       continue;
     if (!exampleHost(host) && !documentationHosts.has(host)) add('NON_EXAMPLE_DOMAIN', match.index);
   }
   for (const match of content.matchAll(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g)) {
+    // A labelled MSIX package version is public release metadata, not a network address.
+    if (
+      /\bMSIX \*\*$/.test(content.slice(0, match.index)) &&
+      content.slice(match.index + match[0].length).startsWith('**')
+    )
+      continue;
     if (isIP(match[0]) && !exampleHost(match[0])) add('NON_EXAMPLE_IP', match.index);
   }
   for (const match of content.matchAll(

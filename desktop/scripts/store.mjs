@@ -106,7 +106,10 @@ try {
   fs.writeFileSync(path.join(payload, 'AppxManifest.xml'), manifest);
   // The pinned builder ships checksums for this Windows SDK bundle; no beta MSIX builder target needed.
   const { kit } = await getWindowsKitsBundle({ winCodeSign: '1.1.0', arch: Arch.x64 });
-  const makeappx = path.join(kit, 'makeappx.exe');
+  // Keep the SDK tools and their private assembly manifests together at a short path.
+  const sdk = path.join(stage, 'sdk');
+  fs.cpSync(kit, sdk, { recursive: true });
+  const makeappx = path.join(sdk, 'makeappx.exe');
   const name = `PMCanvas-Desktop-${pkg.version}-Windows-x64${ciTest ? '-CI-TEST-ONLY' : '-Store'}.msix`;
   const file = path.join(output, name),
     extracted = path.join(stage, 'verified');
@@ -150,7 +153,12 @@ try {
       2,
     ) + '\n',
   );
-  if (ciTest) fs.writeFileSync(path.join(output, 'ci-tools.json'), JSON.stringify({ kit }));
+  if (ciTest) {
+    // Lifecycle checks run after the packaging stage has been removed.
+    const ciKit = fs.mkdtempSync(path.join(process.env.RUNNER_TEMP, 'pmcanvas-sdk-'));
+    fs.cpSync(sdk, ciKit, { recursive: true });
+    fs.writeFileSync(path.join(output, 'ci-tools.json'), JSON.stringify({ kit: ciKit }));
+  }
   console.log(
     'PASS: unsigned MSIX verified. Submit production packages to Partner Center for Store signing and certification.',
   );

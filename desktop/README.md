@@ -1,4 +1,6 @@
-# PM Canvas Desktop 0.8.3
+# PM Canvas 0.8.3 — Windows·macOS
+
+Developer **jhoon-dev** · Brand **Toolmoa** · App ID **`app.toolmoa.pmcanvas`** · Display Name **PM Canvas**. [제품 식별·표기 규칙](../README.md#제품-식별표기-규칙)을 따릅니다.
 
 [개인정보처리방침 / Privacy policy](PRIVACY.md). 앱의 **파일 옵션 → 개인정보처리방침** 또는 네이티브 **파일** 메뉴에서도 확인할 수 있습니다.
 
@@ -8,7 +10,7 @@ macOS의 App Store 배포는 [Mac App Store 설정·빌드·제출 안내](MAC-A
 
 빈 프로젝트는 참여인력 → 첫 업무 → 완료 기록 순서로 시작을 안내합니다. 업무 입력창은 이름·담당자·일정·체크리스트를 먼저 보여주며, **분류 · 선행 업무 · 메모**를 펼치면 상위 업무와 추가 설정을 수정할 수 있습니다. 기존 상위·선행 업무나 메모가 있으면 자동으로 펼쳐집니다. 검색 중에는 **필터 초기화**로 전체 업무로 돌아올 수 있으며 입력·완료 기록은 유지됩니다. 상단 실행 취소·다시 실행은 작은 화살표로 표시하며 키보드 단축키도 사용할 수 있습니다.
 
-Windows의 새 배포 경로는 [Microsoft Store 제출용 MSIX](WINDOWS-STORE.md)입니다. Partner Center 앱 예약 후 제품 ID를 설정하면 CI에서 제출 파일을 만들 수 있습니다. 아직 Store에 게시한 상태는 아니며 기존 공개 EXE는 호환용으로 유지합니다. Mac의 [인증서 발급 → 공증 → GitHub Secrets 등록 순서](MAC-SETUP.md)도 단계별로 안내합니다.
+Windows의 새 배포 경로는 [Microsoft Store 제출용 MSIX](WINDOWS-STORE.md)입니다. Partner Center 앱 예약 후 제품 ID를 설정하면 CI에서 제출 파일을 만들 수 있습니다. 현재 새 Store 제품을 심사 중이며 기존 무서명 EXE의 공개 배포는 종료했습니다. Mac의 [인증서 발급 → 공증 → GitHub Secrets 등록 순서](MAC-SETUP.md)도 단계별로 안내합니다.
 
 Mac이 없어도 Windows에서 `npm --prefix desktop run signing:setup`으로 개인 키·CSR 생성, Apple 발급 안내, P12 변환·검증, GitHub Secrets 등록을 이어서 진행할 수 있습니다. 개인 키는 Git 밖에 암호화해 보관하며 입력한 암호를 파일이나 로그에 남기지 않습니다. 자세한 사용법은 [Mac 설정 가이드](MAC-SETUP.md)를 참고하세요.
 
@@ -28,7 +30,7 @@ Mac이 없어도 Windows에서 `npm --prefix desktop run signing:setup`으로 �
 
 프로젝트·계정·파일 경로는 업데이트 서버에 보내지 않습니다. 프로젝트 파일과 PC 설정은 기존 위치에 보존하며, 오프라인에서도 편집과 저장을 계속 사용할 수 있습니다. Windows Store 버전은 GitHub 설치 파일을 사용하지 않습니다.
 
-설치 파일은 [데스크톱 Release](https://github.com/jhoon-dev/PMCanvas/releases?q=desktop-v)에서 받습니다. 프로젝트를 먼저 저장하고 앱을 종료한 뒤 새 설치 파일을 실행하세요. 프로젝트는 설치 폴더 바깥에 보관합니다. 서명·공증 없는 임시 배포 파일은 발급자 신뢰를 제공하지 않으므로 Release의 체크섬과 빌드 상태를 확인하세요.
+Windows 설치와 업데이트는 [Microsoft Store 배포 안내](WINDOWS-STORE.md)를 따릅니다. 기존 EXE·무서명 데스크톱 설치 파일은 공개 배포를 해제했습니다. Mac의 GitHub Release에는 서명·공증을 검증한 파일만 게시합니다. 프로젝트는 설치 폴더 바깥에 보관하고 배포 방식을 바꾸기 전에 파일로 저장하세요.
 
 **파일 옵션 → 업무 기준 시간대**에서 IANA 시간대를 지정할 수 있습니다. 기본값은 `Asia/Seoul`이고 설정은 이 PC에 보존됩니다. 오늘·완료 체크·보고서가 같은 시간대를 사용하며 기존 일정과 완료일은 변환하지 않습니다. 변경사항·열린 입력창·Excel 가져오기를 먼저 저장하거나 취소하세요. 새 기준에서 기존 완료일이 미래가 되는 변경은 거절하여 기록을 보호합니다.
 
@@ -102,7 +104,7 @@ npm run test:app
 npm run test:app -- dist/win-unpacked/resources/app.asar
 
 # Windows에 실제로 설치한 EXE 검증 (PowerShell, 별도 임시 사용자 데이터 사용)
-npm run test:app -- --installed "$env:LOCALAPPDATA\Programs\PM Canvas Desktop\PM Canvas Desktop.exe"
+npm run test:app -- --installed "$env:LOCALAPPDATA\Programs\PM Canvas\PM Canvas.exe"
 ```
 
 화면 검증에는 Playwright Chromium이 필요합니다. 최초 한 번 web/에서 `npx playwright install chromium --only-shell`로 설치합니다. 파일·복구·스키마·계산 검증은 Electron 없이 실행됩니다. 실제 앱 검증은 Electron으로 네이티브 창·격리된 브리지·파일 저장·재시작을 확인합니다.
@@ -138,6 +140,8 @@ $nsisCompiler = Get-ChildItem "$env:LOCALAPPDATA\electron-builder\Cache\nsis" -R
 
 ## 설치 파일 빌드
 
+2026-11-01부터 Windows는 **Microsoft Store MSIX만 배포**합니다. 기존 무서명 데스크톱 릴리스 0.7.1·0.7.2·0.8.0·0.8.1·0.8.2는 공개 배포를 해제했습니다. EXE·무서명 DMG/ZIP을 사용자 다운로드로 제공하지 않으며, 이전 설치본은 공개 해제한 초안으로 보관하며, CI 검증 설치본은 고정된 0.7.1 소스에서 일회용으로 다시 만듭니다.
+
 제거 중 작업 경로가 설치 폴더를 잠그지 않도록 `build/installer.nsh`에서 임시 폴더로 변경합니다. 등록 정보와 바로가기 정리는 electron-builder의 표준 제거 프로그램이 수행하며, 프로젝트·복구 데이터 삭제는 비활성화했습니다. 검사 환경의 차이를 등록 정리 결함으로 오인해 추가했던 별도 정리 도우미는 제거했습니다.
 
 각 운영체제에서 해당 명령을 실행합니다.
@@ -149,7 +153,7 @@ $nsisCompiler = Get-ChildItem "$env:LOCALAPPDATA\electron-builder\Cache\nsis" -R
 | macOS              | `npm run dist:mac`     | Apple Silicon·Intel용 `.dmg`와 `.zip`      |
 | 현재 OS 압축 전 앱 | `npm run pack`         | 패키징된 앱 디렉터리                       |
 
-결과는 `desktop/dist/`에 생성됩니다. Windows 기본 배포는 `dist:win`으로 만드는 MSIX를 Partner Center에 제출하는 방식이며 [Store 설정](WINDOWS-STORE.md)이 필요합니다. `dist:win:dev`는 기존 EXE 개발·호환용이며 별도 인증서가 있는 EXE 배포에는 `dist:win:legacy`를 사용합니다.
+결과는 `desktop/dist/`에 생성됩니다. Windows 기본 배포는 `dist:win`으로 만드는 MSIX를 Partner Center에 제출하는 방식이며 [Store 설정](WINDOWS-STORE.md)이 필요합니다. `dist:win:dev`는 개발·마이그레이션 검증 전용이며 공개 배포하지 않습니다. Windows 공개 배포는 Microsoft Store가 서명한 MSIX만 사용합니다. EXE 배포 명령과 무서명 설치 파일 공개 작업은 제거했습니다.
 
 저장소의 **Desktop verification and builds** 워크플로는 푸시·PR에서 Windows·macOS 파일·화면·날짜/언어·실제 앱과 패키징 후 실행을 자동 검사합니다. 정식 서명 빌드는 별도 수동 실행과 인증서 설정을 사용합니다. [서명·공증 설정](SIGNING.md)을 참고하세요.
 

@@ -1,4 +1,4 @@
-export const IOS_BUNDLE_ID = 'dev.jhoon.pmcanvas';
+export const IOS_BUNDLE_ID = 'app.toolmoa.pmcanvas';
 
 export function iosStoreInputs(pkg, config, env) {
   if (config.appId !== IOS_BUNDLE_ID || !/^\d+\.\d+\.\d+$/.test(pkg.version))
