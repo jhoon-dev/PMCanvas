@@ -1,6 +1,6 @@
 # Windows Microsoft Store 배포 — MSIX
 
-Windows의 기본 배포 경로는 **MSIX → Partner Center → Microsoft Store**입니다. Mac은 Developer ID 서명·공증 후 GitHub Release를 사용합니다. Store는 제출된 MSIX를 심사한 뒤 서명을 제공하므로 Store 배포를 위해 Windows 코드 서명 인증서를 따로 구매할 필요가 없습니다. CI가 만드는 제출 파일은 아직 Store 서명이 없는 파일이며 사용자에게 직접 설치용으로 배포하지 않습니다. [Microsoft 배포 안내](https://learn.microsoft.com/en-us/windows/apps/publish/get-started)
+Windows의 유일한 공개 배포 경로는 **MSIX → Partner Center → Microsoft Store**입니다. Mac은 Developer ID 서명·공증 후 GitHub Release를 사용합니다. Store는 제출된 MSIX를 심사한 뒤 서명을 제공하므로 Store 배포를 위해 Windows 코드 서명 인증서를 따로 구매할 필요가 없습니다. CI가 만드는 제출 파일은 아직 Store 서명이 없는 파일이며 사용자에게 직접 설치용으로 배포하지 않습니다. [Microsoft 배포 안내](https://learn.microsoft.com/en-us/windows/apps/publish/get-started)
 
 ## 현재 출시 대상 — 2026-11-01
 
@@ -10,9 +10,13 @@ Apple·Capacitor·데스크톱 앱의 번들 ID는 `app.toolmoa.pmcanvas`이며,
 
 개발자 **jhoon-dev**, 브랜드 **Toolmoa**, 제품 표시 이름 **PM Canvas**를 사용합니다. [공통 표기 규칙](../README.md#제품-식별표기-규칙)을 따르며, Store 목록의 개발자 필드와 패키지 author는 `jhoon-dev`로 맞춥니다. `PublisherDisplayName`은 Product identity의 법적 발행자 값입니다. 앱·실행 파일은 `PM Canvas`, `PM Canvas.exe`를 사용하고, 기존 `pmcanvas-desktop` 프로필 폴더와 NSIS 업그레이드 GUID는 데이터·설치 호환성을 위해 보존합니다.
 
-2026-11-01 새 제품의 **Submission 1**(제출 ID `1152921505702288369`)을 인증 심사에 제출했고, Partner Center에서 **인증 중 / 사전 처리 중**으로 접수된 것을 확인했습니다. 한국어·영어 목록, 무료·전 세계 배포, 기존 IARC 등급, 제한 기능 사용 사유와 새 패키지 검증을 완료했습니다. 승인·게시 완료를 뜻하지 않습니다. 다음 로컬 패키지는 `PM_STORE_BUILD_NUMBER=2` 이상을 사용합니다.
+2026-11-01 새 제품의 **Submission 1**(제출 ID `1152921505702288369`)을 인증 심사에 제출했고, Partner Center에서 **인증 중 / 사전 처리 중**으로 접수된 것을 확인했습니다. 개발자 `jhoon-dev`·브랜드 `Toolmoa`·제품명 `PM Canvas`를 반영한 한국어·영어 목록과 각 4장의 새 화면, 무료·전 세계 배포, 기존 IARC 등급, 제한 기능 사용 사유와 새 패키지 검증을 완료했습니다. 최초 1.8.4.0 제출을 취소한 뒤 새 1.8.5.0 패키지로 교체해 다시 제출했습니다. 승인·게시 완료를 뜻하지 않습니다. 다음 로컬 패키지는 `PM_STORE_BUILD_NUMBER=3` 이상을 사용합니다.
 
-새 제품용 앱 **0.8.3**, MSIX **1.8.4.0**은 네이티브 실행·저장·재시작·Excel 기능, MakeAppx 생성·추출, 전체 payload 비교를 통과했습니다. 제출 파일의 소스 커밋은 `bed5dc52576463e6c5ec3efc3640d398aa0fb392`, SHA-256은 `689caf99001eeb66955650a40812872c56dcd8732c732e5c952735022a40c699`입니다. SDK 도구는 서명된 원본과 인접한 매니페스트를 짧은 작업 경로로 복사한 뒤 실행합니다.
+새 제품용 앱 **0.8.3**, MSIX **1.8.5.0**은 네이티브 실행·저장·재시작·Excel 기능, MakeAppx 생성·추출, 전체 payload 비교를 통과했습니다. 제출 파일의 소스 커밋은 `9f2782f70cfa13ab3658f5f2817ee26e049105eb`, SHA-256은 `29160b1c31c798f905ab67c421ea6afb48b0f5657b2aa41d48eaadb7eaf40638`입니다. SDK 도구는 서명된 원본과 인접한 매니페스트를 짧은 작업 경로로 복사한 뒤 실행합니다.
+
+## 무서명 배포 종료 — 2026-11-01
+
+공개된 무서명 데스크톱 릴리스 5개(0.7.1·0.7.2·0.8.0·0.8.1·0.8.2)를 비공개 초안으로 전환했습니다. 기존 EXE 다운로드 URL은 인증 없는 요청에 404를 반환합니다. EXE 배포 명령과 무서명 설치 파일의 공개 CI 작업을 제거했으며, 공개 스크립트는 Windows EXE·무서명 파일·이전 무서명 실행의 재공개를 거부합니다. 이전 파일은 인증된 CI의 마이그레이션 검증용으로만 유지합니다. Store 제출용 unsigned MSIX는 Partner Center 전용이며, 사용자에게는 Microsoft Store가 서명한 패키지만 배포합니다.
 
 ## 1. 앱 예약 후 설정할 값
 
@@ -86,4 +90,4 @@ Store 패키지 버전은 앱의 세 필드 `[major, minor, patch]`와 `PM_STORE
 
 Store에서 실행된 앱은 Electron의 실제 패키지 식별 상태로 채널을 구분합니다. **업데이트 확인**은 Microsoft Store 라이브러리로 안내하고 GitHub 설치 파일을 조회하지 않습니다. Mac과 기존 EXE는 기존 GitHub 버전 확인을 유지합니다.
 
-기존 EXE의 설치 복구용 `dist:unsigned:win`, `dist:win:dev`와 별도 인증서를 사용하는 `dist:win:legacy`는 남아 있습니다. 새 Windows 기본 명령 `dist:win`과 기본 안내는 MSIX Store 경로입니다. 기존 공개 EXE 파일은 덮어쓰거나 제거하지 않습니다.
+Windows 공개 배포는 `dist:win` → Partner Center → Microsoft Store만 사용합니다. 기존 EXE·무서명 설치 파일은 공개 배포에서 제외했습니다. `dist:win:dev`와 이전 EXE는 개발·CI 마이그레이션 검증 전용이며 사용자 다운로드로 게시하지 않습니다.

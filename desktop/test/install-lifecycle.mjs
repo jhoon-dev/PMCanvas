@@ -82,22 +82,26 @@ function absentInstallation() {
 }
 async function downloadBaseline() {
   const file = path.join(work, name('0.7.1'));
-  const res = await fetch(
-    'https://github.com/jhoon-dev/PMCanvas/releases/download/desktop-v0.7.1/' + name('0.7.1'),
-    { signal: AbortSignal.timeout(180000) },
-  );
-  assert.equal(res.ok, true, 'Baseline installer download failed.');
+  // Withdrawn installers remain authenticated CI migration fixtures, not public downloads.
+  const asset = { win: 684892289, arm64: 684892081, x64: 684892122 }[
+    platform === 'win' ? 'win' : process.arch
+  ];
   const fd = fs.openSync(file, 'wx', 0o600);
-  let size = 0;
   try {
-    for await (const chunk of res.body) {
-      size += chunk.length;
-      assert.ok(size < 256 * 1024 * 1024);
-      fs.writeSync(fd, chunk);
-    }
+    run(
+      'gh',
+      [
+        'api',
+        'repos/jhoon-dev/PMCanvas/releases/assets/' + asset,
+        '--header',
+        'Accept:application/octet-stream',
+      ],
+      { stdio: ['ignore', fd, 'pipe'] },
+    );
   } finally {
     fs.closeSync(fd);
   }
+  assert.ok(fs.statSync(file).size < 256 * 1024 * 1024);
   assert.equal(
     hash(file),
     baselineHashes[platform === 'win' ? 'win' : process.arch],
@@ -150,7 +154,14 @@ function installPackage(file) {
   }
 }
 async function launch(expectedVersion) {
-  application = await electron.launch({ executablePath: executable(), args: [], timeout: 40000 });
+  application = await electron.launch({
+    executablePath: executable(),
+    args: [],
+    timeout: 40000,
+    env: Object.fromEntries(
+      Object.entries(process.env).filter(([key]) => !['GH_TOKEN', 'GITHUB_TOKEN'].includes(key)),
+    ),
+  });
   const details = await application.evaluate(({ app }) => ({
     version: app.getVersion(),
     profile: app.getPath('userData'),

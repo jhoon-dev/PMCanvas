@@ -31,8 +31,14 @@ export function releasePlan({ mode = 'unsigned', platform = 'all' } = {}) {
     ],
   };
 }
-// Preserve publication recovery for the original unsigned, two-platform runs.
+// Preserve evidence verification for the original private migration fixtures.
 export const releaseJobs = Object.freeze(releasePlan().jobs);
+export function assertPublicDesktopRelease(plan) {
+  if (plan.mode !== 'signed' || plan.platform !== 'mac')
+    throw Error(
+      'Windows distribution is MSIX through Microsoft Store only; unsigned installers cannot be published. Only signed and notarized Mac releases may use GitHub Releases.',
+    );
+}
 export function verifiedReleaseSource(run, jobs, options) {
   if (
     run.repository?.full_name?.toLowerCase() !== 'jhoon-dev/pmcanvas' ||

@@ -9,6 +9,7 @@ import {
   assertMainlineCommit,
   editableReleaseDraft,
   releasePlan,
+  assertPublicDesktopRelease,
 } from './release-policy.mjs';
 import { stageReleaseArtifacts } from './release-evidence.mjs';
 import {
@@ -17,7 +18,7 @@ import {
   UPDATE_MANIFEST,
 } from '../update-signatures.mjs';
 
-// Both modes require successful builds and every selected architecture's real installation test.
+// Public GitHub releases are signed/notarized Mac builds; Windows uses Store MSIX.
 if (process.env.GITHUB_ACTIONS !== 'true' || !/^\d+$/.test(process.env.GITHUB_RUN_ID || ''))
   throw Error('An explicitly dispatched GitHub run is required.');
 const root = fileURLToPath(new URL('../../', import.meta.url));
@@ -35,6 +36,7 @@ const plan = releasePlan({
   mode: process.env.PM_RELEASE_MODE || 'unsigned',
   platform: process.env.PM_RELEASE_PLATFORM || 'all',
 });
+assertPublicDesktopRelease(plan);
 const runId = process.env.PM_RELEASE_RUN_ID || process.env.GITHUB_RUN_ID;
 assert.match(runId, /^\d+$/);
 const sourceRun = JSON.parse(gh(['api', 'repos/jhoon-dev/PMCanvas/actions/runs/' + runId]));
@@ -147,14 +149,7 @@ const notes = path.join(stage, 'notes.txt');
 const targets = plan.platforms
   .map((target) => (target === 'win' ? 'Windows x64' : 'Mac Apple Silicon(arm64)·Intel(x64)'))
   .join(', ');
-const trust =
-  plan.mode === 'signed'
-    ? '정식 인증서 서명을 검증했습니다.' +
-      (plan.platforms.includes('mac')
-        ? ' Mac 파일은 Developer ID 서명·Gatekeeper·공증 티켓을 DMG와 ZIP의 앱에서 확인했습니다.'
-        : '')
-    : '정식 인증서 서명·공증 없는 빌드입니다.' +
-      (plan.platforms.includes('mac') ? ' Mac은 실행용 ad-hoc 서명만 적용했습니다.' : '');
+const trust = 'Developer ID 서명·Gatekeeper·공증 티켓을 DMG와 ZIP의 앱에서 확인했습니다.';
 fs.writeFileSync(
   notes,
   `PM Canvas ${version}\n\n${targets} 설치 파일과 SHA-256을 제공합니다. ${trust}\n\n` +

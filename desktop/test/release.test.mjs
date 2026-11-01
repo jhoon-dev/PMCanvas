@@ -12,7 +12,18 @@ import {
   editableReleaseDraft,
   releaseJobs,
   releasePlan,
+  assertPublicDesktopRelease,
 } from '../scripts/release-policy.mjs';
+
+test('public distribution rejects unsigned installers, Windows EXE releases and recovery bypasses', () => {
+  for (const mode of ['signed', 'unsigned'])
+    for (const platform of ['all', 'win', 'mac']) {
+      const plan = releasePlan({ mode, platform });
+      if (mode === 'signed' && platform === 'mac')
+        assert.doesNotThrow(() => assertPublicDesktopRelease(plan));
+      else assert.throws(() => assertPublicDesktopRelease(plan), /MSIX/);
+    }
+});
 
 test('platform plans keep both default targets and require both Mac architectures without Windows signing', () => {
   assert.equal(releasePlan().jobs.length, 7);
@@ -88,6 +99,9 @@ test('CI dispatch rejects mixed signing modes, unsafe run IDs and publication wi
     { PM_PUBLISH: 'true' },
     { PM_RELEASE_RUN_ID: '12\nextra=value' },
     { PM_RELEASE_PLATFORM: 'mac\nother' },
+    { PM_UNSIGNED: 'true', PM_PUBLISH: 'true', PM_RELEASE_PLATFORM: 'mac' },
+    { PM_UNSIGNED: 'true', PM_PUBLISH: 'true', PM_RELEASE_PLATFORM: 'win' },
+    { PM_PUBLISH: 'true', PM_RELEASE_RUN_ID: '123' },
   ])
     assert.throws(() => run(extra));
   run({ PM_SIGNED: 'true', PM_PUBLISH: 'true', PM_RELEASE_PLATFORM: 'mac' });
@@ -97,7 +111,12 @@ test('CI dispatch rejects mixed signing modes, unsafe run IDs and publication wi
     JSON.parse(lines[1].slice('builds='.length)),
     releasePlan({ platform: 'mac' }).builds,
   );
-  run({ PM_PUBLISH: 'true', PM_RELEASE_RUN_ID: '123' });
+  run({
+    PM_PUBLISH: 'true',
+    PM_RELEASE_RUN_ID: '123',
+    PM_SIGNED: 'true',
+    PM_RELEASE_PLATFORM: 'mac',
+  });
 });
 
 test('publication recovery requires all source checks and rejects another repository, workflow or event', () => {

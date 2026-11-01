@@ -15,20 +15,16 @@ on:
   workflow_dispatch:
     inputs:
       platform:
-        description: Platforms to build, install-test and publish
+        description: Signed Mac builds (Windows distribution uses the MSIX workflow)
         type: choice
-        options: [all, mac, win]
+        options: [mac]
         default: mac
       signed:
         description: Sign Mac releases using desktop-release (Windows uses the Store workflow)
         type: boolean
         default: false
-      unsigned:
-        description: Build unsigned installers for the selected platforms
-        type: boolean
-        default: false
       publish:
-        description: Publish selected signed or unsigned installers after verification
+        description: Publish signed and notarized Mac installers after verification
         type: boolean
         default: false
       release_run:
@@ -53,7 +49,6 @@ jobs:
         run: node desktop/scripts/ci-release-plan.mjs
         env:
           PM_SIGNED: ${{ inputs.signed }}
-          PM_UNSIGNED: ${{ inputs.unsigned }}
           PM_PUBLISH: ${{ inputs.publish }}
           PM_RELEASE_RUN_ID: ${{ inputs.release_run }}
           PM_RELEASE_PLATFORM: ${{ inputs.platform }}
@@ -130,41 +125,10 @@ jobs:
         run: node --test --test-name-pattern='CI macOS imports' desktop/test/mac-signing.test.mjs
         env:
           PM_SIGNING_INTEROP_FOLDER: ${{ runner.temp }}/pmcanvas-signing-interop
-  unsigned:
-    name: unsigned (${{ matrix.os }}, ${{ matrix.target }})
-    if: github.event_name == 'workflow_dispatch' && inputs.unsigned && inputs.release_run == ''
-    needs: [plan, verify, mac-p12-interop]
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJSON(needs.plan.outputs.builds) }}
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: '24'
-      - run: npm ci --ignore-scripts
-        working-directory: web
-      - run: npm ci
-        working-directory: desktop
-      - run: npm run dist:unsigned:${{ matrix.target }}
-        working-directory: desktop
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: PMCanvas-unsigned-${{ matrix.target }}
-          path: |
-            desktop/dist/unsigned-*/*.exe
-            desktop/dist/unsigned-*/*.dmg
-            desktop/dist/unsigned-*/*.zip
-            desktop/dist/unsigned-*/*.sha256
-            desktop/dist/unsigned-*/unsigned-manifest.json
-          if-no-files-found: error
-          retention-days: 14
   install:
     name: install (${{ matrix.os }})
-    if: always() && needs.plan.result == 'success' && (needs.unsigned.result == 'success' || needs.signed.result == 'success')
-    needs: [plan, unsigned, signed]
+    if: always() && needs.plan.result == 'success' && needs.signed.result == 'success'
+    needs: [plan, signed]
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.plan.outputs.installs) }}
@@ -189,6 +153,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
       - run: node test/install-lifecycle.mjs
         working-directory: desktop
+        env:
+          GH_TOKEN: ${{ github.token }}
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
@@ -197,7 +163,7 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
   release:
-    if: always() && github.event_name == 'workflow_dispatch' && inputs.publish && needs.plan.result == 'success' && (needs.install.result == 'success' || inputs.release_run != '')
+    if: always() && github.event_name == 'workflow_dispatch' && inputs.publish && inputs.signed && inputs.platform == 'mac' && needs.plan.result == 'success' && (needs.install.result == 'success' || inputs.release_run != '')
     needs: [plan, install]
     environment: desktop-update-signing
     runs-on: ubuntu-latest
@@ -261,7 +227,6 @@ jobs:
         with:
           name: PMCanvas-signed-${{ matrix.target }}
           path: |
-            desktop/dist/release-*/*.exe
             desktop/dist/release-*/*.dmg
             desktop/dist/release-*/*.zip
             desktop/dist/release-*/*.sha256

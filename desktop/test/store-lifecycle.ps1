@@ -52,7 +52,11 @@ function Run-App($exe, $mode, $version, $registered) {
 try {
   Write-Output 'Store lifecycle: download and seed legacy installer'
   $baseline = Join-Path $work 'PMCanvas-Desktop-0.7.1-Windows-x64.exe'
-  Invoke-WebRequest -UseBasicParsing -Uri 'https://github.com/jhoon-dev/PMCanvas/releases/download/desktop-v0.7.1/PMCanvas-Desktop-0.7.1-Windows-x64.exe' -OutFile $baseline
+  # This withdrawn draft is an authenticated CI migration fixture, not a public download.
+  $download = Start-Process -FilePath (Get-Command gh.exe).Source -ArgumentList @('api', 'repos/jhoon-dev/PMCanvas/releases/assets/684892289', '--header', 'Accept:application/octet-stream') -RedirectStandardOutput $baseline -RedirectStandardError (Join-Path $work 'baseline-download.err') -Wait -PassThru -WindowStyle Hidden
+  if ($download.ExitCode -ne 0) { throw 'Authenticated baseline fixture download failed.' }
+  # The test app and its helper processes do not need the fixture download token.
+  $env:GH_TOKEN = $null
   if ((Get-FileHash -LiteralPath $baseline -Algorithm SHA256).Hash.ToLowerInvariant() -ne '82ca271d86dff7e87a7e1d47850d378aae817994cc2ed168b79e0e89d7c6666c') { throw 'Baseline hash mismatch.' }
   $legacy = Join-Path $work 'legacy'
   Start-Process -FilePath $baseline -ArgumentList @('/S', '/currentuser', ('/D=' + $legacy)) -Wait -WindowStyle Hidden

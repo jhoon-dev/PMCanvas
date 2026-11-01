@@ -16,6 +16,7 @@ let staging;
 try {
   if (args.some((arg) => arg !== '--check') || args.length > 1)
     throw Error('Usage: release.mjs win|mac [--check]');
+  if (target === 'win') throw Error('Windows distribution is MSIX only. Use npm run dist:win.');
   const commit = releaseSource(root);
   requirePublicSafety(checkPublicRepository(root));
   const configuration = signingPolicy(target);
