@@ -2,6 +2,8 @@
 
 현재 CI는 Mac ARM64·Intel DMG/ZIP을 Developer ID로 서명하고 Apple에 공증을 요청합니다. 두 Mac의 설치 검증과 파일 해시 검증을 통과한 뒤 GitHub Release를 공개합니다. Apple 로그인·회원 가입·약관 동의·인증서 발급은 계정 소유자가 진행합니다. Apple 계정 이메일만 등록한 상태로는 서명할 수 없습니다.
 
+출시 앱의 Bundle ID는 `app.toolmoa.pmcanvas`입니다. `package.json`의 `build.appId`와 `build.mac.appId`가 같은 값을 사용하며, Mac App Store·iOS·Android 설정도 이 식별자로 통일합니다. Mac App Store의 앱 등록·프로비저닝 확인 절차는 [Store 배포 문서](MAC-APP-STORE.md)를 확인하세요.
+
 ## Windows 자동 설정 도구 — Mac이 없는 경우
 
 저장소 루트의 PowerShell에서 실행합니다. Node.js와 Git for Windows의 OpenSSL 3, GitHub CLI가 필요합니다. 이 PC의 기본 Git OpenSSL 경로는 도구가 자동으로 찾습니다.

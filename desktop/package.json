@@ -3,7 +3,8 @@
   "version": "0.8.3",
   "private": true,
   "description": "Offline project planning for Windows and macOS",
-  "author": "PM Canvas",
+  "author": "jhoon-dev",
+  "productName": "PM Canvas",
   "type": "module",
   "main": "main.mjs",
   "engines": {
@@ -41,7 +42,7 @@
   },
   "build": {
     "appId": "app.toolmoa.pmcanvas",
-    "productName": "PM Canvas Desktop",
+    "productName": "PM Canvas",
     "directories": {
       "output": "dist"
     },
@@ -105,7 +106,8 @@
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
       "deleteAppDataOnUninstall": false,
-      "include": "build/installer.nsh"
+      "include": "build/installer.nsh",
+      "guid": "df0635bf-66e1-510a-b0e5-9ed63f670162"
     },
     "mac": {
       "icon": "build/icon-mac.png",
@@ -132,5 +134,6 @@
     "exceljs": {
       "uuid": "11.1.1"
     }
-  }
+  },
+  "brand": "Toolmoa"
 }

@@ -87,13 +87,13 @@ try {
   Add-AppxPackage -Path $old
   Check-Preserved
   $installed = Get-AppxPackage -Name $identity
-  Run-App (Join-Path $installed.InstallLocation 'app\PM Canvas Desktop.exe') 'check' $package.version $true
+  Run-App (Join-Path $installed.InstallLocation 'app\PM Canvas.exe') 'check' $package.version $true
   $checks.Add('Migrated the NSIS profile to a registered MSIX and verified Store identity, data and Excel export.')
   Write-Output 'Store lifecycle: update MSIX'
   Add-AppxPackage -Path $new
   Check-Preserved
   $installed = Get-AppxPackage -Name $identity
-  Run-App (Join-Path $installed.InstallLocation 'app\PM Canvas Desktop.exe') 'check' $package.version $true
+  Run-App (Join-Path $installed.InstallLocation 'app\PM Canvas.exe') 'check' $package.version $true
   $checks.Add('Updated MSIX package version while preserving external project, recovery, preferences and language.')
   Write-Output 'Store lifecycle: remove MSIX'
   Get-AppxPackage -Name $identity | Remove-AppxPackage
@@ -103,7 +103,7 @@ try {
   Add-AppxPackage -Path $new
   Check-Preserved
   $installed = Get-AppxPackage -Name $identity
-  Run-App (Join-Path $installed.InstallLocation 'app\PM Canvas Desktop.exe') 'check' $package.version $true
+  Run-App (Join-Path $installed.InstallLocation 'app\PM Canvas.exe') 'check' $package.version $true
   $checks.Add('Reinstalled MSIX and reopened the same project and settings with Store update routing.')
   $report = @{ version=$package.version; commit=$evidence.commit; packageVersion=$evidence.packageVersion; mode='ci-test-only'; msixSha256=$evidence.artifacts[0].sha256; checks=$checks.ToArray(); verifiedAt=(Get-Date).ToUniversalTime().ToString('o') }
   [IO.Directory]::CreateDirectory((Join-Path $desktopRoot 'test-results')) | Out-Null

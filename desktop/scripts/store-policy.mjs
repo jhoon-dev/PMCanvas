@@ -10,9 +10,7 @@ export function storeConfiguration(env = process.env) {
   const publisher = get('PM_STORE_PUBLISHER');
   const publisherDisplayName = get('PM_STORE_PUBLISHER_DISPLAY_NAME');
   const productId = get('PM_STORE_PRODUCT_ID');
-  const displayName = env.PM_STORE_DISPLAY_NAME
-    ? get('PM_STORE_DISPLAY_NAME')
-    : 'PM Canvas Desktop';
+  const displayName = env.PM_STORE_DISPLAY_NAME ? get('PM_STORE_DISPLAY_NAME') : 'PM Canvas';
   if (!/^[A-Za-z0-9.-]{3,50}$/.test(identityName)) throw Error('Invalid Store identity name.');
   if (!/^CN=.{1,250}$/.test(publisher)) throw Error('Invalid Store publisher distinguished name.');
   if (publisherDisplayName.length > 256) throw Error('Invalid Store publisher display name.');
@@ -53,7 +51,7 @@ export function storeManifest(config, version, buildNumber = 0) {
  IgnorableNamespaces="uap desktop6 virtualization rescap">
  <Identity Name="${xml(config.identityName)}" Publisher="${xml(config.publisher)}" Version="${storeVersion(version, buildNumber)}" ProcessorArchitecture="x64"/>
  <Properties>
-  <DisplayName>${xml(config.displayName || 'PM Canvas Desktop')}</DisplayName>
+  <DisplayName>${xml(config.displayName || 'PM Canvas')}</DisplayName>
   <PublisherDisplayName>${xml(config.publisherDisplayName)}</PublisherDisplayName>
   <Description>Offline project planning, WBS, Gantt and Excel reports</Description>
   <Logo>assets\\StoreLogo.png</Logo>
@@ -65,8 +63,8 @@ export function storeManifest(config, version, buildNumber = 0) {
  </Properties>
  <Resources><Resource Language="ko-KR"/><Resource Language="en-US"/></Resources>
  <Dependencies><TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.19041.0" MaxVersionTested="10.0.26100.0"/></Dependencies>
- <Applications><Application Id="PMCanvas" Executable="app\\PM Canvas Desktop.exe" EntryPoint="Windows.FullTrustApplication">
-  <uap:VisualElements DisplayName="${xml(config.displayName || 'PM Canvas Desktop')}" Description="Offline project planning" BackgroundColor="transparent"
+ <Applications><Application Id="PMCanvas" Executable="app\\PM Canvas.exe" EntryPoint="Windows.FullTrustApplication">
+  <uap:VisualElements DisplayName="${xml(config.displayName || 'PM Canvas')}" Description="Offline project planning" BackgroundColor="transparent"
    Square150x150Logo="assets\\Square150x150Logo.png" Square44x44Logo="assets\\Square44x44Logo.png"/>
  </Application></Applications>
  <Capabilities><rescap:Capability Name="runFullTrust"/><rescap:Capability Name="unvirtualizedResources"/></Capabilities>

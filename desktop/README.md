@@ -1,4 +1,6 @@
-# PM Canvas Desktop 0.8.3
+# PM Canvas 0.8.3 — Windows·macOS
+
+Developer **jhoon-dev** · Brand **Toolmoa** · App ID **`app.toolmoa.pmcanvas`** · Display Name **PM Canvas**. [제품 식별·표기 규칙](../README.md#제품-식별표기-규칙)을 따릅니다.
 
 [개인정보처리방침 / Privacy policy](PRIVACY.md). 앱의 **파일 옵션 → 개인정보처리방침** 또는 네이티브 **파일** 메뉴에서도 확인할 수 있습니다.
 
@@ -102,7 +104,7 @@ npm run test:app
 npm run test:app -- dist/win-unpacked/resources/app.asar
 
 # Windows에 실제로 설치한 EXE 검증 (PowerShell, 별도 임시 사용자 데이터 사용)
-npm run test:app -- --installed "$env:LOCALAPPDATA\Programs\PM Canvas Desktop\PM Canvas Desktop.exe"
+npm run test:app -- --installed "$env:LOCALAPPDATA\Programs\PM Canvas\PM Canvas.exe"
 ```
 
 화면 검증에는 Playwright Chromium이 필요합니다. 최초 한 번 web/에서 `npx playwright install chromium --only-shell`로 설치합니다. 파일·복구·스키마·계산 검증은 Electron 없이 실행됩니다. 실제 앱 검증은 Electron으로 네이티브 창·격리된 브리지·파일 저장·재시작을 확인합니다.

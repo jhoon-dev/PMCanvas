@@ -40,5 +40,7 @@
   "overrides": {
     "glob": "14.0.3",
     "minimatch": "11.0.3"
-  }
+  },
+  "author": "jhoon-dev",
+  "brand": "Toolmoa"
 }

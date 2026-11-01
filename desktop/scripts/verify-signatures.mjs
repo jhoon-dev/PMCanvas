@@ -24,7 +24,7 @@ export function verifyMacApp(app, run = execFileSync) {
 export function verifySignatures(target, output, run = execFileSync) {
   if (target === 'win') {
     const files = [
-      path.join(output, 'win-unpacked', 'PM Canvas Desktop.exe'),
+      path.join(output, 'win-unpacked', 'PM Canvas.exe'),
       ...fs
         .readdirSync(output)
         .filter((name) => name.endsWith('.exe'))
@@ -34,7 +34,7 @@ export function verifySignatures(target, output, run = execFileSync) {
     for (const file of files) verifyWindowsSignature(file, run);
   } else if (target === 'mac') {
     for (const dir of ['mac', 'mac-arm64']) {
-      const app = path.join(output, dir, 'PM Canvas Desktop.app');
+      const app = path.join(output, dir, 'PM Canvas.app');
       verifyMacApp(app, run);
     }
   } else throw Error('Unsupported signature target.');

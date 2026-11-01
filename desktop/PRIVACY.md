@@ -2,17 +2,19 @@
 
 시행일 / Effective date: 2026-10-31
 
-개발자 / Publisher: JIN HOON KIM
+개발자 / Developer: jhoon-dev
 
-이 페이지의 본문은 Windows·macOS용 PM Canvas Desktop의 방침입니다. iPhone·Android용 PM Canvas Mobile의 방침은 [모바일 개인정보처리방침](../mobile/PRIVACY.md)에서 확인할 수 있으며 앱 안에서도 오프라인으로 제공됩니다. 모바일 앱은 프로젝트를 기기에 저장하며 개발자 서버로 자동 수집·전송하지 않습니다. 사용자가 내보내기·공유 대상으로 선택한 서비스는 해당 서비스의 방침에 따라 파일을 처리합니다.
+브랜드 / Brand: Toolmoa
 
-The policy below covers PM Canvas Desktop for Windows and macOS. For PM Canvas Mobile on iPhone and Android, see the [mobile privacy policy](../mobile/PRIVACY.md), also available offline inside the app. Mobile projects remain on the device and are not automatically collected or sent to the developer's server. Services chosen by the user to export or share files process those files under their own policies.
+이 페이지의 본문은 Windows·macOS용 PM Canvas의 방침입니다. iPhone·Android용 PM Canvas의 방침은 [모바일 개인정보처리방침](../mobile/PRIVACY.md)에서 확인할 수 있으며 앱 안에서도 오프라인으로 제공됩니다. 모바일 앱은 프로젝트를 기기에 저장하며 개발자 서버로 자동 수집·전송하지 않습니다. 사용자가 내보내기·공유 대상으로 선택한 서비스는 해당 서비스의 방침에 따라 파일을 처리합니다.
+
+The policy below covers PM Canvas for Windows and macOS. For PM Canvas on iPhone and Android, see the [mobile privacy policy](../mobile/PRIVACY.md), also available offline inside the app. Mobile projects remain on the device and are not automatically collected or sent to the developer's server. Services chosen by the user to export or share files process those files under their own policies.
 
 ## 한국어
 
 ### 적용 범위와 처리 목적
 
-이 방침은 Windows·macOS용 **PM Canvas Desktop**에 적용됩니다. 별도로 설치·운영하는 PM Canvas 웹 서버의 데이터 처리에는 적용되지 않습니다.
+이 방침은 Windows·macOS용 **PM Canvas**에 적용됩니다. 별도로 설치·운영하는 PM Canvas 웹 서버의 데이터 처리에는 적용되지 않습니다.
 
 앱은 사용자가 입력하거나 파일에서 가져온 프로젝트명, 참여인력 이름·역할, 업무·일정·메모, 예상 공수와 완료 기록을 처리합니다. 이 정보는 계획·진척률·예상 일정 계산, 화면 표시, 프로젝트 저장·복구와 보고서 생성에 사용됩니다. 참여인력 이름이나 메모에는 개인정보가 포함될 수 있습니다. 앱은 별도 사용자 계정, 연락처 목록, 위치, 카메라 또는 마이크를 요구하지 않습니다.
 
@@ -40,7 +42,7 @@ Mac App Store 설치본은 GitHub 업데이트 API를 조회하거나 설치 파
 
 ### Scope and purpose
 
-This policy covers **PM Canvas Desktop** for Windows and macOS. It does not cover independently operated PM Canvas web servers.
+This policy covers **PM Canvas** for Windows and macOS. It does not cover independently operated PM Canvas web servers.
 
 The app processes project names, team members' names and roles, tasks, schedules, notes, estimated hours and completion records entered by the user or imported from files. It uses this information for planning, progress and forecast calculations, display, saving and recovery, and report generation. Names and notes may contain personal information. The app does not require its own user account, contacts, location, camera or microphone.
 

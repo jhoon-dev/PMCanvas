@@ -54,7 +54,7 @@ try {
     target === 'win'
       ? [path.join(output, 'win-unpacked/resources/app.asar')]
       : ['mac', 'mac-arm64'].map((dir) =>
-          path.join(output, dir, 'PM Canvas Desktop.app/Contents/Resources/app.asar'),
+          path.join(output, dir, 'PM Canvas.app/Contents/Resources/app.asar'),
         );
   for (const archive of archives)
     run('test/package-safety.mjs', [archive, commit, '--development']);
