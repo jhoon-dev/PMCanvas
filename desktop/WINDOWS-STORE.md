@@ -10,7 +10,7 @@ Apple·Capacitor·데스크톱 앱의 번들 ID는 `app.toolmoa.pmcanvas`이며,
 
 개발자 **jhoon-dev**, 브랜드 **Toolmoa**, 제품 표시 이름 **PM Canvas**를 사용합니다. [공통 표기 규칙](../README.md#제품-식별표기-규칙)을 따르며, Store 목록의 개발자 필드와 패키지 author는 `jhoon-dev`로 맞춥니다. `PublisherDisplayName`은 Product identity의 법적 발행자 값입니다. 앱·실행 파일은 `PM Canvas`, `PM Canvas.exe`를 사용하고, 기존 `pmcanvas-desktop` 프로필 폴더와 NSIS 업그레이드 GUID는 데이터·설치 호환성을 위해 보존합니다.
 
-2026-11-01 새 제품의 **Submission 1**(제출 ID `1152921505702288369`)을 인증 심사에 제출했고, Partner Center에서 **인증 중 / 사전 처리 중**으로 접수된 것을 확인했습니다. 개발자 `jhoon-dev`·브랜드 `Toolmoa`·제품명 `PM Canvas`를 반영한 한국어·영어 목록과 각 4장의 새 화면, 무료·전 세계 배포, 기존 IARC 등급, 제한 기능 사용 사유와 새 패키지 검증을 완료했습니다. 최초 1.8.4.0 제출을 취소한 뒤 새 1.8.5.0 패키지로 교체해 다시 제출했습니다. 승인·게시 완료를 뜻하지 않습니다. 다음 로컬 패키지는 `PM_STORE_BUILD_NUMBER=3` 이상을 사용합니다.
+2026-11-01 새 제품의 **Submission 1**(제출 ID `1152921505702288369`)을 인증 심사에 제출했고, Partner Center에서 **인증 중 / 사전 처리 중**으로 접수된 것을 확인했습니다. 개발자 `jhoon-dev`·브랜드 `Toolmoa`·제품명 `PM Canvas`를 반영한 한국어·영어 목록과 각 4장의 새 화면, 무료·전 세계 배포, 기존 IARC 등급, 제한 기능 사용 사유와 새 패키지 검증을 완료했습니다. 최초 제출을 취소한 뒤 아래 새 패키지로 교체해 다시 제출했습니다. 승인·게시 완료를 뜻하지 않습니다. 다음 로컬 패키지는 `PM_STORE_BUILD_NUMBER=3` 이상을 사용합니다.
 
 새 제품용 앱 **0.8.3**, MSIX **1.8.5.0**은 네이티브 실행·저장·재시작·Excel 기능, MakeAppx 생성·추출, 전체 payload 비교를 통과했습니다. 제출 파일의 소스 커밋은 `9f2782f70cfa13ab3658f5f2817ee26e049105eb`, SHA-256은 `29160b1c31c798f905ab67c421ea6afb48b0f5657b2aa41d48eaadb7eaf40638`입니다. SDK 도구는 서명된 원본과 인접한 매니페스트를 짧은 작업 경로로 복사한 뒤 실행합니다.
 
