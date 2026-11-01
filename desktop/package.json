@@ -40,7 +40,7 @@
     "electron-builder": "26.18.0"
   },
   "build": {
-    "appId": "app.pmcanvas.desktop",
+    "appId": "app.toolmoa.pmcanvas",
     "productName": "PM Canvas Desktop",
     "directories": {
       "output": "dist"
@@ -109,7 +109,7 @@
     },
     "mac": {
       "icon": "build/icon-mac.png",
-      "appId": "dev.jhoon.pmcanvas",
+      "appId": "app.toolmoa.pmcanvas",
       "target": [
         "dmg",
         "zip"
