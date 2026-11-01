@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { screenProject } from '../../web/test/support/screen-fixtures.mjs';
 import { captureBaseline } from '../app/shared/planning.js';
 import { verifyWindowsSignature, verifyMacApp } from '../scripts/verify-signatures.mjs';
+import { buildLegacyFixture } from './legacy-fixture.mjs';
 const { _electron: electron } = createRequire(new URL('../../web/package.json', import.meta.url))(
   '@playwright/test',
 );
@@ -27,11 +28,7 @@ const name = (v) =>
   'PMCanvas-Desktop-' +
   v +
   (platform === 'win' ? '-Windows-x64.exe' : '-macOS-' + process.arch + '.dmg');
-const baselineHashes = {
-  win: '82ca271d86dff7e87a7e1d47850d378aae817994cc2ed168b79e0e89d7c6666c',
-  arm64: '118a23853c93414f080ead5399343099255f591eb22a1f2f258ebbb7e80239db',
-  x64: '28cf717bb545d019dff7399e75df057e679ee26f0fd26c529acb7a80a2f69d8a',
-};
+
 const work = fs.mkdtempSync(path.join(process.env.RUNNER_TEMP, 'pmcanvas-install-'));
 const install = path.join(work, platform === 'win' ? 'installed' : 'PM Canvas Desktop.app');
 const projectFile = path.join(work, 'Documents', 'Preserved.pmcanvas');
@@ -80,35 +77,12 @@ function absentInstallation() {
     );
   }
 }
-async function downloadBaseline() {
-  const file = path.join(work, name('0.7.1'));
-  // Withdrawn installers remain authenticated CI migration fixtures, not public downloads.
-  const asset = { win: 684892289, arm64: 684892081, x64: 684892122 }[
-    platform === 'win' ? 'win' : process.arch
-  ];
-  const fd = fs.openSync(file, 'wx', 0o600);
-  try {
-    run(
-      'gh',
-      [
-        'api',
-        'repos/jhoon-dev/PMCanvas/releases/assets/' + asset,
-        '--header',
-        'Accept:application/octet-stream',
-      ],
-      { stdio: ['ignore', fd, 'pipe'] },
-    );
-  } finally {
-    fs.closeSync(fd);
-  }
-  assert.ok(fs.statSync(file).size < 256 * 1024 * 1024);
-  assert.equal(
-    hash(file),
-    baselineHashes[platform === 'win' ? 'win' : process.arch],
-    'Pinned baseline checksum mismatch.',
-  );
-  return file;
+async function prepareBaseline() {
+  const fixture = buildLegacyFixture();
+  assert.equal(hash(fixture.installer), fixture.sha256);
+  return fixture;
 }
+
 function findCurrent(folder, expectedName = name(version)) {
   const matches = [];
   const visit = (dir) => {
@@ -214,7 +188,7 @@ async function waitRemoved() {
 }
 try {
   absentInstallation();
-  const baseline = await downloadBaseline();
+  const baseline = await prepareBaseline();
   const artifactFolder = path.resolve(
     process.argv[2] || path.join(desktop, 'dist/lifecycle-artifact'),
   );
@@ -227,8 +201,8 @@ try {
     verifyMacApp(path.join(extracted, pkg.build.productName + '.app'));
     zipSha256 = hash(zip);
   }
-  installPackage(baseline);
-  checks.push('Installed the checksum-pinned 0.7.1 installer.');
+  installPackage(baseline.installer);
+  checks.push('Installed a CI-only 0.7.1 fixture recreated from its pinned source commit.');
   let page = await launch('0.7.1');
   await page.locator('[data-command="new"]').first().waitFor();
   const project = screenProject();
@@ -292,6 +266,8 @@ try {
     platform: process.platform,
     arch: process.arch,
     baseline: '0.7.1',
+    baselineSourceCommit: baseline.sourceCommit,
+    baselineInstallerSha256: baseline.sha256,
     version,
     mode,
     installerSha256: hash(current),
