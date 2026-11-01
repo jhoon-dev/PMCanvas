@@ -257,7 +257,7 @@ try {
   await step('check an item, filter tasks and calculate 25 percent progress', async () => {
     await page.getByRole('link', { name: '완료 체크', exact: true }).click();
     await page.getByRole('checkbox', { name: /프로젝트 저장/ }).click();
-    await expect(page.locator('[data-item]')).toHaveCount(1);
+    await expect(page.locator('[data-item]')).toHaveCount(2);
     await page.getByLabel('할 일만', { exact: true }).uncheck();
     await expect(page.locator('[data-item]:checked')).toHaveCount(1);
     await screenshot('02-checklist');
@@ -298,11 +298,17 @@ try {
     await fillField(page.locator('[name="name"]'), '취소할 수정');
     await back();
     try {
-      await expect(page.locator('#editor')).not.toBeVisible({ timeout: 3000 });
+      await expect(
+        page.getByRole('heading', { name: '변경사항을 버릴까요?', exact: true }),
+      ).toBeVisible({ timeout: 3000 });
     } catch {
-      // If the software keyboard consumed Back, the second press closes the editor.
+      // The keyboard may consume the first Back; the next requests editor dismissal.
       await back();
     }
+    await expect(
+      page.getByRole('heading', { name: '변경사항을 버릴까요?', exact: true }),
+    ).toBeVisible();
+    await page.getByRole('button', { name: '버리기', exact: true }).click();
     await expect(page.locator('#editor')).not.toBeVisible();
     await expect(
       page.getByRole('button', { name: 'Android 주요 기능 검증', exact: true }),
