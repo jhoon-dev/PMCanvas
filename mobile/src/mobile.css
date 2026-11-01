@@ -572,7 +572,7 @@ main.with-navigation {
 }
 .filters select {
   padding: 10px 8px;
-  font-size: 13px;
+  font-size: 16px;
 }
 .search-box {
   display: flex;
@@ -590,7 +590,7 @@ main.with-navigation {
 .search-box input {
   border: 0;
   padding: 12px 8px;
-  font-size: 14px;
+  font-size: 16px;
   background: transparent;
 }
 .notice {
@@ -617,7 +617,7 @@ main.with-navigation {
 }
 .daily-options input[type='date'] {
   width: 150px;
-  font-size: 13px;
+  font-size: 16px;
   padding: 9px;
 }
 .switch-label {
@@ -836,7 +836,7 @@ body:has(dialog[open]) {
 }
 .form-grid input[type='date'] {
   padding: 10px 7px;
-  font-size: 13px;
+  font-size: 16px;
 }
 .items-title {
   display: flex;
@@ -857,7 +857,8 @@ body:has(dialog[open]) {
   margin-bottom: 10px;
 }
 .item-editor input {
-  font-size: 14px;
+  /* Smaller editable text triggers automatic zoom in iPhone WKWebView. */
+  font-size: 16px;
   padding: 12px 8px;
 }
 .item-editor > span {
@@ -995,4 +996,304 @@ body:has(dialog[open]) {
 }
 .privacy-content a {
   color: #2563eb;
+}
+
+/* Shared touch-first layout for iOS, iPadOS and Android. */
+:root {
+  --muted: #59677d;
+}
+.in-project .app-header {
+  padding-top: calc(12px + var(--inset-top));
+  padding-bottom: 4px;
+}
+.in-project .brand-mark {
+  width: 28px;
+  height: 28px;
+}
+.in-project .brand {
+  font-size: 16px;
+}
+.in-project .brand small,
+.in-project .offline-label {
+  display: none;
+}
+.in-project main {
+  padding-top: 6px;
+}
+.project-heading {
+  margin-top: 0;
+  margin-bottom: 20px;
+}
+.project-heading-line {
+  align-items: center;
+}
+.back-link {
+  margin: 0;
+  font-size: 14px;
+}
+.saved-label {
+  margin-top: 0;
+  font-size: 12px;
+}
+.project-heading h1 {
+  font-size: 24px;
+}
+.date-caption {
+  margin-top: 6px;
+  font-size: 12px;
+}
+.button,
+.dialog-actions .button,
+.stack-actions .button {
+  font-size: 14px;
+}
+.page-heading p,
+.empty-state p,
+.task-meta,
+.field,
+.settings-card > p,
+.member-row strong {
+  font-size: 14px;
+}
+.project-card-body > small,
+.project-card-foot,
+.phase,
+.badge,
+.progress-line strong,
+.field small,
+.form-hint,
+.optional,
+.items-title,
+.items-title > span,
+.check-row small,
+.member-row small,
+.privacy-note,
+.storage-note p,
+.hero-foot,
+.hero-progress > span,
+.metric-grid article > span,
+.forecast-card small {
+  font-size: 12px;
+}
+.task-title {
+  font-size: 17px;
+}
+.task-meta,
+.phase,
+.check-row small,
+.form-hint {
+  color: var(--muted);
+}
+.bottom-nav a {
+  color: #637089;
+  font-size: 12px;
+  min-height: 52px;
+}
+.bottom-nav a[aria-current] {
+  background: #eef0ff;
+  border-radius: 12px;
+}
+.quick-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 16px 0;
+}
+.setup-card {
+  padding: 24px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+}
+.setup-card > p {
+  margin: 10px 0 20px;
+  font-size: 14px;
+  color: var(--muted);
+}
+.setup-card > .primary {
+  width: 100%;
+  margin-bottom: 20px;
+}
+.setup-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 0;
+}
+.setup-step > span {
+  display: grid;
+  place-items: center;
+  flex: 0 0 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #eef0ff;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 700;
+}
+.setup-step strong {
+  font-size: 14px;
+}
+.setup-step p {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.completion-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border: 1px solid #dfe4fa;
+  border-radius: 14px;
+  padding: 18px;
+  background: #eef0ff;
+}
+.completion-summary strong {
+  font-size: 24px;
+}
+.completion-summary strong span,
+.completion-summary p {
+  font-size: 12px;
+  font-weight: 400;
+  color: #526183;
+}
+.completion-summary p {
+  margin-top: 6px;
+}
+.daily-options {
+  flex-wrap: wrap;
+}
+.switch-label {
+  min-height: 44px;
+  font-size: 14px;
+}
+.check-row > span {
+  font-size: 15px;
+}
+.check-row:last-child {
+  padding-bottom: 15px;
+}
+.filter-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: -4px 0 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.task-details {
+  margin: 0 0 20px;
+  padding: 12px 0 0;
+}
+.task-details summary {
+  display: list-item;
+  min-height: 44px;
+  padding: 8px 0;
+  font-size: 14px;
+  color: #455574;
+}
+.task-details[open] summary {
+  margin-bottom: 12px;
+}
+.task-details summary small {
+  display: block;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--muted);
+  padding-left: 16px;
+}
+.item-editor {
+  grid-template-columns: minmax(0, 1fr) 14px 44px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #f8f9fc;
+}
+.item-editor input[name='itemTitle'] {
+  grid-column: 1 / -1;
+}
+.item-editor input[name='itemHours'] {
+  width: 100%;
+}
+.item-editor > span {
+  font-size: 12px;
+}
+.item-editor .icon-button {
+  width: 44px;
+  min-width: 44px;
+}
+#editor {
+  padding: 0;
+  overflow: hidden;
+  max-height: calc(
+    var(--editor-viewport-height, 100dvh) - 24px - var(--inset-top) - var(--inset-bottom)
+  );
+}
+#editorForm {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(
+    var(--editor-viewport-height, 100dvh) - 26px - var(--inset-top) - var(--inset-bottom)
+  );
+}
+#editor .dialog-head {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--line);
+}
+#editorBody {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 20px;
+  scroll-padding: 16px;
+}
+#editor .dialog-actions {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 12px 20px;
+  border-top: 1px solid var(--line);
+  background: #fff;
+}
+#editor .dialog-actions .primary {
+  min-width: 90px;
+}
+#editor .error:not(:empty) {
+  padding: 12px 20px;
+  margin: 0;
+  max-height: 100px;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+#toast {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 16px;
+  min-height: 48px;
+  font-size: 14px;
+}
+.toast-undo {
+  flex-shrink: 0;
+  min-height: 44px;
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  color: #cbd6ff;
+  font-size: 14px;
+  font-weight: 700;
+}
+@media (max-width: 600px) {
+  #editor {
+    width: 100%;
+    top: auto;
+    bottom: var(--editor-bottom, 0px);
+    margin-bottom: 0;
+    border-radius: 20px 20px 0 0;
+  }
+  #editor .dialog-actions {
+    padding-bottom: calc(12px + var(--inset-bottom));
+  }
 }

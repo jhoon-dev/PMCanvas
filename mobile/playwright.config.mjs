@@ -15,6 +15,7 @@ export default defineConfig({
   projects: [
     { name: 'android', use: { ...devices['Pixel 7'] } },
     { name: 'iphone', use: { ...devices['iPhone 13'] } },
+    { name: 'ipad', use: { ...devices['iPad Pro 11'] } },
   ],
   webServer: {
     command: 'npm run preview -- --port 4177 --strictPort',
