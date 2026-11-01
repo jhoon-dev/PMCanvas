@@ -3,5 +3,6 @@
 .idea/
 .DS_Store
 build/
+android/.kotlin/
 ios/App/CapApp-SPM/.build/
 ios/App/CapApp-SPM/.swiftpm/
