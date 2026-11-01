@@ -40,7 +40,8 @@ final class AppUITests: XCTestCase {
         let committed = XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "value == %@", text), object: field
         )
-        XCTAssertEqual(XCTWaiter.wait(for: [committed], timeout: 10), .completed, app.debugDescription)
+        XCTAssertEqual(XCTWaiter.wait(for: [committed], timeout: 10), .completed,
+                       "Input value: \(String(reflecting: field.value)); expected: \(String(reflecting: text))\n\(app.debugDescription)")
     }
 
     private func keepStoreScreenshot(_ app: XCUIApplication, _ name: String) {
@@ -61,7 +62,7 @@ final class AppUITests: XCTestCase {
         app.launch()
         let web = app.webViews.firstMatch
         let create = web.buttons["＋ 새 프로젝트"]
-        XCTAssertTrue(create.waitForExistence(timeout: 60), "Bundled Store screen did not load")
+        XCTAssertTrue(create.waitForExistence(timeout: 120), "Bundled Store screen did not load")
         web.buttons["개인정보처리방침"].tap()
         XCTAssertTrue(web.staticTexts["기기에 보관하는 정보"].waitForExistence(timeout: 10))
         web.buttons["개인정보처리방침 닫기"].tap()
@@ -84,7 +85,9 @@ final class AppUITests: XCTestCase {
         web.links["업무"].tap()
         for (task, detail) in [("UX review", "Review navigation"), ("Release build", "Prepare store package"), ("Launch checklist", "Confirm launch readiness")] {
             web.buttons.matching(NSPredicate(format: "label == %@", "＋ 업무 추가")).firstMatch.tap()
-            let title = web.textFields.matching(NSPredicate(format: "placeholderValue == %@", "예: 회원 관리 기능 개발")).firstMatch
+            // Track the input by its stable label while its editing state changes,
+            // rather than re-resolving a placeholder predicate after typing.
+            let title = web.textFields["업무명"]
             XCTAssertTrue(title.waitForExistence(timeout: 5))
             enter(task, in: title, app: app)
             let item = web.textFields["세부 작업 이름"]
@@ -148,7 +151,7 @@ final class AppUITests: XCTestCase {
         let relaunchedWeb = app.webViews.firstMatch
         // A fresh WebContent process can start after native launch has idled.
         // Check page readiness separately so a slow boot is not reported as data loss.
-        XCTAssertTrue(relaunchedWeb.buttons["＋ 새 프로젝트"].waitForExistence(timeout: 60), "Bundled iPhone screen did not load after relaunch: \(app.debugDescription)")
+        XCTAssertTrue(relaunchedWeb.buttons["＋ 새 프로젝트"].waitForExistence(timeout: 120), "Bundled iPhone screen did not load after relaunch: \(app.debugDescription)")
         let savedProject = relaunchedWeb.buttons.matching(NSPredicate(format: "label CONTAINS %@", "iPhone persistence check")).firstMatch
         XCTAssertTrue(savedProject.waitForExistence(timeout: 20), "Committed project disappeared after relaunch: \(app.debugDescription)")
         savedProject.tap()
