@@ -29,10 +29,10 @@ final class AppUITests: XCTestCase {
     private func enter(_ text: String, in field: XCUIElement, app: XCUIApplication) {
         XCTAssertTrue(field.waitForExistence(timeout: 10))
         field.tap()
-        // Opening the software keyboard changes the web dialog's frame. Resolve
-        // the field again after the keyboard appears before dispatching text.
+        // A second tap during the bottom sheet's keyboard resize can land on
+        // a keyboard key (for example inserting W before the intended text).
+        // Keep the focus from the first tap; typeText re-resolves the field.
         _ = app.keyboards.firstMatch.waitForExistence(timeout: 5)
-        field.tap()
         // A single rapid key sequence can outrun WKWebView on shared CI hosts.
         // Let XCTest idle between characters, then commit the keyboard input.
         for character in text { field.typeText(String(character)) }
