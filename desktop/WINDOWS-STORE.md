@@ -8,7 +8,7 @@ Windows의 기본 배포 경로는 **MSIX → Partner Center → Microsoft Store
 
 Apple·Capacitor·데스크톱 앱의 번들 ID는 `app.toolmoa.pmcanvas`이며, Windows MSIX의 `Package/Identity/Name`은 새 제품의 Product identity에서 발급한 별도 값을 사용합니다. 번들 ID를 MSIX Identity에 임의로 넣지 않습니다.
 
-개발자 **jhoon-dev**, 브랜드 **Toolmoa**, 제품 표시 이름 **PM Canvas**를 사용합니다. [공통 표기 규칙](../README.md#제품-식별표기-규칙)을 따르며, Store 목록의 개발자 필드와 패키지 author는 `jhoon-dev`로 맞춥니다. `PublisherDisplayName`은 Product identity의 법적 발행자 값입니다. 앱·실행 파일은 `PM Canvas`, `PM Canvas.exe`를 사용하고, 기존 `PM Canvas Desktop` 프로필 폴더와 NSIS 업그레이드 GUID는 데이터·설치 호환성을 위해 보존합니다.
+개발자 **jhoon-dev**, 브랜드 **Toolmoa**, 제품 표시 이름 **PM Canvas**를 사용합니다. [공통 표기 규칙](../README.md#제품-식별표기-규칙)을 따르며, Store 목록의 개발자 필드와 패키지 author는 `jhoon-dev`로 맞춥니다. `PublisherDisplayName`은 Product identity의 법적 발행자 값입니다. 앱·실행 파일은 `PM Canvas`, `PM Canvas.exe`를 사용하고, 기존 `pmcanvas-desktop` 프로필 폴더와 NSIS 업그레이드 GUID는 데이터·설치 호환성을 위해 보존합니다.
 
 2026-11-01 새 제품의 **Submission 1**(제출 ID `1152921505702288369`)을 인증 심사에 제출했고, Partner Center에서 **인증 중 / 사전 처리 중**으로 접수된 것을 확인했습니다. 한국어·영어 목록, 무료·전 세계 배포, 기존 IARC 등급, 제한 기능 사용 사유와 새 패키지 검증을 완료했습니다. 승인·게시 완료를 뜻하지 않습니다. 다음 로컬 패키지는 `PM_STORE_BUILD_NUMBER=2` 이상을 사용합니다.
 

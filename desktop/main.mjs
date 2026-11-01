@@ -32,7 +32,7 @@ const PRIVACY_POLICY = 'https://github.com/jhoon-dev/PMCanvas/blob/main/desktop/
 const testing = !app.isPackaged && process.env.PMCANVAS_DESKTOP_TEST === '1';
 // Keep existing recovery, preferences and Chromium storage across the display-name change.
 if (app.isPackaged && !app.commandLine.hasSwitch('user-data-dir'))
-  app.setPath('userData', path.join(app.getPath('appData'), 'PM Canvas Desktop'));
+  app.setPath('userData', path.join(app.getPath('appData'), metadata.name));
 if (!app.isPackaged && process.env.PMCANVAS_DESKTOP_DATA)
   app.setPath('userData', path.resolve(process.env.PMCANVAS_DESKTOP_DATA));
 protocol.registerSchemesAsPrivileged([
