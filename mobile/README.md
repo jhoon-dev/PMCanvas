@@ -96,7 +96,7 @@ CI는 브라우저 검증과 개발용 Android APK 빌드, Mac에서 iPhone 시�
 
 2026-10-30 Windows에서 모델·저장소 테스트 8개, Android Chromium·iPhone WebKit 시나리오 8개, 포맷·공개 파일·의존성 검사와 개발용 Android APK 빌드를 통과했습니다. 생성한 APK의 앱 ID·서명과 최신 화면 번들 일치도 확인했습니다. 2026-10-31 [Mac CI의 iPhone 네이티브 검증](https://github.com/jhoon-dev/PMCanvas/actions/runs/41157141725)에서 실제 시뮬레이터의 개인정보처리방침·프로젝트 생성·종료 후 복원 테스트와 기기용 아카이브 빌드를 통과했습니다. 당시 검증에는 실제 기기와 Store 서명·업로드가 포함되지 않았습니다.
 
-출시 식별자는 macOS·iOS·Android 모두 `app.toolmoa.pmcanvas`입니다. 2026-11-01 [새 PM Canvas 앱 레코드](https://appstoreconnect.apple.com/apps/6829387538/distribution/info)(Apple ID `6829387538`, SKU `PMCanvas-ToolMoa`)를 iOS·macOS 공통으로 등록했습니다. 이전 앱의 iOS·macOS 심사 제출을 취소하고 앱 레코드를 삭제했으며 새 레코드만 출시 대상으로 사용합니다. 새 식별자의 빌드 업로드·심사 제출·게시는 아직 진행하지 않았습니다. 업로드 전 새 App ID에 맞는 서명·프로비저닝 프로파일을 준비합니다.
+출시 식별자는 macOS·iOS·Android 모두 `app.toolmoa.pmcanvas`입니다. 2026-11-01 [새 PM Canvas 앱 레코드](https://appstoreconnect.apple.com/apps/6829387538/distribution/info)(Apple ID `6829387538`, SKU `PMCanvas-ToolMoa`)를 iOS·macOS 공통으로 등록했습니다. 이전 앱의 iOS·macOS 심사 제출을 취소하고 앱 레코드를 삭제했으며 새 레코드만 출시 대상으로 사용합니다. 새 App ID용 iOS 배포 프로파일을 기존 배포 환경에 등록했습니다. [iPhone·iPad 네이티브 스크린샷 검증](https://github.com/jhoon-dev/PMCanvas/actions/runs/41293586331)과 [모바일 네이티브 검증](https://github.com/jhoon-dev/PMCanvas/actions/runs/41293586282)이 통과했으며, 필수 검사를 통과한 PR #32를 병합한 뒤 [main의 iOS 서명·업로드 워크플로](https://github.com/jhoon-dev/PMCanvas/actions/runs/41296552107)를 시작했습니다. App Review 제출·공개 출시는 아직 완료하지 않았습니다.
 
 10월 30~31일의 네이티브 검증은 변경 전 식별자로 실행한 기록입니다. 과거 결과 JSON과 APK 해시는 그대로 보존하며 새 식별자의 네이티브 검증 결과로 간주하지 않습니다.
 
@@ -109,5 +109,9 @@ CI는 브라우저 검증과 개발용 Android APK 빌드, Mac에서 iPhone 시�
 서명은 임시 키체인을 사용하며 앱 Release 타깃에만 적용하고 프로젝트 파일을 복원합니다. IPA의 앱 ID·버전·빌드 번호·프로파일·인타이틀먼트·서명 인증서·개인정보 매니페스트·서명 무결성을 확인한 뒤 Apple 검증·업로드를 수행합니다. `PMCanvas-iOS-App-Store-submission` 아티팩트에는 IPA, SHA-256과 소스 커밋을 포함한 매니페스트, 업로드 결과를 보존합니다. 빌드 번호는 실행 번호와 재실행 차수를 결합해 중복을 방지합니다.
 
 업로드는 App Review 제출이나 출시를 수행하지 않습니다. Apple의 빌드 처리가 끝난 뒤 App Store Connect에서 iOS 빌드, 스크린샷, 심사 정보를 연결하고 심사에 제출합니다. `PMCanvas-iPhone-verification-NOT-for-submission` 아티팩트는 계속 서명 전 검증용으로만 사용합니다.
+
+2026-11-01 새 iOS 버전에 한국어 소개, 실제 iPhone·iPad 스크린샷 각 4장과 기존 PM Canvas 앱의 심사 연락처를 저장했습니다. 새 앱 레코드에는 이전 심사 연락처가 자동 복사되지 않으므로 플랫폼별 저장을 확인했습니다. 연락처 원문은 저장소에 기록하지 않습니다. 공통 가격은 무료, 배포 지역은 175개, 연령 등급은 4+, 개인정보 표시는 데이터 수집 없음입니다.
+
+이전 iOS 제출의 [Apple 심사 메시지](https://appstoreconnect.apple.com/apps/6829098378/distribution/reviewsubmissions/details/ddf53bd8-9324-4ea0-b156-30d073010817)는 Guideline 2.1에 따라 **최신 OS를 실행하는 실제 기기에서 앱 실행부터 일반 사용 흐름까지 보여주는 화면 녹화**와 지원 플랫폼의 실기기 QA를 요청했습니다. 새 앱 레코드에서도 이 요청을 해결한 뒤 재제출합니다. 시뮬레이터 스크린샷·네이티브 테스트 성공을 실기기 녹화나 QA로 표시하지 않습니다. 기기·OS·빌드 정보, 실제 녹화 링크, 생성·편집·완료 체크·재실행 복원·파일 내보내기와 가져오기 결과를 확인해 심사 메모에 추가합니다. 앱 목적·대상 사용자·기능 접근 방법·외부 서비스·지역별 동일 동작 설명은 새 심사 메모에 작성했습니다.
 
 2026-10-31에는 부팅 설정을 조정한 Android 15 에뮬레이터에서 실제 APK의 전체 12단계 검증을 통과했습니다. 저장 직후와 완료 기록 변경 후의 강제 종료·복원, 편집·진척률·오프라인 실행 취소·뒤로 가기, 네이티브 공유·파일 선택·가져오기·삭제를 확인했습니다. [결과와 환경 설정](docs/validation/android-emulator-2026-10-31.md)을 참고하세요.
