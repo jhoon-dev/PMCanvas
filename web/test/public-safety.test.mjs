@@ -36,6 +36,22 @@ test('icon documentation recognizes ICO filenames without treating them as priva
   assert.deepEqual(inspect('desktop/build/ICONS.md', '`build/icon.ico` is the Windows icon.'), []);
 });
 
+test('review evidence filenames are not domains but actual service URLs still require allowed hosts', () => {
+  assert.deepEqual(
+    inspect(
+      'docs/review.md',
+      '[Results](physical-device-results.csv) `PMCanvas-iPhone-YYYYMMDD.mov` `demo.mp4`',
+    ),
+    [],
+  );
+  for (const host of ['private.csv', 'private.mov', 'private.mp4'])
+    assert.ok(
+      inspect('docs/review.md', 'https://' + host).some(
+        (finding) => finding.rule === 'NON_EXAMPLE_HOST',
+      ),
+    );
+});
+
 test('privacy documentation permits the official Microsoft policy host but rejects lookalike hosts', () => {
   assert.deepEqual(
     inspect('desktop/PRIVACY.md', 'https://privacy.microsoft.com/privacystatement'),
