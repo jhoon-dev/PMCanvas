@@ -16,6 +16,8 @@
     "mobile:android": "npm --prefix mobile run android",
     "mobile:ios": "npm --prefix mobile run ios",
     "mobile:build": "npm --prefix mobile run build",
+    "prepare:icons": "npm --prefix mobile run prepare:icons",
+    "verify:icons": "node mobile/scripts/verify-icons.mjs",
     "test:web": "npm --prefix web test",
     "test:desktop": "npm --prefix desktop test",
     "test:mobile": "npm --prefix mobile test",
