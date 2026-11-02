@@ -1,18 +1,26 @@
 # Desktop icon source
 
-`build/icon.ico` is the unmodified icon resource extracted from the previously tested
-Windows 0.8.2 executable (Electron 45.1.0). It contains the original 16, 32, 48
-and 256 pixel representations. The existing Windows atom icon is retained at
-the user's request.
+`build/icon-source.png` is the shared opaque 1024px master for Windows, macOS,
+iPhone and Android. It retains the existing Windows atom artwork supplied with
+Electron 45.1.0. The master is the previously generated iPhone artwork with its
+opaque background, now used by every platform at the user's request.
 
-Run `npm run prepare:icons` in `desktop` to derive the sidebar image, Mac icon
-and Windows Store tile images from its original 256 pixel PNG. No new artwork
-is drawn. All desktop distribution channels use these same source images.
+`build/icon-settings.json` defines the shared background, `#2c2e3a`. Icons have
+no transparent pixels, so wallpaper and operating-system themes do not change
+their background. Windows ICO contains 16, 20, 24, 32, 40, 48, 64, 128 and 256px
+PNG frames. Mac and iPhone use byte-identical copies of the master. Store tiles
+and Android adaptive background use the same color; OS icon masks may differ.
 
-The iPhone, Android and web icons also derive from this same ICO. Run
-`npm run prepare:icons` in `mobile` to refresh their launcher icons, launch
-screens, in-app brand image and web favicon. iOS uses an opaque background;
-Android's adaptive foreground keeps the complete symbol within its safe area.
+Install mobile development dependencies and Playwright Chromium, then run
+`npm run prepare:icons` at the repository root to refresh all platforms, launch
+screens, in-app branding and web favicon. The desktop command delegates to the
+same generator for desktop outputs only. Run `npm run verify:icons` to check
+actual pixel opacity, background colors, dimensions, ICO frames and shared
+source copies. `npm --prefix mobile run verify:icons -- --preview` also produces
+a comparison under `test-results/icon-backgrounds/preview.png`.
+
+Keep the master separate from generated output: regeneration never reads its
+own ICO or resized PNGs. Android keeps the symbol within its adaptive safe area.
 Do not reintroduce a separate P monogram or web logo.
 
 The artwork is supplied with Electron. Its copyright and license are preserved

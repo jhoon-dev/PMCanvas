@@ -92,7 +92,7 @@ npm run test:ios
 
 CI는 브라우저 검증과 개발용 Android APK 빌드, Mac에서 iPhone 시뮬레이터의 XCTest 실행 및 서명 전 기기용 아카이브를 수행합니다. iPhone 테스트는 앱 실행, 개인정보처리방침, 프로젝트 생성, 앱 종료·재실행 후 저장 복원을 확인하며 자신이 만든 시뮬레이터만 정리합니다. `PMCanvas-iPhone-verification-NOT-for-submission` 아티팩트에 시뮬레이터 앱·서명 전 기기 아카이브·XCTest 결과를 ZIP으로 보존합니다. 이 파일은 서명된 IPA나 Store 제출본이 아닙니다. Store 배포 전 실제 iPhone과 Android에서 파일 선택·공유·키보드·백그라운드 복귀·업그레이드 후 데이터 보존을 추가로 확인하세요.
 
-아이콘 원본은 데스크톱과 동일한 `../desktop/build/icon.ico`입니다. Chromium 설치 후 `npm run prepare:icons`를 실행하면 iPhone·Android의 실행 아이콘과 시작 화면, 앱 내부 로고, 웹 파비콘을 같은 원본으로 갱신합니다. 생성된 PNG는 소스 관리하며 일반 앱 빌드에는 브라우저 도구가 필요하지 않습니다.
+아이콘 원본은 `../desktop/build/icon-source.png`이며 공통 배경은 `icon-settings.json`의 `#2c2e3a`입니다. Chromium 설치 후 `npm run prepare:icons`를 실행하면 Windows ICO·Mac·iPhone·Android 실행 아이콘과 시작 화면, 앱 내부 로고, 웹 파비콘을 같은 불투명 원본으로 갱신합니다. Mac·iPhone의 1024px 파일은 바이트까지 같으며 Android 적응형 배경과 Windows Store 타일도 같은 색을 사용합니다. `npm run verify:icons`는 실제 이미지의 투명도·배경색·크기와 플랫폼 설정을 검사합니다. 생성된 PNG는 소스 관리하며 일반 앱 빌드에는 브라우저 도구가 필요하지 않습니다.
 
 2026-10-30 Windows에서 모델·저장소 테스트 8개, Android Chromium·iPhone WebKit 시나리오 8개, 포맷·공개 파일·의존성 검사와 개발용 Android APK 빌드를 통과했습니다. 생성한 APK의 앱 ID·서명과 최신 화면 번들 일치도 확인했습니다. 2026-10-31 [Mac CI의 iPhone 네이티브 검증](https://github.com/jhoon-dev/PMCanvas/actions/runs/41157141725)에서 실제 시뮬레이터의 개인정보처리방침·프로젝트 생성·종료 후 복원 테스트와 기기용 아카이브 빌드를 통과했습니다. 당시 검증에는 실제 기기와 Store 서명·업로드가 포함되지 않았습니다.
 
@@ -113,6 +113,8 @@ CI는 브라우저 검증과 개발용 Android APK 빌드, Mac에서 iPhone 시�
 2026-11-01 새 iOS 버전에 한국어 소개, 실제 iPhone·iPad 스크린샷 각 4장과 기존 PM Canvas 앱의 심사 연락처를 저장했습니다. 새 앱 레코드에는 이전 심사 연락처가 자동 복사되지 않으므로 플랫폼별 저장을 확인했습니다. 연락처 원문은 저장소에 기록하지 않습니다. 공통 가격은 무료, 배포 지역은 175개, 연령 등급은 4+, 개인정보 표시는 데이터 수집 없음입니다.
 
 내부 TestFlight 그룹 **PM Canvas Release QA**에 iOS **0.1.0 (20.1)**과 Mac **0.8.3 (60)**을 연결하고 두 빌드가 **테스트 중**인 것을 확인했습니다. 계정 소유자 본인이 내부 테스터로 초대되어 있습니다. 초대를 받은 Apple 계정으로 각 기기의 TestFlight에서 초대를 수락하고 PM Canvas를 설치합니다. iOS 빌드는 iPhone·iPad 공통입니다. 이전 번들 ID 앱과 별도 앱이므로 기존 프로젝트를 먼저 내보내고 새 앱에서 가져옵니다. 기존 앱을 제거하거나 데이터를 지울 필요가 없습니다.
+
+2026-11-02 두 빌드가 내부 그룹에서 **테스트 중**이며 본인 테스터는 **초대됨**인 것을 다시 확인했습니다. 플랫폼별 TestFlight 테스트 안내와 이전 Guideline 2.1 여섯 항목을 반영한 iOS·Mac 심사 메모 초안을 저장하고, iOS 버전에 빌드 **20.1**을 연결했습니다. 실제 기기·OS·QA 결과·영상 링크는 대기 중이며 App Review에 제출하지 않았습니다. [새 ID 심사 준비 자료](../docs/app-store-review/README.md)와 [촬영 순서](../docs/app-store-review/recording-guide.ko.md)를 사용합니다.
 
 이전 iOS 제출의 [Apple 심사 메시지](https://appstoreconnect.apple.com/apps/6829098378/distribution/reviewsubmissions/details/ddf53bd8-9324-4ea0-b156-30d073010817)는 Guideline 2.1에 따라 **최신 OS를 실행하는 실제 기기에서 앱 실행부터 일반 사용 흐름까지 보여주는 화면 녹화**와 지원 플랫폼의 실기기 QA를 요청했습니다. 새 앱 레코드에서도 이 요청을 해결한 뒤 재제출합니다. 시뮬레이터 스크린샷·네이티브 테스트 성공을 실기기 녹화나 QA로 표시하지 않습니다. 기기·OS·빌드 정보, 실제 녹화 링크, 생성·편집·완료 체크·재실행 복원·파일 내보내기와 가져오기 결과를 확인해 심사 메모에 추가합니다. 앱 목적·대상 사용자·기능 접근 방법·외부 서비스·지역별 동일 동작 설명은 새 심사 메모에 작성했습니다.
 

@@ -1,3 +1,9 @@
+import { readFileSync } from 'node:fs';
+
+const { background: iconBackground } = JSON.parse(
+  readFileSync(new URL('../build/icon-settings.json', import.meta.url), 'utf8'),
+);
+
 // Partner Center identities are configuration, never inferred from a personal account.
 export function storeConfiguration(env = process.env) {
   const get = (key) => {
@@ -64,7 +70,7 @@ export function storeManifest(config, version, buildNumber = 0) {
  <Resources><Resource Language="ko-KR"/><Resource Language="en-US"/></Resources>
  <Dependencies><TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.19041.0" MaxVersionTested="10.0.26100.0"/></Dependencies>
  <Applications><Application Id="PMCanvas" Executable="app\\PM Canvas.exe" EntryPoint="Windows.FullTrustApplication">
-  <uap:VisualElements DisplayName="${xml(config.displayName || 'PM Canvas')}" Description="Offline project planning" BackgroundColor="transparent"
+  <uap:VisualElements DisplayName="${xml(config.displayName || 'PM Canvas')}" Description="Offline project planning" BackgroundColor="${xml(iconBackground)}"
    Square150x150Logo="assets\\Square150x150Logo.png" Square44x44Logo="assets\\Square44x44Logo.png"/>
  </Application></Applications>
  <Capabilities><rescap:Capability Name="runFullTrust"/><rescap:Capability Name="unvirtualizedResources"/></Capabilities>

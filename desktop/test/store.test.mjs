@@ -44,6 +44,7 @@ test('MSIX manifest preserves external AppData, escapes identities and uses full
   assert.equal(element('Identity').getAttribute('Version'), '1.7.4.0');
   assert.equal(element('PublisherDisplayName').textContent, 'Example & Company');
   assert.equal(element('Application').getAttribute('Executable'), 'app\\PM Canvas.exe');
+  assert.equal(element('uap:VisualElements').getAttribute('BackgroundColor'), '#2c2e3a');
   assert.equal(element('desktop6:FileSystemWriteVirtualization').textContent, 'disabled');
   assert.equal(doc.getElementsByTagName('virtualization:ExcludedDirectory').length, 2);
   assert.match(xml, /Name="unvirtualizedResources"/);

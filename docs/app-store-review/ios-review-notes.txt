@@ -1,0 +1,35 @@
+PM Canvas | iOS 0.1.0 (20.1)
+Bundle ID: app.toolmoa.pmcanvas | Apple ID: 6829387538
+
+1. Physical-device recording and quality assurance
+PREPARATION STATUS: Physical-device QA/recordings are pending; complete this draft before App Review submission. It follows the six Guideline 2.1 items requested for the previous iOS record (6829098378).
+iPhone model / exact iOS / test date: [PENDING]
+iPad model / exact iPadOS / test date: [PENDING]
+Tested app version/build: 0.1.0 (20.1) [VERIFY ON EACH DEVICE]
+iPhone recording URL: [PENDING]
+iPad recording URL: [PENDING]
+Actual QA results, including any failures: [PENDING]
+Recordings will show launch, creation/editing, completion/progress, relaunch persistence and file export/import on physical devices with the latest compatible public OS. Simulator results are not physical-device QA.
+
+2. Purpose and intended audience
+PM Canvas is an offline project/task planner for individuals, students, freelancers and people managing small projects. It organizes participants, tasks, dates, estimated hours and completion records, and calculates hours-weighted progress. It is for general users, not restricted to one company or organization. No account/enrollment is needed.
+
+3. Setup and access to main features
+No login, credentials, subscription, server setup or sample file is required. The UI is Korean.
+a) Launch the app; tap "+ 새 프로젝트" (New Project), enter "Review Project" and tap "저장" (Save).
+b) Open "더보기" (More) > "참여인력" (Participants) > "+ 추가" (Add); create "Alex".
+c) Open "업무" (Tasks) > "+ 업무 추가" (Add Task). Enter "Prepare outline" and save. A blank optional checklist title uses the task name; default estimated hours are 4. Create "Review outline" the same way. Expand "담당자 · 일정" to edit assignment/dates.
+d) Open "완료 체크" (Completion Check), keep today's date and complete one of the two equal-hours items. "현황" (Overview) shows 50% progress. Uncheck or use the immediate undo action to reverse completion.
+e) Edit a task, save, close and relaunch the app; reopen the saved project.
+f) More > "프로젝트 내보내기" (Export Project), then Save to Files in the iOS share sheet. "업무 보고서 CSV" exports a report. "프로젝트 가져오기" or the project-list Import control imports the exported project as a new copy.
+The project list offers the privacy policy. There is no automatic sync, real-time collaboration, mobile Excel I/O or WBS/baseline creation UI.
+
+4. External services, tools and user content
+Core functions use bundled HTML/JavaScript, Capacitor/WKWebView, local IndexedDB and on-device calculations. Capacitor App, Filesystem and Share provide lifecycle/file/share integration. No developer backend, remote data provider, authentication, payments, AI, ads or analytics is used for core functions. GitHub hosts optional support/privacy links. User-selected Files/share providers are optional.
+Project/task text is private local content; there is no public posting, feed, messaging or hosted distribution. Other-user reporting/blocking is not applicable. There are no accounts, paid features or in-app purchases; registration/login/account deletion are not applicable.
+
+5. Regional differences
+Features/content are consistent across offered regions. The UI is Korean; the configurable business time zone defaults to Asia/Seoul.
+
+6. Regulated services and protected material
+This is a general productivity tool, not a regulated financial, medical or gambling service. It does not distribute protected third-party media or require industry credentials for its described functions.

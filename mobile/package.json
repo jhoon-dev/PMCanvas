@@ -11,6 +11,7 @@
     "dev": "vite --host 127.0.0.1",
     "build": "vite build",
     "prepare:icons": "node scripts/prepare-icons.mjs",
+    "verify:icons": "node scripts/verify-icons.mjs",
     "preview": "vite preview --host 127.0.0.1",
     "sync": "npm run build && cap sync",
     "android": "npm run sync && cap open android",
