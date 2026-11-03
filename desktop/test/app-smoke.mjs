@@ -201,20 +201,35 @@ try {
     0,
   );
   assert.deepEqual(readFileSync(path.join(temporary, 'Input.xlsx')), input);
+  checkpoint('wbs-summary');
+  const parentId = imported.project.tasks[0].id;
   await page.getByRole('button', { name: 'WBS · 기준 계획', exact: true }).click();
   await page.getByRole('button', { name: '＋ 업무 추가', exact: true }).click();
   await page.locator('[name="name"]').fill('Native child');
   await page.locator('.task-details summary').click();
-  await page.locator('[name="parentId"]').selectOption(imported.project.tasks[0].id);
+  await page.locator('[name="parentId"]').selectOption(parentId);
+  await page.locator('[name="start"]').fill('2026-10-26');
+  await page.locator('[name="end"]').fill('2026-10-30');
   await page.locator('[name="itemTitle"]').fill('Native WBS work');
   await page.getByRole('button', { name: '적용', exact: true }).click();
+  const grouped = await page.evaluate(() => window.desktop.snapshot()),
+    childId = grouped.project.tasks.find((task) => task.name === 'Native child').id,
+    ownWork = grouped.project.tasks.find(
+      (task) => task.id !== childId && task.parentId === parentId,
+    );
+  assert.equal(grouped.project.tasks.length, 3);
+  assert.equal(grouped.project.tasks.find((task) => task.id === parentId).kind, 'summary');
+  assert.deepEqual(grouped.project.tasks.find((task) => task.id === parentId).items, []);
+  assert.deepEqual(ownWork.items, imported.project.tasks[0].items);
   await page.getByRole('button', { name: '기준 계획 저장', exact: true }).click();
   await page.locator('[name="baselineName"]').fill('Native baseline');
   await page.getByRole('button', { name: '적용', exact: true }).click();
   await page.getByText('Native baseline', { exact: true }).waitFor();
+  checkpoint('schedule-preview');
   await page.getByRole('button', { name: 'Native child 일정 조정', exact: true }).click();
   await page.locator('#previewSchedule').click();
-  await page.getByText('변경할 일정 1개 · 아직 적용하지 않았습니다.', { exact: true }).waitFor();
+  // Moving the child also changes the parent's rolled-up end date.
+  await page.getByText('변경할 일정 2개 · 아직 적용하지 않았습니다.', { exact: true }).waitFor();
   const beforeSchedule = await page.evaluate(() => window.desktop.snapshot());
   // Simulate a native document update while the schedule preview is open.
   await page.evaluate(
@@ -231,10 +246,17 @@ try {
   await page.getByRole('button', { name: '적용', exact: true }).click();
   await page.waitForFunction(() => !document.querySelector('#editorDialog').open);
   const planned = await page.evaluate(() => window.desktop.snapshot());
-  assert.notEqual(planned.project.tasks[1].start, beforeSchedule.project.tasks[1].start);
+  const plannedChild = planned.project.tasks.find((task) => task.id === childId);
+  assert.equal(plannedChild.start, '2026-10-27');
+  assert.equal(plannedChild.end, '2026-10-31');
+  assert.deepEqual(
+    planned.project.tasks.find((task) => task.id === ownWork.id),
+    ownWork,
+  );
   assert.deepEqual(planned.project.baseline, beforeSchedule.project.baseline);
-  assert.equal(planned.project.tasks[1].parentId, planned.project.tasks[0].id);
-  assert.equal(planned.project.baseline.tasks.length, 2);
+  assert.equal(plannedChild.parentId, parentId);
+  assert.equal(planned.project.tasks.find((task) => task.id === parentId).end, plannedChild.end);
+  assert.equal(planned.project.baseline.tasks.length, 3);
   await assert.rejects(
     page.evaluate((revision) => window.desktop.undo(revision - 1), planned.revision),
     /문서가 변경/,
@@ -271,6 +293,7 @@ try {
     false,
   );
   await page.getByRole('button', { name: '취소', exact: true }).click();
+  checkpoint('bulk-copy-delete');
   await page.locator('[data-select-visible]').check();
   await page.getByRole('button', { name: '선택 복제', exact: true }).click();
   await page.evaluate(async () => {
@@ -285,21 +308,34 @@ try {
   await page.getByRole('button', { name: '적용', exact: true }).click();
   await page.waitForFunction(() => !document.querySelector('#editorDialog').open);
   const copied = await page.evaluate(() => window.desktop.snapshot());
-  assert.equal(copied.project.tasks.length, 4);
+  assert.equal(copied.project.tasks.length, planned.project.tasks.length * 2);
   const copiedTasks = copied.project.tasks.filter(
     (task) => !planned.project.tasks.some((old) => old.id === task.id),
   );
-  assert.equal(copiedTasks[1].parentId, copiedTasks[0].id);
+  const copiedParent = copiedTasks.find((task) => task.kind === 'summary');
+  assert.equal(copiedTasks.length, 3);
+  assert.deepEqual(copiedParent.items, []);
+  assert.ok(
+    copiedTasks
+      .filter((task) => task.id !== copiedParent.id)
+      .every((task) => task.parentId === copiedParent.id),
+  );
   await page.getByRole('button', { name: '실행 취소', exact: true }).click();
   await page.getByText('프로젝트 변경을 되돌렸습니다.', { exact: true }).waitFor();
   assert.deepEqual((await page.evaluate(() => window.desktop.snapshot())).project, planned.project);
   await page.getByRole('button', { name: '다시 실행', exact: true }).click();
   await page.getByText('프로젝트 변경을 다시 실행했습니다.', { exact: true }).waitFor();
-  await page.locator('[data-select-task="' + copiedTasks[0].id + '"]').check();
+  await page.locator('[data-select-task="' + copiedParent.id + '"]').check();
   await page.getByRole('button', { name: '선택 삭제', exact: true }).click();
   await page.getByRole('button', { name: '선택 업무 삭제', exact: true }).click();
   await page.waitForFunction(() => !document.querySelector('#editorDialog').open);
-  assert.equal((await page.evaluate(() => window.desktop.snapshot())).project.tasks.length, 3);
+  const removed = (await page.evaluate(() => window.desktop.snapshot())).project;
+  assert.equal(removed.tasks.length, copied.project.tasks.length - 1);
+  for (const task of copiedTasks.filter((task) => task.id !== copiedParent.id)) {
+    const preserved = removed.tasks.find((row) => row.id === task.id);
+    assert.deepEqual(preserved.items, task.items);
+    assert.ok(!preserved.parentId);
+  }
   await page.getByRole('button', { name: '실행 취소', exact: true }).click();
   await page.getByText('프로젝트 변경을 되돌렸습니다.', { exact: true }).waitFor();
   const finalProject = (await page.evaluate(() => window.desktop.snapshot())).project;
