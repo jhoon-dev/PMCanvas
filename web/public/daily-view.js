@@ -1,3 +1,4 @@
+import { taskLeaves } from './task-model.js';
 import { ui } from './i18n.js';
 import { escapeHtml as esc } from './html.js';
 import { today, progress } from './engine.js';
@@ -49,7 +50,7 @@ function filterControls(p, { query, ownerFilter, statusFilter }) {
   );
 }
 export function filteredTasks(p, { asOf, ownerFilter = '', statusFilter = '', query = '' }) {
-  return p.tasks.filter(
+  return taskLeaves(p).filter(
     (t) =>
       (!ownerFilter || t.owner === ownerFilter) &&
       (!query || t.name.toLowerCase().includes(query.toLowerCase())) &&
@@ -119,7 +120,18 @@ export function dailyView(
     (ts.length
       ? ts
           .map((t) => {
-            const visible = t.items.filter((i) => !onlyPending || !i.doneDate || i.doneDate > asOf);
+            const entries =
+              t.kind === 'milestone'
+                ? [
+                    {
+                      id: '__milestone',
+                      title: ui('마일스톤 완료'),
+                      hours: 0,
+                      doneDate: t.doneDate,
+                    },
+                  ]
+                : t.items;
+            const visible = entries.filter((i) => !onlyPending || !i.doneDate || i.doneDate > asOf);
             if (!visible.length) return '';
             return (
               '<article class="panel check-panel"><div class="check-task-head"><div><span class="eyebrow">' +
@@ -196,7 +208,10 @@ export async function recordCompletion({
   toast,
 }) {
   const t = p.tasks.find((t) => t.id === taskId),
-    i = t?.items.find((i) => i.id === itemId);
+    i =
+      t?.kind === 'milestone' && itemId === '__milestone'
+        ? t
+        : t?.items.find((i) => i.id === itemId);
   if (!i) return;
   if (asOf > currentDate) {
     toast(ui('미래 날짜에는 완료를 기록할 수 없습니다.'));

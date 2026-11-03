@@ -1,3 +1,4 @@
+import { weeklyDraft } from '../app/shared/management.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildReport } from '../reports.mjs';
@@ -101,4 +102,22 @@ test('empty reports export column headers and reject invalid dates, future dates
     { kind: 'completion', from: '2020-01-03', to: '2020-01-06', owner: 'missing' },
   ])
     assert.throws(() => buildReport(project, options));
+});
+
+test('weekly HTML exports use the published main-process snapshot and escape report input', () => {
+  const p = { name: 'Published', members: [], tasks: [], holidays: [] };
+  p.weeklyReports = [
+    weeklyDraft(p, {
+      id: 'weekly',
+      from: '2026-10-19',
+      to: '2026-10-23',
+      notes: '<script>alert(1)</script>',
+      nextNotes: '',
+    }),
+  ];
+  const result = buildReport(p, { kind: 'weekly', id: 'weekly', format: 'html' });
+  assert.match(result.filename, /\.html$/);
+  assert.ok(result.html.includes('&lt;script&gt;'));
+  assert.ok(!result.html.includes('<script>'));
+  assert.throws(() => buildReport(p, { kind: 'weekly', id: 'missing', format: 'html' }));
 });

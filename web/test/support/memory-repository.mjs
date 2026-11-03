@@ -1,3 +1,4 @@
+import { assertReportHistory } from '../../../shared/browser/management.js';
 // API contract tests only. PostgreSQL is exercised separately by postgres.integration.mjs.
 import { randomUUID } from 'node:crypto';
 import { fail } from '../../server/errors.mjs';
@@ -521,6 +522,7 @@ export class MemoryRepository extends MemoryOperations {
     const entry = this.access(userId, id, 'editor');
     if (entry.revision !== revision)
       fail(409, 'REVISION_CONFLICT', '다른 사용자가 먼저 수정했습니다.');
+    assertReportHistory(entry.data, p);
     const changes = projectChanges(entry.data, p);
     this.captureTasks(userId, entry, p);
     entry.data = structuredClone(p);

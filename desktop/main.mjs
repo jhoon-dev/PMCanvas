@@ -467,15 +467,27 @@ else {
         if (revision !== document.revision)
           throw Error(ui('문서가 변경되었습니다. 보고서를 다시 확인해 주세요.'));
         const report = buildReport(document.project, options);
-        if (options.format !== undefined && !['csv', 'xlsx'].includes(options.format))
+        if (options.format !== undefined && !['csv', 'xlsx', 'html'].includes(options.format))
           throw Error(ui('내보내기 형식을 확인해 주세요.'));
         const format = options.format || 'csv';
+        if ((format === 'html') !== (options.kind === 'weekly'))
+          throw Error(ui('내보내기 형식을 확인해 주세요.'));
         const result = await dialog.showSaveDialog(window, {
-          title: format === 'xlsx' ? ui('Excel 보고서 저장') : ui('CSV 보고서 저장'),
+          title:
+            format === 'html'
+              ? ui('주간보고 저장')
+              : format === 'xlsx'
+                ? ui('Excel 보고서 저장')
+                : ui('CSV 보고서 저장'),
           defaultPath: report.filename.replace(/\.csv$/, '.' + format),
           filters: [
             {
-              name: format === 'xlsx' ? ui('Excel 통합문서') : ui('CSV 보고서 (Excel에서 열기)'),
+              name:
+                format === 'html'
+                  ? 'HTML'
+                  : format === 'xlsx'
+                    ? ui('Excel 통합문서')
+                    : ui('CSV 보고서 (Excel에서 열기)'),
               extensions: [format],
             },
           ],
@@ -491,7 +503,9 @@ else {
                 options,
                 dirty: document.dirty,
               })
-            : report.csv;
+            : format === 'html'
+              ? report.html
+              : report.csv;
         return fileAccess.write(file, () => {
           atomicWrite(file, bytes);
           return true;

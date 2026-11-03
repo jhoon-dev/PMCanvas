@@ -12,6 +12,7 @@ import {
 } from 'node:fs';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
+import { assertReportHistory } from './app/shared/management.js';
 import { cleanProject } from './app/model/project.mjs';
 import { readBounded, preserveInvalidFile } from './file-io.mjs';
 
@@ -37,7 +38,7 @@ export function parseDocument(bytes) {
   if (Buffer.byteLength(bytes) > MAX_BYTES)
     throw Error('8MB 이하의 프로젝트 파일을 선택해 주세요.');
   const value = JSON.parse(String(bytes).replace(/^\uFEFF/, ''));
-  if (value?.format !== 'pm-canvas-project' || value.version !== 1)
+  if (value?.format !== 'pm-canvas-project' || ![1, 2, 3].includes(value.version))
     throw Error('PM Canvas 프로젝트 파일이 아닙니다.');
   return normalizeProject(value.project);
 }
@@ -45,7 +46,7 @@ export function serializeDocument(project) {
   const document = JSON.stringify(
     {
       format: 'pm-canvas-project',
-      version: 1,
+      version: 3,
       exportedAt: new Date().toISOString(),
       project: normalizeProject(project),
     },
@@ -151,6 +152,7 @@ export class DesktopDocument {
     serializeDocument(project);
     project.id = this.project?.id || project.id;
     const previous = this.project;
+    if (previous) assertReportHistory(previous, project);
     this.update({
       project,
       file: this.file,
@@ -182,6 +184,9 @@ export class DesktopDocument {
     if (!from.length) throw Error('되돌리거나 다시 실행할 변경이 없습니다.');
     const project = JSON.parse(from.at(-1).json),
       previous = this.project;
+    // Published snapshots survive undo/redo; ordinary plan and issue edits remain reversible.
+    if (previous.weeklyReports?.length)
+      project.weeklyReports = structuredClone(previous.weeklyReports);
     // Write recovery first, so a failed write cannot consume history or accept a change.
     this.update({
       project,

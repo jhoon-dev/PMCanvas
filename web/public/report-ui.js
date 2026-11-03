@@ -1,3 +1,4 @@
+import { normalizeTaskModel } from './task-model.js';
 import { ui } from './i18n.js';
 import { getLanguage } from './i18n.js';
 import { escapeHtml as esc } from './html.js';
@@ -81,9 +82,9 @@ export function historyBody(p, historyQuery, asOf) {
   return body;
 }
 export function importedProject(data, uid = () => crypto.randomUUID()) {
-  if (data.format !== 'pm-canvas-project' || data.version !== 1)
+  if (data.format !== 'pm-canvas-project' || ![1, 2, 3].includes(data.version))
     throw Error(ui('PM Canvas 프로젝트 백업 파일이 아닙니다.'));
-  const p = structuredClone(validateProject(data.project));
+  const p = validateProject(normalizeTaskModel(structuredClone(data.project)));
   if (p._wbsPendingCells !== undefined) p._wbsPendingCells = backupPendingCells(p);
   delete p._revision;
   delete p._role;
@@ -128,7 +129,7 @@ export function createReportUi({
           JSON.stringify(
             {
               format: 'pm-canvas-project',
-              version: 1,
+              version: 3,
               exportedAt: new Date().toISOString(),
               project: p,
             },

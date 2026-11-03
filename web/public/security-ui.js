@@ -111,6 +111,9 @@ export function createSecurityUi({
           member: ui('참여인력'),
           task: ui('업무'),
           item: ui('세부 작업'),
+          issue: ui('이슈·리스크'),
+          'weekly-report': ui('주간보고'),
+          'staffing-period': ui('투입 기간 추가'),
         },
         actions = { create: ui('추가'), update: ui('수정'), delete: ui('삭제') };
       $('#infoBody').innerHTML =
@@ -151,6 +154,10 @@ export function createSecurityUi({
                             c.before?.title ||
                             c.after?.name ||
                             c.before?.name ||
+                            c.after?.projectName ||
+                            c.before?.projectName ||
+                            c.after?.memberId ||
+                            c.before?.memberId ||
                             c.email ||
                             c.userId ||
                             '',

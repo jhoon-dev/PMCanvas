@@ -1,4 +1,13 @@
-import { progress, planned, taskHours, workdays, addDays, validDate } from './engine.js';
+import { taskView, predecessorIds, taskIndex } from './task-model.js';
+import {
+  progress,
+  planned,
+  taskHours,
+  workdays,
+  addDays,
+  validDate,
+  capacityCalendar,
+} from './engine.js';
 import { ui } from './i18n.js';
 import { hierarchy } from './planning.js';
 
@@ -22,7 +31,9 @@ export function csvText(rows) {
 }
 
 export function wbsRows(project, at, forecast, tasks = project.tasks) {
-  const tree = hierarchy(project);
+  const tree = hierarchy(project),
+    index = taskIndex(project),
+    calendar = capacityCalendar(project);
   const header = [
     '프로젝트',
     '보고 기준일',
@@ -43,8 +54,12 @@ export function wbsRows(project, at, forecast, tasks = project.tasks) {
     '추정 방법',
     '선행 업무',
     '메모',
+    '업무 유형',
+    '마일스톤 완료일',
   ];
   const methods = {
+    summary: '하위 업무 집계',
+    milestone: '마일스톤',
     actual: '실제 완료',
     velocity: '최근 속도 반영',
     plan: '계획 기준 추정',
@@ -52,7 +67,8 @@ export function wbsRows(project, at, forecast, tasks = project.tasks) {
   };
   return [
     header.map((label) => ui(label)),
-    ...tasks.map((task) => {
+    ...tasks.map((row) => {
+      const task = taskView(project, row, index);
       const member = project.members.find((m) => m.id === task.owner);
       const f = forecast.tasks[task.id];
       const total = taskHours(task),
@@ -65,7 +81,7 @@ export function wbsRows(project, at, forecast, tasks = project.tasks) {
         task.name,
         member?.name || ui('미지정'),
         member?.grade || '',
-        member?.allocation ?? '',
+        member ? (calendar.hours(member.id, at) / member.hours) * 100 : '',
         task.start,
         task.end,
         total,
@@ -75,8 +91,12 @@ export function wbsRows(project, at, forecast, tasks = project.tasks) {
         f?.end || '',
         f?.end ? Math.max(0, workdays(addDays(task.end, 1), f.end, project.holidays)) : '',
         ui(methods[f?.method] || '계산 대기'),
-        project.tasks.find((t) => t.id === task.predecessor)?.name || '',
+        predecessorIds(task)
+          .map((id) => project.tasks.find((t) => t.id === id)?.name || id)
+          .join(', '),
         task.memo || '',
+        task.kind || 'task',
+        task.kind === 'milestone' ? task.doneDate || '' : '',
       ];
     }),
   ];

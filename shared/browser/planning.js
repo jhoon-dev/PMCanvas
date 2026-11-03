@@ -9,7 +9,17 @@ import {
   today,
   validDate,
   nextWorkday,
+  capacityCalendar,
 } from './engine.js';
+import {
+  LIMITS,
+  normalizeTaskModel,
+  taskView,
+  summaryIds,
+  predecessorIds,
+  executionTasks,
+  taskIndex,
+} from './task-model.js';
 
 export function hierarchy(project) {
   const map = new Map(project.tasks.map((t) => [t.id, t])),
@@ -43,10 +53,18 @@ export function ordered(project) {
   return [...h.keys()].map((id) => tasks.get(id));
 }
 export function rollups(project, at = today(), tree = hierarchy(project)) {
+  const index = taskIndex(project),
+    summaries = index.summaries;
   const result = new Map(
     project.tasks.map((t) => [
       t.id,
-      { hours: taskHours(t), done: earned(t, at), start: t.start, end: t.end, count: 1 },
+      {
+        hours: summaries.has(t.id) ? 0 : taskHours(t),
+        done: summaries.has(t.id) ? 0 : earned(t, at),
+        start: taskView(project, t, index).start,
+        end: taskView(project, t, index).end,
+        count: summaries.has(t.id) ? 0 : 1,
+      },
     ]),
   );
   for (const id of [...tree.keys()].reverse()) {
@@ -65,21 +83,7 @@ export function rollups(project, at = today(), tree = hierarchy(project)) {
   return result;
 }
 export function rollup(project, id, at = today()) {
-  const h = hierarchy(project),
-    tasks = project.tasks.filter((t) => t.id === id || h.get(t.id).ancestors.includes(id));
-  const hours = tasks.reduce((n, t) => n + taskHours(t), 0),
-    done = tasks.reduce((n, t) => n + earned(t, at), 0);
-  return {
-    hours,
-    done,
-    progress: hours ? done / hours : 0,
-    start: tasks.map((t) => t.start).sort()[0],
-    end: tasks
-      .map((t) => t.end)
-      .sort()
-      .at(-1),
-    count: tasks.length,
-  };
+  return rollups(project, at).get(id);
 }
 export function setParent(project, ids, direction) {
   const p = structuredClone(project),
@@ -104,28 +108,35 @@ export function setParent(project, ids, direction) {
     }
   }
   hierarchy(p);
-  return p;
+  return normalizeTaskModel(p);
 }
 export function captureBaseline(project, name = '기준 계획') {
+  const index = taskIndex(project);
   return {
     name,
     createdAt: new Date().toISOString(),
-    tasks: project.tasks.map((t) => ({
-      id: t.id,
-      name: t.name,
-      start: t.start,
-      end: t.end,
-      hours: taskHours(t),
-      parentId: t.parentId || '',
-    })),
+    tasks: project.tasks.map((task) => {
+      const t = taskView(project, task, index);
+      return {
+        id: t.id,
+        name: t.name,
+        start: t.start,
+        end: t.end,
+        hours: taskHours(t),
+        parentId: t.parentId || '',
+        ...(t.kind === 'milestone' ? { kind: 'milestone' } : {}),
+      };
+    }),
   };
 }
 export function baselineDiff(project) {
-  const old = new Map((project.baseline?.tasks || []).map((t) => [t.id, t])),
+  const index = taskIndex(project),
+    old = new Map((project.baseline?.tasks || []).map((t) => [t.id, t])),
     current = new Set(project.tasks.map((t) => t.id));
   return {
     rows: project.tasks.map((t) => {
       const b = old.get(t.id);
+      t = taskView(project, t, index);
       return {
         id: t.id,
         name: t.name,
@@ -141,18 +152,18 @@ export function baselineDiff(project) {
   };
 }
 export function criticalPath(project) {
-  if (!project.tasks.length) return { ids: new Set(), slack: {}, duration: 0 };
-  const tasks = orderTasks(project.tasks),
-    origin = tasks.map((t) => t.start).sort()[0],
+  const tasks = orderTasks(executionTasks(project));
+  if (!tasks.length) return { ids: new Set(), slack: {}, duration: 0 };
+  const origin = tasks.map((t) => t.start).sort()[0],
     h = project.holidays || [],
     early = Object.create(null),
     finish = Object.create(null),
     successors = new Map(tasks.map((t) => [t.id, []]));
   for (const t of tasks) {
-    if (t.predecessor) successors.get(t.predecessor).push(t.id);
-    const release = workdays(origin, addDays(t.start, -1), h),
-      duration = workdays(t.start, t.end, h);
-    early[t.id] = Math.max(release, t.predecessor ? finish[t.predecessor] : 0);
+    for (const id of predecessorIds(t)) successors.get(id).push(t.id);
+    const release = workdays(origin, t.kind === 'milestone' ? t.start : addDays(t.start, -1), h),
+      duration = t.kind === 'milestone' ? 0 : workdays(t.start, t.end, h);
+    early[t.id] = Math.max(release, ...predecessorIds(t).map((id) => finish[id]));
     finish[t.id] = early[t.id] + duration;
   }
   const duration = Math.max(...Object.values(finish)),
@@ -167,25 +178,35 @@ export function criticalPath(project) {
   return { ids: new Set(tasks.filter((t) => slack[t.id] === 0).map((t) => t.id)), slack, duration };
 }
 export function scheduleWarnings(project) {
-  const dependencies = project.tasks.filter(
-      (t) => t.predecessor && t.start <= project.tasks.find((p) => p.id === t.predecessor)?.end,
+  const tasks = executionTasks(project),
+    calendar = capacityCalendar(project),
+    byId = new Map(tasks.map((t) => [t.id, t]));
+  const dependencies = tasks.filter((t) =>
+      predecessorIds(t).some((id) =>
+        t.kind === 'milestone' ? t.start < byId.get(id)?.end : t.start <= byId.get(id)?.end,
+      ),
     ),
     overloads = [];
   for (const member of project.members) {
-    const events = new Map(),
-      capacity = (member.hours * member.allocation) / 100;
-    for (const t of project.tasks.filter((t) => t.owner === member.id)) {
+    const events = new Map();
+    for (const t of tasks.filter((t) => t.owner === member.id && t.kind !== 'milestone')) {
       const rate = taskHours(t) / workdays(t.start, t.end, project.holidays);
       events.set(t.start, (events.get(t.start) || 0) + rate);
       const end = addDays(t.end, 1);
       events.set(end, (events.get(end) || 0) - rate);
+    }
+    const bounds = [...events.keys()].sort();
+    if (bounds.length) {
+      for (const s of calendar.segments(member.id, bounds[0], bounds.at(-1)))
+        if (!events.has(s.from)) events.set(s.from, 0);
     }
     const dates = [...events.keys()].sort();
     let load = 0;
     for (let i = 0; i < dates.length - 1; i++) {
       load += events.get(dates[i]);
       const from = dates[i],
-        to = addDays(dates[i + 1], -1);
+        to = addDays(dates[i + 1], -1),
+        capacity = calendar.hours(member.id, from);
       if (load > capacity + 0.0001 && workdays(from, to, project.holidays) > 0) {
         const first = nextWorkday(from, project.holidays);
         let last = to;
@@ -217,10 +238,11 @@ export function validatePlanning(project) {
     b.createdAt.length > 40 ||
     !Number.isFinite(Date.parse(b.createdAt)) ||
     !Array.isArray(b.tasks) ||
-    b.tasks.length > 500
+    b.tasks.length > LIMITS.tasks
   )
     throw Error('기준 계획 형식을 확인해 주세요.');
-  const seen = new Set();
+  const seen = new Set(),
+    parents = new Set(b.tasks.map((t) => t.parentId));
   for (const t of b.tasks) {
     if (
       typeof t.id !== 'string' ||
@@ -233,7 +255,7 @@ export function validatePlanning(project) {
       t.start > t.end ||
       !Number.isFinite(t.hours) ||
       t.hours < 0 ||
-      t.hours > 2000000
+      t.hours > LIMITS.baselineHours * (parents.has(t.id) ? LIMITS.workTasks : 1)
     )
       throw Error('기준 계획의 업무를 확인해 주세요.');
     seen.add(t.id);

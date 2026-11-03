@@ -1,3 +1,10 @@
+import {
+  normalizeTaskModel,
+  predecessorIds,
+  taskView,
+  summaryIds,
+  taskIndex,
+} from './task-model.js';
 import { ui, rowLabel } from './i18n.js';
 import {
   hierarchy,
@@ -80,7 +87,7 @@ export class WbsWorkspace {
   }
   reset(project) {
     this.base = clone(project);
-    this.draft = clone(project);
+    this.draft = normalizeTaskModel(clone(project));
     this.changedFlag = false;
     this.pending.clear();
     this.undoStack = [];
@@ -153,6 +160,7 @@ export class WbsWorkspace {
         at: this.at,
         tree,
         tasks,
+        index: taskIndex(this.draft),
         ordered: [...tree.keys()].map((id) => tasks.get(id)),
         aggregates: rollups(this.draft, this.at, tree),
         summary: summary(this.draft, this.at),
@@ -174,7 +182,8 @@ export class WbsWorkspace {
     );
   }
   value(task, field) {
-    if (field === 'hours') return taskHours(task);
+    if (field === 'hours') return taskHours(taskView(this.draft, task, this.context().index));
+    if (field === 'predecessor') return predecessorIds(task).join(', ');
     return task[field] || '';
   }
   pendingProject() {
@@ -291,6 +300,8 @@ export class WbsWorkspace {
     const advanced = this.readOnly
       ? ''
       : ui('<p class="menu-label">계획 · 관리</p>') +
+        button(ui('마일스톤 추가'), 'add-milestone') +
+        button(ui('요약 업무 추가'), 'add-summary') +
         button(ui('현재 일정을 기준 계획으로 저장'), 'baseline') +
         (this.draft.baseline ? button(ui('기준 계획 삭제'), 'baseline-clear', 'danger') : '') +
         ui('<button class="button" data-action="task">상세 양식으로 업무 추가</button>') +
@@ -383,7 +394,25 @@ export class WbsWorkspace {
         rowLabel(row, this.layout()[index][1]) +
         '" ' +
         disabled;
-    if (field === 'owner' || field === 'predecessor') {
+    if (summaryIds(this.draft).has(task.id) && ['owner', 'hours', 'start', 'end'].includes(field))
+      return (
+        '<span class="wbs-summary-value" title="' +
+        esc(ui('하위 업무에서 계산')) +
+        '">' +
+        esc(field === 'owner' ? ui('요약 업무') : value) +
+        '</span>'
+      );
+    if (field === 'predecessor')
+      return (
+        '<input type="text"' +
+        common +
+        ' value="' +
+        esc(value) +
+        '" placeholder="' +
+        esc(ui('업무 번호 또는 ID, 쉼표로 구분')) +
+        '">'
+      );
+    if (field === 'owner') {
       const rows =
         field === 'owner' ? this.draft.members : this.draft.tasks.filter((t) => t.id !== task.id);
       return (
@@ -526,7 +555,7 @@ export class WbsWorkspace {
             '<td data-progress="' +
             esc(t.id) +
             '">' +
-            Math.round(progress(t, this.at) * 100) +
+            Math.round(progress(taskView(this.draft, t, this.context().index), this.at) * 100) +
             '%</td>' +
             (this.detailed
               ? '<td data-row-forecast="' +
@@ -572,7 +601,7 @@ export class WbsWorkspace {
     const cp = this.analysis ? criticalPath(p) : { ids: new Set() },
       baseDates = (p.baseline?.tasks || []).flatMap((t) => [t.start, t.end]),
       s = this.context().summary,
-      from = addDays([s.start, ...baseDates].filter(Boolean).sort()[0], -3),
+      from = addDays([s.start, ...baseDates].filter(Boolean).sort()[0] || this.at, -3),
       to = addDays([s.end, s.forecast.end, this.at, ...baseDates].filter(Boolean).sort().at(-1), 5),
       span = daysBetween(from, to) + 1,
       width = Math.max(680, Math.min(20000, span * this.zoom)),
@@ -585,9 +614,13 @@ export class WbsWorkspace {
       ticks.push('<span style="left:' + i * day + 'px">' + addDays(from, i).slice(5) + '</span>');
     const mondayOffset = -((new Date(from + 'T00:00:00Z').getUTCDay() + 6) % 7) * day,
       links = (this.analysis ? ts : [])
-        .filter((t) => t.predecessor && ts.some((x) => x.id === t.predecessor))
-        .map((t) => {
-          const pred = p.tasks.find((x) => x.id === t.predecessor),
+        .flatMap((task) =>
+          predecessorIds(task)
+            .filter((id) => ts.some((x) => x.id === id))
+            .map((id) => ({ task, id })),
+        )
+        .map(({ task: t, id }) => {
+          const pred = p.tasks.find((x) => x.id === id),
             a = left(addDays(pred.end, 1)),
             b = left(t.start),
             y1 = ts.findIndex((x) => x.id === pred.id) * 44 + 22,
@@ -676,6 +709,7 @@ export class WbsWorkspace {
             '" data-gantt-task="' +
             esc(t.id) +
             '" data-drag="move" class="wbs-plan ' +
+            (t.kind === 'milestone' ? 'milestone ' : '') +
             (this.analysis && cp.ids.has(t.id) ? 'critical ' : '') +
             (this.selected.has(t.id) ? 'selected' : '') +
             '" style="left:' +
@@ -687,9 +721,9 @@ export class WbsWorkspace {
             '" aria-label="' +
             esc(t.name) +
             ui(' 시작일 조절"></span><i style="width:') +
-            progress(t, this.at) * 100 +
+            progress(taskView(this.draft, t, this.context().index), this.at) * 100 +
             '%"></i><span class="wbs-bar-label">' +
-            Math.round(progress(t, this.at) * 100) +
+            Math.round(progress(taskView(this.draft, t, this.context().index), this.at) * 100) +
             '%</span><span class="wbs-resize end" data-drag="end" role="button" tabindex="' +
             (this.readOnly ? '-1' : '0') +
             '" aria-label="' +
@@ -844,7 +878,7 @@ export class WbsWorkspace {
         'help',
         ui('사용 팁 · 일정 표시 안내'),
         ui(
-          '<p>Tab: 다음 셀 · Enter: 다음 행 · Ctrl+S: 저장 · Ctrl+Z: 실행 취소. 전체 열을 보려면 더 보기에서 세부 항목을 켜세요.</p><p>상위 업무 합계는 자체 작업과 하위 작업을 포함합니다. 입력 칸은 자체 작업의 값입니다.</p><p>실선: 계획과 진척 · 점선: 예상 일정 · 회색: 기준 계획 · 빨간 테두리: 임계 업무 · 초록 선: 하위 포함 일정.</p>',
+          '<p>Tab: 다음 셀 · Enter: 다음 행 · Ctrl+S: 저장 · Ctrl+Z: 실행 취소. 전체 열을 보려면 더 보기에서 세부 항목을 켜세요.</p><p>상위 업무는 요약 전용입니다. 일정·공수·진척률은 하위 업무에서 계산합니다.</p><p>실선: 계획과 진척 · 점선: 예상 일정 · 회색: 기준 계획 · 빨간 테두리: 임계 업무 · 초록 선: 하위 포함 일정.</p>',
         ),
         'wbs-help-panel',
       ) +
@@ -909,9 +943,7 @@ export class WbsWorkspace {
     this.root.querySelector('.wbs-error').textContent = this.error
       ? this.error + (this.pending.size ? ui(' · 확인할 셀 ') + this.pending.size + ui('개') : '')
       : '';
-    const conflicts = this.draft.tasks.filter(
-      (t) => t.predecessor && t.start <= this.draft.tasks.find((p) => p.id === t.predecessor)?.end,
-    ).length;
+    const conflicts = scheduleWarnings(this.draft).dependencies.length;
     this.root.querySelector('.wbs-warning').textContent =
       this.localError ||
       (conflicts
@@ -1276,7 +1308,10 @@ export class WbsWorkspace {
                 f === 'owner'
                   ? this.draft.members.find((m) => m.id === t.owner)?.name || ''
                   : f === 'predecessor'
-                    ? this.draft.tasks.findIndex((x) => x.id === t.predecessor) + 1 || ''
+                    ? predecessorIds(t)
+                        .map((id) => this.draft.tasks.findIndex((x) => x.id === id) + 1)
+                        .filter(Boolean)
+                        .join(', ')
                     : this.value(t, f),
               ),
             ),
@@ -1306,9 +1341,12 @@ export class WbsWorkspace {
         this.changed(p);
         return;
       }
-      if (action === 'add') {
+      if (['add', 'add-summary', 'add-milestone'].includes(action)) {
         const p = clone(this.draft),
-          t = newTask(p);
+          t = newTask(p, {
+            summary: action === 'add-summary',
+            milestone: action === 'add-milestone',
+          });
         p.tasks.push(t);
         this.query = '';
         this.owner = '';

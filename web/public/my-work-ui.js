@@ -1,6 +1,7 @@
+import { taskLeaves } from './task-model.js';
 import { ui } from './i18n.js';
 export function myWorkView({ projects, esc, progress, today, projectMode, canLink = false }) {
-  const tasks = projects.flatMap((p) => p.tasks.map((t) => ({ p, t }))),
+  const tasks = projects.flatMap((p) => taskLeaves(p).map((t) => ({ p, t }))),
     pending = tasks.filter(({ t }) => progress(t, today) < 1),
     late = pending.filter(({ t }) => t.end < today),
     current = pending.filter(({ t }) => t.end >= today && t.start <= today),
@@ -24,7 +25,34 @@ export function myWorkView({ projects, esc, progress, today, projectMode, canLin
           esc(t.end) +
           '</small></span><b>' +
           Math.round(progress(t, today) * 100) +
-          '%</b></button>',
+          '%</b></button>' +
+          (p._role !== 'viewer' && (t.items || []).some((i) => !i.doneDate)
+            ? '<details class="my-work-quick"><summary>' +
+              ui('오늘 완료 기록') +
+              '</summary><p>' +
+              ui('오늘 실제로 완료한 항목만 선택하세요.') +
+              '</p>' +
+              t.items
+                .filter((i) => !i.doneDate)
+                .map(
+                  (i) =>
+                    '<button class="button" data-my-complete-project="' +
+                    esc(p.id) +
+                    '" data-my-complete-task="' +
+                    esc(t.id) +
+                    '" data-my-complete-item="' +
+                    esc(i.id) +
+                    '">' +
+                    esc(i.title) +
+                    ' · ' +
+                    esc(i.hours) +
+                    'h · ' +
+                    ui('오늘 완료') +
+                    '</button>',
+                )
+                .join('') +
+              '</details>'
+            : ''),
       )
       .join('');
   return (

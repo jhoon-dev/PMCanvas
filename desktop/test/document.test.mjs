@@ -1,3 +1,4 @@
+import { weeklyDraft } from '../app/shared/management.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -15,6 +16,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { DesktopDocument, parseDocument, serializeDocument, MAX_BYTES } from '../document.mjs';
 import { assetPath } from '../assets.mjs';
+import { normalizeTaskModel } from '../app/shared/task-model.js';
 import { summary } from '../app/shared/engine.js';
 
 const fixture = () => ({
@@ -67,8 +69,9 @@ test('web backup round trip preserves calculations and hierarchy while removing 
   assert.equal(restored._role, undefined);
   assert.equal(restored.id, project.id);
   assert.equal(restored.tasks[1].parentId, 't');
-  assert.deepEqual(restored.baseline, project.baseline);
-  assert.deepEqual(summary(restored, '2026-10-21'), summary(project, '2026-10-21'));
+  const migrated = normalizeTaskModel(structuredClone(project));
+  assert.deepEqual(restored.baseline, migrated.baseline);
+  assert.deepEqual(summary(restored, '2026-10-21'), summary(migrated, '2026-10-21'));
 });
 test('invalid formats, unfinished drafts, oversized input and broken dependencies cannot be opened', () => {
   assert.throws(() => parseDocument('{}'), /프로젝트 파일/);
@@ -235,4 +238,65 @@ test('custom protocol exposes only renderer assets, never native model, preload 
     'pmcanvas://desktop/shared/%2e%2e%2fmodel/project.mjs',
   ])
     assert.equal(assetPath(url), null, url);
+});
+
+test('v2 documents retain every predecessor and empty summary across a native file round trip', () => {
+  const p = fixture();
+  p.tasks.push({
+    ...structuredClone(p.tasks[0]),
+    id: 'other',
+    items: [{ id: 'other-item', title: 'Other', hours: 8, doneDate: null }],
+  });
+  p.tasks.push({
+    ...structuredClone(p.tasks[0]),
+    id: 'last',
+    predecessor: 't',
+    predecessors: ['t', 'other'],
+    items: [{ id: 'last-item', title: 'Last', hours: 8, doneDate: null }],
+  });
+  p.tasks.push({
+    ...structuredClone(p.tasks[0]),
+    id: 'empty',
+    kind: 'summary',
+    owner: '',
+    items: [],
+  });
+  const bytes = serializeDocument(p),
+    restored = parseDocument(bytes);
+  assert.equal(JSON.parse(bytes).version, 3);
+  assert.deepEqual(restored.tasks.find((t) => t.id === 'last').predecessors, ['t', 'other']);
+  assert.equal(restored.tasks.find((t) => t.id === 'empty').kind, 'summary');
+  assert.equal(
+    parseDocument(JSON.stringify({ format: 'pm-canvas-project', version: 1, project: fixture() }))
+      .tasks[0].id,
+    't',
+  );
+});
+
+test('published weekly snapshots survive native save/reopen and undo, and cannot be overwritten', (t) => {
+  const root = temporary(t),
+    doc = new DesktopDocument(path.join(root, 'recovery.json'));
+  doc.create(fixture());
+  const next = structuredClone(doc.project);
+  next.weeklyReports = [
+    weeklyDraft(next, {
+      id: 'report',
+      from: '2026-10-19',
+      to: '2026-10-23',
+      notes: 'Frozen',
+      nextNotes: '',
+    }),
+  ];
+  doc.replace(next, doc.revision);
+  const snapshot = structuredClone(doc.project.weeklyReports[0]);
+  doc.undo(doc.revision);
+  assert.deepEqual(doc.project.weeklyReports[0], snapshot);
+  const invalid = structuredClone(doc.project);
+  invalid.weeklyReports[0].notes = 'Changed';
+  assert.throws(() => doc.replace(invalid, doc.revision), /발행한/);
+  const file = path.join(root, 'Published.pmcanvas');
+  doc.save(file);
+  const restored = new DesktopDocument(path.join(root, 'other-recovery.json'));
+  restored.open(file);
+  assert.deepEqual(restored.project.weeklyReports[0], snapshot);
 });

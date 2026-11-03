@@ -1,3 +1,5 @@
+import { forecast, summary } from '../public/engine.js';
+import { managementChange, monthlyPlan, weeklyDraft } from '../public/management.js';
 import { AdminMfa, totp } from '../server/admin-mfa.mjs';
 import { BackupWorker } from '../server/backup-worker.mjs';
 import { MailSettings } from '../server/mail-settings.mjs';
@@ -787,20 +789,20 @@ test(
       p = setParent(p, ['b'], 1);
       p.baseline = captureBaseline(p);
       let saved = await repo.createProject(user.id, id, cleanProject(p));
-      assert.equal(saved.tasks[1].parentId, 'a');
+      assert.equal(saved.tasks.find((t) => t.id === 'b').parentId, 'a');
       assert.deepEqual(saved.baseline, p.baseline);
-      saved.tasks[1].end = '2026-10-28';
+      saved.tasks.find((t) => t.id === 'b').end = '2026-10-28';
       saved = await repo.updateProject(user.id, id, cleanProject(saved), saved._revision);
-      assert.equal(saved.tasks[1].parentId, 'a');
-      assert.equal(saved.baseline.tasks[1].end, '2026-10-27');
+      assert.equal(saved.tasks.find((t) => t.id === 'b').parentId, 'a');
+      assert.equal(saved.baseline.tasks.find((t) => t.id === 'b').end, '2026-10-27');
       let loaded = await repo.getProject(user.id, id);
       assert.deepEqual(loaded.baseline, p.baseline);
-      assert.equal(loaded.tasks[1].parentId, 'a');
+      assert.equal(loaded.tasks.find((t) => t.id === 'b').parentId, 'a');
       delete loaded.baseline;
-      delete loaded.tasks[1].parentId;
+      delete loaded.tasks.find((t) => t.id === 'b').parentId;
       loaded = await repo.updateProject(user.id, id, cleanProject(loaded), loaded._revision);
       assert.equal(loaded.baseline, undefined);
-      assert.equal(loaded.tasks[1].parentId, undefined);
+      assert.equal(loaded.tasks.find((t) => t.id === 'b').parentId, undefined);
       assert.ok(
         (await repo.listEvents(user.id, id)).some((e) =>
           e.changes.some((c) => c.entity === 'project' && c.after?.baseline === null),
@@ -1966,6 +1968,241 @@ test(
         "UPDATE pm_backup_settings SET updated_by=NULL,time_zone='Asia/Seoul' WHERE id=true",
       );
       if (admin) await pool.query('DELETE FROM pm_users WHERE id=$1', [admin.id]);
+      await pool.end();
+    }
+  },
+);
+
+test(
+  '실제 PostgreSQL: PM 관리 저장·재연결·HTTP 권한·발행 사본 불변·SQL 롤백',
+  { skip: process.env.RUN_POSTGRES_TESTS !== '1' },
+  async () => {
+    if (!/_test$/.test(process.env.PGDATABASE || ''))
+      throw Error('Dedicated _test database required.');
+    const pool = await createPool(),
+      repo = new PgRepository(pool),
+      projectId = randomUUID(),
+      users = [];
+    let server, reopened;
+    const work = (id, start, end, extra = {}) => ({
+      id,
+      name: id,
+      phase: '',
+      owner: 'm',
+      start,
+      end,
+      predecessor: '',
+      memo: '',
+      items: [{ id: id + '-item', title: id, hours: 40, doneDate: null }],
+      ...extra,
+    });
+    try {
+      await migrate(pool);
+      for (const name of ['owner', 'editor', 'viewer'])
+        users.push(
+          await repo.createUser({
+            email: randomUUID() + '@example.com',
+            name,
+            passwordHash: 'unused-pm-validation-fixture',
+          }),
+        );
+      const [owner, editor, viewer] = users;
+      let p = cleanProject({
+        name: '실제 DB PM 관리',
+        description: '',
+        holidays: [],
+        members: [
+          { id: 'm', name: '개발자', role: '개발', grade: '중급', hours: 8, allocation: 100 },
+          { id: 'n', name: '검증자', role: 'QA', grade: '중급', hours: 8, allocation: 100 },
+        ],
+        tasks: [
+          work('P', '2026-10-19', '2026-10-30', { kind: 'summary', owner: '', items: [] }),
+          work('A', '2026-10-19', '2026-10-23', { parentId: 'P' }),
+          work('B', '2026-10-26', '2026-10-30', { parentId: 'P', predecessor: 'A' }),
+          work('M', '2026-10-30', '2026-10-30', {
+            kind: 'milestone',
+            items: [],
+            doneDate: null,
+            predecessor: 'B',
+          }),
+          work('C', '2026-11-02', '2026-11-02', {
+            owner: 'n',
+            predecessors: ['A', 'M'],
+            items: [{ id: 'C-item', title: '검수', hours: 8, doneDate: null }],
+          }),
+        ],
+      });
+      p.baseline = captureBaseline(p, '승인 계획');
+      p = managementChange(p, 'issue', {
+        id: 'risk',
+        title: 'API 공급 일정',
+        type: 'risk',
+        impact: 'high',
+        probability: 'medium',
+        owner: 'm',
+        taskId: 'A',
+        due: '2026-10-23',
+        status: 'doing',
+        action: '공급사 일정 확인',
+      });
+      p = managementChange(p, 'staffing', {
+        hoursPerMM: 160,
+        assignment: {
+          id: 'assignment',
+          memberId: 'm',
+          start: '2026-10-19',
+          end: '2026-10-30',
+          allocation: 100,
+        },
+      });
+      let saved = await repo.createProject(owner.id, projectId, cleanProject(p));
+      assert.deepEqual(cleanProject(saved), cleanProject(p));
+      assert.equal(saved.tasks.find((t) => t.id === 'P').items.length, 0);
+      assert.equal(forecast(saved, '2026-10-18').tasks.C.start, '2026-11-02');
+      assert.equal(summary(saved, '2026-10-18').total, 88);
+      assert.equal(monthlyPlan(saved, '2026-10').rows.find((r) => r.id === 'm').mm, 0.5);
+      const limited = structuredClone(saved);
+      limited.staffing.assignments[0].allocation = 25;
+      saved = await repo.updateProject(owner.id, projectId, cleanProject(limited), saved._revision);
+      const reduced = await repo.getProject(owner.id, projectId);
+      assert.equal(forecast(reduced, '2026-10-18').tasks.A.end, null);
+      assert.equal(monthlyPlan(reduced, '2026-10').rows.find((r) => r.id === 'm').mm, 0.125);
+      saved.staffing.assignments[0].allocation = 100;
+      saved = await repo.updateProject(owner.id, projectId, cleanProject(saved), saved._revision);
+      await repo.grantAccess(owner.id, projectId, editor.email, 'editor');
+      await repo.grantAccess(owner.id, projectId, viewer.email, 'viewer');
+      saved = await repo.getProject(owner.id, projectId);
+      for (const id of ['A', 'B'])
+        saved.tasks.find((t) => t.id === id).items[0].doneDate =
+          id === 'A' ? '2026-10-23' : '2026-10-30';
+      saved.tasks.find((t) => t.id === 'M').doneDate = '2026-10-30';
+      const report = weeklyDraft(saved, {
+        id: 'published',
+        from: '2026-10-26',
+        to: '2026-10-30',
+        currentDate: '2026-10-30',
+        publishedAt: '2026-10-30T12:00:00.000Z',
+        notes: '발행 사본',
+        nextNotes: '검수 진행',
+      });
+      saved.weeklyReports = [report];
+      saved = await repo.updateProject(editor.id, projectId, cleanProject(saved), saved._revision);
+      const frozen = structuredClone(saved.weeklyReports[0]);
+      assert.equal(frozen.snapshot.metrics.done, 80);
+      const physical = (
+        await pool.query('SELECT planning FROM pm_projects WHERE id=$1', [projectId])
+      ).rows[0].planning;
+      assert.equal(physical.milestones.M, '2026-10-30');
+      assert.deepEqual(physical.dependencies.C, ['A', 'M']);
+      assert.equal(physical.management.issues[0].probability, 'medium');
+      assert.deepEqual(physical.management.weeklyReports[0], frozen);
+      assert.equal(
+        (
+          await pool.query(
+            'SELECT count(*)::int AS n FROM pm_task_items WHERE project_id=$1 AND task_id=$2',
+            [projectId, 'M'],
+          )
+        ).rows[0].n,
+        0,
+      );
+      // A different pool and repository must read the persisted document, not cached objects.
+      reopened = await createPool();
+      const reloaded = await new PgRepository(reopened).getProject(owner.id, projectId);
+      assert.deepEqual(cleanProject(reloaded), cleanProject(saved));
+      assert.equal(reloaded.tasks.find((t) => t.id === 'M').doneDate, '2026-10-30');
+      await reopened.end();
+      reopened = null;
+
+      server = createApplication({ repo, origin: 'http://localhost' });
+      await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+      const base = 'http://127.0.0.1:' + server.address().port + '/api/projects/' + projectId;
+      const sessionFor = async (user) => {
+        const cookie = token(),
+          csrf = token();
+        await repo.createSession({
+          hash: digest(cookie),
+          userId: user.id,
+          csrf,
+          expires: new Date(Date.now() + 120000),
+          passwordHash: 'unused-pm-validation-fixture',
+        });
+        return {
+          Cookie: 'pmcanvas_session=' + cookie,
+          Origin: 'http://localhost',
+          'X-CSRF-Token': csrf,
+          'Content-Type': 'application/json',
+        };
+      };
+      const ownerHeaders = await sessionFor(owner),
+        viewerHeaders = await sessionFor(viewer);
+      const request = (headers, project, revision) =>
+        fetch(base, { method: 'PUT', headers, body: JSON.stringify({ project, revision }) });
+      const read = await fetch(base, { headers: ownerHeaders });
+      assert.equal(read.status, 200);
+      assert.deepEqual((await read.json()).project.weeklyReports[0], frozen);
+      const staleRevision = saved._revision;
+      let changed = structuredClone(saved);
+      changed.issues[0].action = '현재 조치 변경';
+      changed.tasks.find((t) => t.id === 'A').items[0].hours = 48;
+      let response = await request(ownerHeaders, changed, saved._revision);
+      assert.equal(response.status, 200);
+      saved = (await response.json()).project;
+      assert.deepEqual(saved.weeklyReports[0], frozen);
+      response = await request(ownerHeaders, changed, staleRevision);
+      assert.equal(response.status, 409);
+      await response.arrayBuffer();
+      response = await request(viewerHeaders, saved, saved._revision);
+      assert.equal(response.status, 403);
+      await response.arrayBuffer();
+      changed = structuredClone(saved);
+      changed.weeklyReports[0].notes = '발행 내용 변조';
+      response = await request(ownerHeaders, changed, saved._revision);
+      assert.equal(response.status, 400);
+      await response.arrayBuffer();
+      changed = structuredClone(saved);
+      changed.weeklyReports = [];
+      response = await request(ownerHeaders, changed, saved._revision);
+      assert.equal(response.status, 400);
+      await response.arrayBuffer();
+      let loaded = await repo.getProject(owner.id, projectId);
+      assert.equal(loaded._revision, saved._revision);
+      assert.deepEqual(loaded.weeklyReports[0], frozen);
+      // Force a real deferred FK failure after writing planning JSON, and verify full rollback.
+      const invalid = structuredClone(loaded);
+      invalid.tasks.find((t) => t.id === 'C').owner = 'missing-member';
+      invalid.issues[0].action = '롤백해야 할 조치';
+      await assert.rejects(repo.updateProject(owner.id, projectId, invalid, loaded._revision), {
+        code: '23503',
+      });
+      loaded = await repo.getProject(owner.id, projectId);
+      assert.equal(loaded._revision, saved._revision);
+      assert.equal(loaded.issues[0].action, '현재 조치 변경');
+      assert.equal(loaded.tasks.find((t) => t.id === 'C').owner, 'n');
+      assert.deepEqual(loaded.weeklyReports[0], frozen);
+      const events = await repo.listEvents(owner.id, projectId);
+      assert.equal(
+        events.flatMap((e) => e.changes).filter((c) => c.entity === 'weekly-report').length,
+        1,
+      );
+      assert.ok(
+        events.some((e) =>
+          e.changes.some((c) => c.entity === 'issue' && c.after?.action === '현재 조치 변경'),
+        ),
+      );
+      assert.ok(
+        !events.some((e) =>
+          e.changes.some((c) => c.entity === 'issue' && c.after?.action === '롤백해야 할 조치'),
+        ),
+      );
+    } finally {
+      if (server) {
+        server.closeAllConnections();
+        await new Promise((resolve) => server.close(resolve));
+      }
+      if (reopened) await reopened.end();
+      await pool.query('DELETE FROM pm_projects WHERE id=$1', [projectId]);
+      if (users.length)
+        await pool.query('DELETE FROM pm_users WHERE id=ANY($1::uuid[])', [users.map((u) => u.id)]);
       await pool.end();
     }
   },

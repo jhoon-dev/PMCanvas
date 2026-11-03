@@ -1,3 +1,12 @@
+import { detachManagementLinks } from './shared/management.js';
+import { managementView, installManagementUi } from './shared/management-ui.js';
+import {
+  taskView,
+  summaryIds,
+  taskLeaves,
+  predecessorIds,
+  taskIndex,
+} from './shared/task-model.js';
 import {
   today,
   validDate,
@@ -23,6 +32,7 @@ import {
   scheduleProposal,
   schedulePreviewHtml,
 } from './planning-ui.js';
+import { newTask } from './shared/wbs-model.js';
 import { setParent, captureBaseline } from './shared/planning.js';
 import { bulkProposal, bulkPreviewHtml } from './bulk-ui.js';
 import {
@@ -103,6 +113,8 @@ function refreshDate({ paint = true } = {}) {
   const active = document.activeElement;
   const advance =
     !busy &&
+    !managementUi.dirty() &&
+    !managementUi.pending() &&
     !editor &&
     !importing &&
     !document.querySelector('dialog[open]') &&
@@ -197,6 +209,7 @@ function controls(p, search = true) {
   );
 }
 function taskTable(p, s, tasks = p.tasks) {
+  const index = taskIndex(p);
   if (!tasks.length)
     return ui('<div class="desktop-note" style="padding:24px">표시할 업무가 없습니다.</div>');
   return (
@@ -204,6 +217,7 @@ function taskTable(p, s, tasks = p.tasks) {
       '<div class="desktop-table-wrap"><table class="desktop-table"><thead><tr><th>업무</th><th>담당자</th><th>계획 일정</th><th>공수</th><th>진척률</th><th>예상 완료일</th><th>상태</th></tr></thead><tbody>',
     ) +
     tasks
+      .map((task) => taskView(p, task, index))
       .map(
         (task) =>
           '<tr><td><button class="task-name" data-edit-task="' +
@@ -234,6 +248,7 @@ function taskTable(p, s, tasks = p.tasks) {
   );
 }
 function gantt(p, tasks) {
+  const index = taskIndex(p);
   if (!tasks.length) return '';
   const start = tasks.map((task) => task.start).sort()[0];
   const end = tasks
@@ -248,6 +263,7 @@ function gantt(p, tasks) {
     end +
     '</span></div>' +
     tasks
+      .map((task) => taskView(p, task, index))
       .map(
         (task) =>
           '<div class="desktop-gantt-row"><span title="' +
@@ -299,7 +315,7 @@ function overview(p, s) {
     ui('<article class="desktop-metric"><small>완료한 업무</small><strong>') +
     s.completed +
     '<span style="font-size:15px;color:#9aa3b4"> / ' +
-    p.tasks.length +
+    taskLeaves(p).length +
     '</span></strong><p>' +
     num(s.done) +
     'h / ' +
@@ -316,7 +332,7 @@ function overview(p, s) {
     taskTable(p, s) +
     '</section>' +
     ui(
-      '<p class="desktop-note">예상 완료일은 계획 일정·담당자 가용시간·완료 기록을 바탕으로 계산합니다. 등급은 분류에만 사용합니다.<br>토·일요일과 프로젝트 설정의 휴무일을 제외합니다. 완료 기록이 부족하면 계획 기준으로 추정합니다.</p>',
+      '<p class="desktop-note">보고 기준일 업무 종료 기준으로 남은 작업을 다음 근무일부터 배정합니다. 예상 완료일은 계획 일정·담당자 가용시간·완료 기록을 바탕으로 계산합니다. 등급은 분류에만 사용합니다.<br>토·일요일과 프로젝트 설정의 휴무일을 제외합니다. 완료 기록이 부족하면 계획 기준으로 추정합니다.</p>',
     )
   );
 }
@@ -341,7 +357,7 @@ function tasksView(p, s) {
   );
 }
 function daily(p) {
-  const tasks = filtered(p);
+  const tasks = filtered(p).filter((t) => !summaryIds(p).has(t.id));
   return (
     pageHead(
       'DAILY CHECK-IN',
@@ -371,7 +387,17 @@ function daily(p) {
               '</div></div><strong>' +
               pct(progress(task, reportDate)) +
               '</strong></div><div class="check-items">' +
-              task.items
+              (task.kind === 'milestone'
+                ? [
+                    {
+                      id: '__milestone',
+                      title: ui('마일스톤 완료'),
+                      hours: 0,
+                      doneDate: task.doneDate,
+                    },
+                  ]
+                : task.items
+              )
                 .map((item) => {
                   const later = item.doneDate && item.doneDate > reportDate;
                   return (
@@ -541,24 +567,26 @@ function render() {
   }
   const s = summary(p, reportDate);
   $('#content').innerHTML =
-    view === 'planning'
-      ? planningView(p, {
-          at: reportDate,
-          query,
-          owner,
-          collapsed,
-          selected,
-          controls: controls(p),
-        })
-      : view === 'reports'
-        ? reportsView(p, s)
-        : view === 'people'
-          ? peopleView(p, s, reportDate)
-          : view === 'daily'
-            ? daily(p)
-            : view === 'tasks'
-              ? tasksView(p, s)
-              : overview(p, s);
+    view === 'management'
+      ? managementView(p, reportDate)
+      : view === 'planning'
+        ? planningView(p, {
+            at: reportDate,
+            query,
+            owner,
+            collapsed,
+            selected,
+            controls: controls(p),
+          })
+        : view === 'reports'
+          ? reportsView(p, s)
+          : view === 'people'
+            ? peopleView(p, s, reportDate)
+            : view === 'daily'
+              ? daily(p)
+              : view === 'tasks'
+                ? tasksView(p, s)
+                : overview(p, s);
   const all = document.querySelector('[data-select-visible]');
   if (all) all.indeterminate = selected.size > 0 && !all.checked;
 }
@@ -589,6 +617,10 @@ async function openBulk(action) {
   }
 }
 async function openEditor(type, id = '') {
+  if (managementUi.dirty() || managementUi.pending()) {
+    toast(ui('관리 입력을 먼저 저장하거나 취소해 주세요.'));
+    return;
+  }
   if (busy || !state.project || editor) return;
   await api.editing(true);
   editor = { type, id };
@@ -642,6 +674,10 @@ async function commit(project) {
   accept(next);
 }
 async function command(name) {
+  if (managementUi.dirty() || managementUi.pending()) {
+    toast(ui('관리 입력을 먼저 저장하거나 취소해 주세요.'));
+    return;
+  }
   if (name === 'appSettings' || name === 'updates') {
     if (editor || importing) {
       toast(ui('입력창의 변경사항을 먼저 적용하거나 취소해 주세요.'));
@@ -655,7 +691,14 @@ async function command(name) {
     return;
   }
   if (name === 'timeZone') {
-    if (busy || editor || importing || state.dirty) {
+    if (
+      busy ||
+      editor ||
+      importing ||
+      state.dirty ||
+      managementUi.dirty() ||
+      managementUi.pending()
+    ) {
       toast(ui('변경사항을 저장하거나 취소한 뒤 시간대를 바꿔 주세요.'));
       return;
     }
@@ -713,8 +756,13 @@ async function command(name) {
     if (name === 'about') {
       const info = await api.info();
       alert(
-        'PM Canvas Desktop ' +
+        info.displayName +
+          ' ' +
           info.version +
+          '\n' +
+          info.brand +
+          ' · ' +
+          info.developer +
           (info.commit ? '\n' + info.commit.slice(0, 12) : '') +
           (info.development ? '\nDevelopment build' : ''),
       );
@@ -780,6 +828,14 @@ document.addEventListener('click', (event) => {
     $('#search')?.focus();
     return;
   }
+  if (target.dataset.action === 'summary') {
+    void run(async () => {
+      const p = structuredClone(state.project);
+      p.tasks.push(newTask(p, { date: reportDate, summary: true }));
+      await commit(p);
+    });
+    return;
+  }
   if (target.dataset.bulk) {
     void openBulk(target.dataset.bulk);
     return;
@@ -815,12 +871,14 @@ document.addEventListener('click', (event) => {
     return;
   }
   if (target.dataset.command) {
+    if (!managementUi.leave()) return;
     target.closest('details.action-menu')?.removeAttribute('open');
     void command(target.dataset.command);
     return;
   }
   const nextView = target.dataset.view || target.dataset.go;
   if (nextView) {
+    if (nextView !== view && !managementUi.leave()) return;
     if (nextView !== view) selected.clear();
     view = nextView;
     render();
@@ -911,9 +969,11 @@ document.addEventListener('change', async (event) => {
   const checked = event.target.checked;
   await run(async () => {
     const p = structuredClone(state.project);
-    const item = p.tasks
-      .find((task) => task.id === taskId)
-      ?.items.find((item) => item.id === itemId);
+    const task = p.tasks.find((task) => task.id === taskId);
+    const item =
+      task?.kind === 'milestone' && itemId === '__milestone'
+        ? task
+        : task?.items.find((item) => item.id === itemId);
     if (!item || item.doneDate > reportDate) throw Error(ui('완료 기록을 확인해 주세요.'));
     item.doneDate = checked ? reportDate : null;
     await commit(p);
@@ -1031,7 +1091,10 @@ $('#deleteButton').addEventListener('click', async () => {
     $('#formError').textContent = ui('담당 업무가 있는 인력입니다. 먼저 담당자를 변경해 주세요.');
     return;
   }
-  if (type === 'task' && p.tasks.some((task) => task.predecessor === id || task.parentId === id)) {
+  if (
+    type === 'task' &&
+    p.tasks.some((task) => predecessorIds(task).includes(id) || task.parentId === id)
+  ) {
     $('#formError').textContent = ui(
       '하위 또는 후속 업무가 연결되어 있습니다. 먼저 연결을 정리해 주세요.',
     );
@@ -1041,6 +1104,7 @@ $('#deleteButton').addEventListener('click', async () => {
   await run(async () => {
     if (type === 'task') p.tasks = p.tasks.filter((task) => task.id !== id);
     else p.members = p.members.filter((member) => member.id !== id);
+    detachManagementLinks(p);
     await commit(p);
     await api.editing(false);
     editor = null;
@@ -1093,10 +1157,38 @@ const navigationIcons = {
 document.querySelectorAll('.desktop-sidebar [data-view]').forEach((button) => {
   button.insertAdjacentHTML('afterbegin', icon(navigationIcons[button.dataset.view]));
 });
+const managementUi = installManagementUi({
+  project: () => state.project,
+  getDate: () => reportDate,
+  toast,
+  canChange: () => !busy && !editor && !importing,
+  onDirtyChange: (value) => void api.editing(value),
+  savedMessage: '변경사항을 적용했습니다. 프로젝트 파일도 저장해 주세요.',
+  publishedMessage: '주간보고를 발행했습니다. 프로젝트 파일도 저장해 주세요.',
+  save: async (next) => {
+    await api.editing(false);
+    await commit(next);
+  },
+  exportReport: async (report) => {
+    await api.editing(false);
+    try {
+      await api.exportReport({ kind: 'weekly', id: report.id, format: 'html' }, state.revision);
+    } finally {
+      await api.editing(managementUi.dirty());
+    }
+  },
+});
 $('#languageSelect').value = getLanguage();
 $('#languageSelect').onchange = async (event) => {
   const next = event.target.value;
-  if (busy || editor || importing || state.dirty) {
+  if (
+    busy ||
+    editor ||
+    importing ||
+    state.dirty ||
+    managementUi.dirty() ||
+    managementUi.pending()
+  ) {
     event.target.value = getLanguage();
     toast(ui('언어를 바꾸기 전에 변경사항을 저장하거나 취소해 주세요.'));
     return;

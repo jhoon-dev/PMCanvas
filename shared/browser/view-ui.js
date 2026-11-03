@@ -57,6 +57,8 @@ function meter(value, cls = '') {
   );
 }
 function badge(t, asOf) {
+  if (t.kind === 'summary' && !t.items.length)
+    return ui('<span class="badge neutral">요약 업무</span>');
   const v = progress(t, asOf);
   if (v === 1) return ui('<span class="badge green">완료</span>');
   if (t.end < asOf) return ui('<span class="badge red">지연</span>');

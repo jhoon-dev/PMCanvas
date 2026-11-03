@@ -1,6 +1,7 @@
-import { validDate } from '../browser/engine.js';
+import { cleanManagement } from '../browser/management.js';
 import { validateProject } from '../browser/engine.js';
-import { hierarchy } from '../browser/planning.js';
+import { hierarchy, validatePlanning } from '../browser/planning.js';
+import { LIMITS, normalizeTaskModel } from '../browser/task-model.js';
 import { fail } from './errors.mjs';
 export const uuid = (value) =>
   typeof value === 'string' &&
@@ -30,8 +31,8 @@ export function cleanProject(input) {
       !Array.isArray(input.tasks)
     )
       fail(400, 'INVALID_PROJECT', '프로젝트 형식을 확인해 주세요.');
-    if (input.members.length > 200 || input.tasks.length > 500)
-      fail(400, 'INVALID_PROJECT', '인력 200명, 업무 500개까지 지원합니다.');
+    if (input.members.length > LIMITS.members || input.tasks.length > LIMITS.tasks)
+      fail(400, 'INVALID_PROJECT', '인력 200명, 실제 업무 500개와 요약 업무 500개까지 지원합니다.');
     const p = {
       name: text(input.name, 120),
       description: text(input.description, 300, true),
@@ -46,10 +47,24 @@ export function cleanProject(input) {
         allocation: finite(m.allocation, 1, 100),
       })),
       tasks: input.tasks.map((t) => {
-        if (!Array.isArray(t.items) || t.items.length > 200)
+        if (!Array.isArray(t.items) || t.items.length > LIMITS.items)
           fail(400, 'INVALID_PROJECT', '세부 작업은 업무당 200개까지 지원합니다.');
         return {
           ...(t.parentId ? { parentId: id(t.parentId) } : {}),
+          ...(['summary', 'milestone'].includes(t.kind) ? { kind: t.kind } : {}),
+          ...(t.kind === 'milestone' ? { doneDate: t.doneDate ?? null } : {}),
+          ...(t.predecessors !== undefined
+            ? {
+                predecessors: (() => {
+                  if (!Array.isArray(t.predecessors) || t.predecessors.length > LIMITS.tasks)
+                    fail(400, 'INVALID_PROJECT', '선행 업무 목록을 확인해 주세요.');
+                  const ids = t.predecessors.map(id);
+                  if (new Set(ids).size !== ids.length)
+                    fail(400, 'INVALID_PROJECT', '선행 업무가 중복됩니다.');
+                  return ids;
+                })(),
+              }
+            : {}),
           id: id(t.id),
           name: text(t.name, 200),
           phase: text(t.phase, 50, true),
@@ -70,45 +85,27 @@ export function cleanProject(input) {
     hierarchy(p);
     if (input.baseline != null) {
       const b = input.baseline;
-      if (
-        !b ||
-        typeof b !== 'object' ||
-        !Array.isArray(b.tasks) ||
-        b.tasks.length > 500 ||
-        typeof b.createdAt !== 'string' ||
-        b.createdAt.length > 40 ||
-        !Number.isFinite(Date.parse(b.createdAt))
-      )
+      if (!b || typeof b !== 'object' || !Array.isArray(b.tasks) || b.tasks.length > LIMITS.tasks)
         fail(400, 'INVALID_BASELINE', '기준 계획 형식을 확인해 주세요.');
-      const seen = new Set();
       p.baseline = {
         name: text(b.name, 80),
         createdAt: b.createdAt,
-        tasks: b.tasks.map((t) => {
-          const key = id(t.id);
-          if (
-            seen.has(key) ||
-            !validDate(t.start) ||
-            !validDate(t.end) ||
-            t.start > t.end ||
-            !Number.isFinite(t.hours) ||
-            t.hours < 0 ||
-            t.hours > 2000000
-          )
-            fail(400, 'INVALID_BASELINE', '기준 계획의 업무를 확인해 주세요.');
-          seen.add(key);
-          return {
-            id: key,
-            name: text(t.name, 200),
-            start: t.start,
-            end: t.end,
-            hours: t.hours,
-            parentId: t.parentId ? id(t.parentId) : '',
-          };
-        }),
+        tasks: b.tasks.map((t) => ({
+          id: id(t.id),
+          name: text(t.name, 200),
+          start: t.start,
+          end: t.end,
+          hours: t.hours,
+          ...(t.kind === 'milestone' ? { kind: 'milestone' } : {}),
+          parentId: t.parentId ? id(t.parentId) : '',
+        })),
       };
+      validatePlanning(p);
     }
+    normalizeTaskModel(p);
     validateProject(p);
+    validatePlanning(p);
+    Object.assign(p, cleanManagement(input, p));
     return p;
   } catch (error) {
     if (error.status) throw error;
@@ -142,9 +139,13 @@ export function projectChanges(before, after) {
           holidays: p.holidays,
           demo: p.demo,
           baseline: p.baseline ?? null,
+          staffingHoursPerMM: p.staffing?.hoursPerMM ?? null,
         }
       : null;
   add('project', before ? [meta(before)] : [], [meta(after)]);
+  add('issue', before?.issues || [], after.issues || []);
+  add('weekly-report', before?.weeklyReports || [], after.weeklyReports || []);
+  add('staffing-period', before?.staffing?.assignments || [], after.staffing?.assignments || []);
   add(
     'member',
     (before?.members || []).map((m, position) => ({ ...m, position })),

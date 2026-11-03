@@ -1,4 +1,13 @@
 import { businessDate } from './business-clock.js';
+import {
+  LIMITS,
+  predecessorIds,
+  taskLeaves,
+  summaryIds,
+  taskView,
+  taskIndex,
+  executionTasks,
+} from './task-model.js';
 export const DAY = 86400000;
 export const dateValue = (s) => Date.parse(s + 'T00:00:00Z');
 export const validDate = (s) =>
@@ -38,10 +47,86 @@ export function shiftWorkday(s, n, h = []) {
   }
   return d;
 }
+// Hours available on a working day. Consumers exclude weekends/project holidays.
+// A member's period plan replaces their fixed allocation; gaps in that plan are zero.
+export function capacityCalendar(project) {
+  const members = new Map(project.members.map((m) => [m.id, m])),
+    periods = new Map();
+  for (const a of project.staffing?.assignments || []) {
+    if (!periods.has(a.memberId)) periods.set(a.memberId, new Map());
+    const events = periods.get(a.memberId),
+      after = addDays(a.end, 1);
+    for (const [date, delta, count] of [
+      [a.start, a.allocation, 1],
+      [after, -a.allocation, -1],
+    ]) {
+      const previous = events.get(date) || { delta: 0, count: 0 };
+      events.set(date, { delta: previous.delta + delta, count: previous.count + count });
+    }
+  }
+  const changes = new Map();
+  for (const [id, events] of periods) {
+    let allocation = 0,
+      active = 0;
+    changes.set(
+      id,
+      [...events.keys()].sort().map((date) => {
+        const event = events.get(date);
+        active += event.count;
+        allocation = active ? Math.max(0, allocation + event.delta) : 0;
+        return { date, allocation: Math.max(0, allocation) };
+      }),
+    );
+  }
+  const hours = (id, date) => {
+    const member = members.get(id);
+    if (!member) return 0;
+    const rows = changes.get(id);
+    if (!rows) return (member.hours * member.allocation) / 100;
+    let lo = 0,
+      hi = rows.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >>> 1;
+      if (rows[mid].date <= date) lo = mid + 1;
+      else hi = mid;
+    }
+    return (member.hours * (lo ? rows[lo - 1].allocation : 0)) / 100;
+  };
+  const segments = (id, from, to) => {
+    if (to < from) return [];
+    const dates = [
+      from,
+      ...(changes.get(id) || []).map((r) => r.date).filter((d) => d > from && d <= to),
+      addDays(to, 1),
+    ];
+    return dates
+      .slice(0, -1)
+      .map((date, i) => ({ from: date, to: addDays(dates[i + 1], -1), capacity: hours(id, date) }));
+  };
+  return {
+    hours,
+    segments,
+    hasPlan: (id) => changes.has(id),
+    nextAvailable: (id, date) =>
+      hours(id, date) > 0
+        ? date
+        : (changes.get(id) || []).find((r) => r.date > date && r.allocation > 0)?.date,
+    totalHours: (id, from, to) =>
+      segments(id, from, to).reduce(
+        (n, s) => n + workdays(s.from, s.to, project.holidays) * s.capacity,
+        0,
+      ),
+  };
+}
 export const taskHours = (t) => t.items.reduce((s, i) => s + i.hours, 0);
 export const earned = (t, at) =>
   t.items.reduce((s, i) => s + (i.doneDate && i.doneDate <= at ? i.hours : 0), 0);
-export const progress = (t, at) => (taskHours(t) ? earned(t, at) / taskHours(t) : 0);
+export const progress = (t, at) =>
+  t.kind === 'milestone'
+    ? Number(Boolean(t.doneDate && t.doneDate <= at))
+    : taskHours(t)
+      ? earned(t, at) / taskHours(t)
+      : 0;
 export function planned(t, at, h = []) {
   const d = workdays(t.start, t.end, h);
   return d ? taskHours(t) * Math.min(1, workdays(t.start, at < t.end ? at : t.end, h) / d) : 0;
@@ -55,8 +140,8 @@ export function orderTasks(tasks) {
     if (visiting.has(t.id)) throw Error('선행 업무가 서로 순환합니다. 연결을 확인해 주세요.');
     if (seen.has(t.id)) return;
     visiting.add(t.id);
-    if (t.predecessor) {
-      const p = map.get(t.predecessor);
+    for (const id of predecessorIds(t)) {
+      const p = map.get(id);
       if (!p) throw Error('존재하지 않는 선행 업무입니다.');
       visit(p);
     }
@@ -71,7 +156,10 @@ export function orderTasks(tasks) {
 }
 export function forecast(project, at) {
   const h = project.holidays || [],
-    tasks = orderTasks(project.tasks),
+    index = taskIndex(project),
+    calendar = capacityCalendar(project),
+    members = new Map(project.members.map((m) => [m.id, m])),
+    tasks = orderTasks(executionTasks(project, index)),
     results = Object.create(null),
     pace = Object.create(null),
     usage = new Map();
@@ -109,10 +197,27 @@ export function forecast(project, at) {
       ratio: observed ? done / expected : 1,
       completedHours: done,
       windowDays: span,
-      capacity: (member.hours * member.allocation) / 100,
+      capacity: calendar.hours(member.id, at),
     };
   }
   for (const t of tasks) {
+    if (t.kind === 'milestone') {
+      const predecessors = predecessorIds(t).map((id) => results[id]);
+      const actual = t.doneDate && t.doneDate <= at;
+      const end = actual
+        ? t.doneDate
+        : predecessors.some((p) => !p.end)
+          ? null
+          : [t.end, addDays(at, 1), ...predecessors.map((p) => p.end)].sort().at(-1);
+      results[t.id] = {
+        start: end,
+        end,
+        method: actual ? 'actual' : 'milestone',
+        remaining: 0,
+        late: end ? Math.max(0, workdays(addDays(t.end, 1), end, h)) : 0,
+      };
+      continue;
+    }
     const total = taskHours(t),
       done = earned(t, at),
       remaining = Math.max(0, total - done);
@@ -130,10 +235,15 @@ export function forecast(project, at) {
       };
       continue;
     }
-    const member = project.members.find((m) => m.id === t.owner),
+    const member = members.get(t.owner),
       p = pace[t.owner],
-      pred = t.predecessor ? results[t.predecessor] : null;
-    if (!member || !p || pred?.end === null) {
+      predecessors = predecessorIds(t).map((id) => results[id]),
+      predEnd = predecessors
+        .map((x) => x.end)
+        .filter(Boolean)
+        .sort()
+        .at(-1);
+    if (!member || !p || predecessors.some((x) => x.end === null)) {
       results[t.id] = {
         start: null,
         end: null,
@@ -144,20 +254,32 @@ export function forecast(project, at) {
       continue;
     }
     const nominal = total / Math.max(1, workdays(t.start, t.end, h)),
-      dailyRate = Math.min(p.capacity, nominal * p.ratio);
+      dailyRate = nominal * p.ratio;
     let start = nextWorkday(
-        [t.start, addDays(at, 1), pred?.end ? addDays(pred.end, 1) : t.start].sort().at(-1),
+        [t.start, addDays(at, 1), predEnd ? addDays(predEnd, 1) : t.start].sort().at(-1),
         h,
       ),
       d = start,
       left = remaining,
       finish = null,
       first = null;
-    for (let guard = 0; guard < 3653 && left > 0.00001; guard++, d = addDays(d, 1)) {
+    const horizon = addDays(start, 3652);
+    for (
+      let guard = 0;
+      guard < 3653 && d <= horizon && left > 0.00001;
+      guard++, d = addDays(d, 1)
+    ) {
+      const capacity = calendar.hours(member.id, d);
+      if (!capacity) {
+        const next = calendar.nextAvailable(member.id, d);
+        if (!next) break;
+        d = addDays(next, -1);
+        continue;
+      }
       if (!working(d, h)) continue;
       const key = member.id + ':' + d,
         used = usage.get(key) || 0,
-        amount = Math.min(left, dailyRate, Math.max(0, p.capacity - used));
+        amount = Math.min(left, dailyRate, Math.max(0, capacity - used));
       if (amount > 0) {
         first ??= d;
         left -= amount;
@@ -166,19 +288,47 @@ export function forecast(project, at) {
       }
     }
     results[t.id] = {
-      start: first || start,
+      start: first || (calendar.hasPlan(member.id) ? null : start),
       end: left > 0.00001 ? null : finish,
       method: p.observed ? 'velocity' : 'plan',
       remaining,
-      reason: left > 0.00001 ? '약 10년 계산 범위 초과' : null,
-      late: finish ? Math.max(0, workdays(addDays(t.end, 1), finish, h)) : 0,
+      reason:
+        left > 0.00001
+          ? calendar.hasPlan(member.id)
+            ? '투입 계획 또는 계산 범위 내 가용시간 부족'
+            : '약 10년 계산 범위 초과'
+          : null,
+      late: left <= 0.00001 && finish ? Math.max(0, workdays(addDays(t.end, 1), finish, h)) : 0,
     };
   }
-  const values = Object.values(results),
-    ends = values
-      .map((x) => x.end)
-      .filter(Boolean)
-      .sort();
+  const values = Object.values(results);
+  for (const id of index.summaries) {
+    const task = index.byId.get(id);
+    if (!task) continue;
+    const view = taskView(project, task, index),
+      children = index.leavesOf(id).map((t) => results[t.id]),
+      end =
+        children.length && children.every((x) => x.end)
+          ? children
+              .map((x) => x.end)
+              .sort()
+              .at(-1)
+          : null;
+    results[id] = {
+      start:
+        children.length && children.every((x) => x.start)
+          ? children.map((x) => x.start).sort()[0]
+          : null,
+      end,
+      method: 'summary',
+      remaining: children.reduce((n, x) => n + x.remaining, 0),
+      late: end ? Math.max(0, workdays(addDays(view.end, 1), end, h)) : 0,
+    };
+  }
+  const ends = values
+    .map((x) => x.end)
+    .filter(Boolean)
+    .sort();
   return {
     tasks: results,
     pace,
@@ -187,19 +337,20 @@ export function forecast(project, at) {
   };
 }
 export function summary(project, at) {
-  const total = project.tasks.reduce((s, t) => s + taskHours(t), 0),
-    done = project.tasks.reduce((s, t) => s + earned(t, at), 0),
-    plan = project.tasks.reduce((s, t) => s + planned(t, at, project.holidays), 0),
+  const tasks = taskLeaves(project),
+    total = tasks.reduce((s, t) => s + taskHours(t), 0),
+    done = tasks.reduce((s, t) => s + earned(t, at), 0),
+    plan = tasks.reduce((s, t) => s + planned(t, at, project.holidays), 0),
     f = forecast(project, at),
-    starts = project.tasks.map((t) => t.start).sort(),
-    ends = project.tasks.map((t) => t.end).sort();
+    starts = tasks.map((t) => t.start).sort(),
+    ends = tasks.map((t) => t.end).sort();
   return {
     total,
     done,
     progress: total ? done / total : 0,
     planned: total ? plan / total : 0,
-    completed: project.tasks.filter((t) => progress(t, at) === 1).length,
-    overdue: project.tasks.filter((t) => t.end < at && progress(t, at) < 1).length,
+    completed: tasks.filter((t) => progress(t, at) === 1).length,
+    overdue: tasks.filter((t) => t.end < at && progress(t, at) < 1).length,
     start: starts[0] || null,
     end: ends.at(-1) || null,
     forecast: f,
@@ -217,8 +368,13 @@ export function validateProject(p) {
     p.name.length > 120
   )
     throw Error('프로젝트 형식 또는 이름이 올바르지 않습니다.');
-  if (p.members.length > 200 || p.tasks.length > 500)
-    throw Error('첫 버전은 인력 200명, 업무 500개까지 지원합니다.');
+  if (
+    p.members.length > LIMITS.members ||
+    p.tasks.length > LIMITS.tasks ||
+    taskLeaves(p).length > LIMITS.workTasks ||
+    summaryIds(p).size > LIMITS.summaries
+  )
+    throw Error('인력 200명, 실제 업무 500개와 요약 업무 500개까지 지원합니다.');
   if (
     p.holidays !== undefined &&
     (!Array.isArray(p.holidays) ||
@@ -227,7 +383,12 @@ export function validateProject(p) {
   )
     throw Error('휴무일 날짜를 확인해 주세요.');
   const dates = [
-    ...p.tasks.flatMap((t) => [t.start, t.end, ...(t.items || []).map((i) => i.doneDate)]),
+    ...p.tasks.flatMap((t) => [
+      t.start,
+      t.end,
+      t.doneDate,
+      ...(t.items || []).map((i) => i.doneDate),
+    ]),
     ...(Array.isArray(p.baseline?.tasks) ? p.baseline.tasks.flatMap((t) => [t.start, t.end]) : []),
   ]
     .filter((d) => typeof d === 'string')
@@ -236,7 +397,8 @@ export function validateProject(p) {
     throw Error('프로젝트 전체 일정과 기준 계획은 100년 이내로 설정해 주세요.');
   const memberIds = new Set(),
     taskIds = new Set(),
-    itemIds = new Set();
+    itemIds = new Set(),
+    summaries = summaryIds(p);
   for (const m of p.members) {
     if (
       typeof m.id !== 'string' ||
@@ -262,11 +424,22 @@ export function validateProject(p) {
       !validDate(t.start) ||
       !validDate(t.end) ||
       t.end < t.start ||
-      daysBetween(t.start, t.end) > 3652 ||
-      !workdays(t.start, t.end, p.holidays) ||
+      daysBetween(t.start, t.end) > (summaries.has(t.id) ? 36525 : 3652) ||
+      (t.kind !== 'milestone' && !workdays(t.start, t.end, p.holidays)) ||
       !Array.isArray(t.items) ||
-      !t.items.length ||
-      t.items.length > 200 ||
+      (!t.items.length && !summaries.has(t.id) && t.kind !== 'milestone') ||
+      (t.kind === 'milestone' &&
+        (t.items.length > 0 ||
+          t.start !== t.end ||
+          (t.doneDate != null && (!validDate(t.doneDate) || t.doneDate > currentDay)))) ||
+      (summaries.has(t.id) && t.items.length > 0) ||
+      t.items.length > LIMITS.items ||
+      (t.kind !== undefined && !['summary', 'milestone'].includes(t.kind)) ||
+      (t.predecessors !== undefined &&
+        (!Array.isArray(t.predecessors) ||
+          t.predecessors.length > LIMITS.tasks ||
+          t.predecessors.some((id) => typeof id !== 'string' || !id) ||
+          new Set(t.predecessors).size !== t.predecessors.length)) ||
       (!memberIds.has(t.owner) && t.owner !== '')
     )
       throw Error('업무 이름·담당자·일정·체크 항목을 확인해 주세요.');
@@ -288,5 +461,6 @@ export function validateProject(p) {
     taskIds.add(t.id);
   }
   orderTasks(p.tasks);
+  orderTasks(executionTasks(p));
   return p;
 }

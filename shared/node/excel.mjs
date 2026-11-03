@@ -1,3 +1,4 @@
+import { taskView, predecessorIds, taskIndex } from '../browser/task-model.js';
 import { hierarchy, rollups, criticalPath, baselineDiff } from '../browser/planning.js';
 import { ui } from '../browser/i18n.js';
 import { completionRecords } from '../browser/reports.js';
@@ -115,6 +116,10 @@ export async function buildCompletionWorkbook(
   return Buffer.from(await book.xlsx.writeBuffer());
 }
 function row(s, values) {
+  if (values.some((value) => typeof value === 'string' && value.length > 32767))
+    throw Error(
+      'Excel 셀은 32,767자까지 지원합니다. 긴 선행 관계는 프로젝트 파일로 보관해 주세요.',
+    );
   const r = s.addRow(values);
   r.height = 30;
   r.alignment = { vertical: 'middle', wrapText: true };
@@ -137,6 +142,7 @@ export async function buildWorkbook(
     tasks = project.tasks.filter((t) => selected.has(t.id)),
     fc = forecast(project, at).tasks,
     tree = hierarchy(project),
+    index = taskIndex(project),
     cp = criticalPath(project);
   const owners = new Map(project.members.map((m) => [m.id, m.name])),
     names = new Map(project.tasks.map((t) => [t.id, t.name]));
@@ -187,10 +193,13 @@ export async function buildWorkbook(
       text('하위 포함 공수 (h)'),
       text('하위 포함 진척률'),
       text('임계 업무'),
+      text('업무 유형'),
+      text('마일스톤 완료일'),
     ],
     [9, 18, 38, 18, 15, 15, 14, 14, 16, 16, 30, 55],
   );
-  for (const t of tasks) {
+  for (const original of tasks) {
+    const t = taskView(project, original, index);
     const r = row(wbs, [
       tree.get(t.id).number,
       t.phase,
@@ -202,14 +211,18 @@ export async function buildWorkbook(
       progress(t, at),
       date(fc[t.id]?.end),
       fc[t.id]?.late ?? null,
-      names.get(t.predecessor) || '',
+      predecessorIds(t)
+        .map((id) => names.get(id) || id)
+        .join(', '),
       t.memo,
       t.id,
       t.parentId || '',
-      t.predecessor || '',
+      predecessorIds(t).join(', '),
       aggregate.get(t.id).hours,
       aggregate.get(t.id).progress,
       cp.ids.has(t.id) ? text('예') : '',
+      index.summaries.has(t.id) ? 'summary' : t.kind === 'milestone' ? 'milestone' : 'task',
+      t.kind === 'milestone' ? date(t.doneDate) : null,
     ]);
     r.getCell(17).numFmt = '0.0%';
     for (const c of [5, 6, 9]) r.getCell(c).numFmt = 'yyyy-mm-dd';

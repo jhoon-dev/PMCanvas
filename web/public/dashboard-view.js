@@ -1,3 +1,4 @@
+import { taskView, taskLeaves, taskIndex } from './task-model.js';
 import { ui } from './i18n.js';
 import { escapeHtml as esc } from './html.js';
 import { addDays, daysBetween, workdays, taskHours, earned, planned, progress } from './engine.js';
@@ -20,6 +21,7 @@ import {
 function methodLabel(f) {
   return (
     {
+      summary: ui('하위 업무 집계'),
       actual: ui('실제 완료'),
       velocity: ui('최근 속도 반영'),
       plan: ui('계획 기준 추정'),
@@ -43,7 +45,7 @@ export function dashboardView(p, s, asOf) {
       (n, t) => n + t.items.filter((i) => !i.doneDate && t.start <= asOf).length,
       0,
     ),
-    eff = p.members.reduce((n, m) => n + m.allocation / 100, 0);
+    eff = p.members.reduce((n, m) => n + (s.forecast.pace[m.id]?.capacity || 0) / m.hours, 0);
   const heading = pageHead(
     'PROJECT OVERVIEW',
     p.name,
@@ -104,7 +106,7 @@ export function dashboardView(p, s, asOf) {
           ? late
             ? ui('계획 대비 +') + late + ui('근무일')
             : ui('계획 기한 이내')
-          : ui('담당자 확인 필요')) +
+          : ui('담당자·투입 계획·선행 확인 필요')) +
         '</span>'
       : ui('계산할 업무가 없어요')) +
     '</div><div class="subtle">' +
@@ -117,7 +119,7 @@ export function dashboardView(p, s, asOf) {
     '</span></div><div class="metric-number">' +
     s.completed +
     '<small>/ ' +
-    p.tasks.length +
+    taskLeaves(p).length +
     '</small></div><div class="metric-foot">' +
     (s.overdue
       ? ui('<span class="red-text">기한 지난 업무 ') + s.overdue + ui('개</span>')
@@ -164,6 +166,8 @@ export function dashboardView(p, s, asOf) {
           ui('</strong> 완료를 예상합니다.')
         : ui('담당자가 지정되지 않은 업무를 확인해 주세요.')
       : ui('참여인력을 추가하고, 업무를 체크 가능한 작은 단위로 나눠 보세요.')) +
+    '</p><p class="muted">' +
+    ui('보고 기준일 업무 종료 기준 · 남은 작업은 다음 근무일부터 배정') +
     '</p><div class="outlook-note">' +
     icon('clock') +
     '<span>' +
@@ -183,7 +187,7 @@ export function dashboardView(p, s, asOf) {
     ui(
       '<section class="bottom-grid"><article class="panel"><div class="panel-head"><div><h2>지금 확인할 업무 <span class="count">',
     ) +
-    p.tasks.filter((t) => progress(t, asOf) < 1 && t.start <= asOf).length +
+    taskLeaves(p).filter((t) => progress(t, asOf) < 1 && t.start <= asOf).length +
     '</span></h2></div>' +
     btn(ui('매일 작업 체크 →'), 'view:daily', 'link') +
     '</div>' +
@@ -197,7 +201,7 @@ export function dashboardView(p, s, asOf) {
 }
 function progressChart(p, s, asOf) {
   if (!s.total) return ui('<div class="chart-empty">업무를 등록하면 진척 추이가 표시됩니다.</div>');
-  const from = s.start,
+  const from = s.start || asOf,
     to = [s.end, s.forecast.end, asOf].filter(Boolean).sort().at(-1),
     n = Math.max(1, daysBetween(from, to)),
     left = 42,
@@ -296,7 +300,8 @@ function gantt(p, s, asOf) {
       ui('프로젝트의 일정을 그려보세요'),
       ui('업무와 계획 일정을 입력하면 타임라인이 만들어집니다.'),
     );
-  const from = s.start,
+  const index = taskIndex(p),
+    from = s.start || asOf,
     to = [s.end, s.forecast.end, asOf].filter(Boolean).sort().at(-1),
     span = Math.max(7, daysBetween(from, to) + 1),
     width = Math.max(570, Math.min(1400, span * 23)),
@@ -319,7 +324,8 @@ function gantt(p, s, asOf) {
     labels +
     '</div></div>' +
     p.tasks
-      .map((t, i) => {
+      .map((row, i) => {
+        const t = taskView(p, row, index);
         const v = progress(t, asOf),
           f = s.forecast.tasks[t.id],
           m = p.members.find((m) => m.id === t.owner),
@@ -383,7 +389,7 @@ function gantt(p, s, asOf) {
   );
 }
 function attention(p, s, asOf) {
-  const ts = p.tasks
+  const ts = taskLeaves(p)
     .filter((t) => progress(t, asOf) < 1 && t.start <= asOf)
     .sort((a, b) => a.end.localeCompare(b.end))
     .slice(0, 4);

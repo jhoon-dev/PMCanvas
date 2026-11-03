@@ -1,3 +1,5 @@
+import { assertReportHistory } from '../../shared/browser/management.js';
+import { normalizeTaskModel } from '../../shared/browser/task-model.js';
 import fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { fail } from './errors.mjs';
@@ -727,6 +729,13 @@ export class PgRepository extends WorkspaceOperations {
         ? row.planning.parents[t.id]
         : null;
       if (parent) t.parentId = parent;
+      if (row.planning?.summaries?.includes(t.id)) t.kind = 'summary';
+      if (Object.hasOwn(row.planning?.milestones || {}, t.id)) {
+        t.kind = 'milestone';
+        t.doneDate = row.planning.milestones[t.id];
+      }
+      if (Object.hasOwn(row.planning?.dependencies || {}, t.id))
+        t.predecessors = row.planning.dependencies[t.id];
     }
     const byTask = new Map(tasks.map((t) => [t.id, t]));
     for (const t of tasks) t.items = [];
@@ -734,8 +743,9 @@ export class PgRepository extends WorkspaceOperations {
       const { task_id, ...item } = i;
       byTask.get(task_id).items.push({ ...item, hours: Number(item.hours) });
     }
-    return {
-      ...(row.planning?.baseline ? { baseline: row.planning.baseline } : {}),
+    return normalizeTaskModel({
+      ...structuredClone(row.planning?.management || {}),
+      ...(row.planning?.baseline ? { baseline: structuredClone(row.planning.baseline) } : {}),
       id: row.id,
       name: row.name,
       description: row.description,
@@ -746,7 +756,7 @@ export class PgRepository extends WorkspaceOperations {
       createdAt: new Date(row.created_at).toISOString().slice(0, 10),
       _revision: row.revision,
       _role: row.role,
-    };
+    });
   }
   async listProjects(userId) {
     return this.transaction(async (c) => {
@@ -792,6 +802,18 @@ export class PgRepository extends WorkspaceOperations {
         parents: Object.fromEntries(
           p.tasks.filter((t) => t.parentId).map((t) => [t.id, t.parentId]),
         ),
+        summaries: p.tasks.filter((t) => t.kind === 'summary').map((t) => t.id),
+        dependencies: Object.fromEntries(
+          p.tasks.filter((t) => t.predecessors).map((t) => [t.id, t.predecessors]),
+        ),
+        milestones: Object.fromEntries(
+          p.tasks.filter((t) => t.kind === 'milestone').map((t) => [t.id, t.doneDate]),
+        ),
+        management: {
+          ...(p.issues ? { issues: p.issues } : {}),
+          ...(p.staffing ? { staffing: p.staffing } : {}),
+          ...(p.weeklyReports ? { weeklyReports: p.weeklyReports } : {}),
+        },
         baseline: p.baseline ?? null,
       }),
     ]);
@@ -862,6 +884,18 @@ export class PgRepository extends WorkspaceOperations {
           parents: Object.fromEntries(
             p.tasks.filter((t) => t.parentId).map((t) => [t.id, t.parentId]),
           ),
+          summaries: p.tasks.filter((t) => t.kind === 'summary').map((t) => t.id),
+          dependencies: Object.fromEntries(
+            p.tasks.filter((t) => t.predecessors).map((t) => [t.id, t.predecessors]),
+          ),
+          milestones: Object.fromEntries(
+            p.tasks.filter((t) => t.kind === 'milestone').map((t) => [t.id, t.doneDate]),
+          ),
+          management: {
+            ...(p.issues ? { issues: p.issues } : {}),
+            ...(p.staffing ? { staffing: p.staffing } : {}),
+            ...(p.weeklyReports ? { weeklyReports: p.weeklyReports } : {}),
+          },
           baseline: p.baseline ?? null,
         },
         role: 'owner',
@@ -879,6 +913,7 @@ export class PgRepository extends WorkspaceOperations {
         );
       const before = await this.hydrate(c, row),
         changes = projectChanges(cleanProject(before), p);
+      assertReportHistory(before, p);
       if (!changes.length) return before;
       const { rows } = await c.query(
         'UPDATE pm_projects SET name=$2,description=$3,holidays=$4::jsonb,demo=$5,revision=revision+1,updated_at=now() WHERE id=$1 RETURNING *',
@@ -893,6 +928,18 @@ export class PgRepository extends WorkspaceOperations {
           parents: Object.fromEntries(
             p.tasks.filter((t) => t.parentId).map((t) => [t.id, t.parentId]),
           ),
+          summaries: p.tasks.filter((t) => t.kind === 'summary').map((t) => t.id),
+          dependencies: Object.fromEntries(
+            p.tasks.filter((t) => t.predecessors).map((t) => [t.id, t.predecessors]),
+          ),
+          milestones: Object.fromEntries(
+            p.tasks.filter((t) => t.kind === 'milestone').map((t) => [t.id, t.doneDate]),
+          ),
+          management: {
+            ...(p.issues ? { issues: p.issues } : {}),
+            ...(p.staffing ? { staffing: p.staffing } : {}),
+            ...(p.weeklyReports ? { weeklyReports: p.weeklyReports } : {}),
+          },
           baseline: p.baseline ?? null,
         },
         role: row.role,

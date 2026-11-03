@@ -1,3 +1,4 @@
+import { taskView, taskLeaves, summaryIds } from '../../shared/browser/task-model.js';
 import './mobile.css';
 import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
@@ -101,6 +102,7 @@ function meter(value) {
   return `<div class="meter" role="meter" aria-label="진척률" aria-valuenow="${Math.round(value * 100)}" aria-valuemin="0" aria-valuemax="100"><span style="width:${value * 100}%"></span></div>`;
 }
 function status(task) {
+  if (task.kind === 'summary' && !task.items.length) return ['active', '요약 업무'];
   return progress(task, today()) === 1
     ? ['done', '완료']
     : task.end < today()
@@ -117,12 +119,17 @@ function filtered(project) {
   );
 }
 function taskCard(project, task, daily = false) {
+  task = taskView(project, task);
   const [style, label] = status(task);
   const member = project.members.find((member) => member.id === task.owner);
-  const items = daily ? task.items.filter((item) => !onlyOpen || !item.doneDate) : [];
+  const entries =
+    task.kind === 'milestone'
+      ? [{ id: '__milestone', title: '마일스톤 완료', hours: 0, doneDate: task.doneDate }]
+      : task.items;
+  const items = daily ? entries.filter((item) => !onlyOpen || !item.doneDate) : [];
   return `<article class="task-card"><div class="card-top"><span class="phase">${esc(task.phase || '일반')}</span><span class="badge ${style}">${label}</span></div>
     <button class="task-title" data-action="edit-task" data-id="${esc(task.id)}">${esc(task.name)}</button>
-    <p class="task-meta">${icon('users')}${esc(member?.name || '미지정')}<span>·</span>${task.start.slice(5)} – ${task.end.slice(5)}</p>
+    <p class="task-meta">${icon('users')}${esc(task.kind === 'summary' ? '요약 업무' : member?.name || '미지정')}<span>·</span>${task.start.slice(5)} – ${task.end.slice(5)}</p>
     ${daily ? `<div class="checklist">${items.map((item) => `<label class="check-row"><input type="checkbox" data-task="${esc(task.id)}" data-item="${esc(item.id)}" ${item.doneDate ? 'checked' : ''}><span>${esc(item.title)}${item.doneDate ? `<small>완료 ${item.doneDate}</small>` : ''}</span><small>${num(item.hours)}h</small></label>`).join('') || '<p class="muted">모든 세부 작업을 완료했습니다.</p>'}</div>` : `<div class="progress-line">${meter(progress(task, today()))}<strong>${pct(progress(task, today()))}</strong></div>`}
   </article>`;
 }
@@ -153,13 +160,13 @@ function projectList() {
 function overview(p) {
   const s = summary(p, today());
   return `<section class="hero"><span class="eyebrow">PROJECT PULSE</span><div class="hero-progress"><strong>${pct(s.progress)}</strong><span>전체 진척률</span></div>${meter(s.progress)}<div class="hero-foot"><span>계획 ${pct(s.planned)}</span><span>${num(s.done)} / ${num(s.total)}h 완료</span></div></section>
-    <div class="metric-grid"><article><span>완료 업무</span><strong>${s.completed}<small> / ${p.tasks.length}</small></strong></article><article><span>지연 업무</span><strong class="${s.overdue ? 'late-text' : ''}">${s.overdue}<small>건</small></strong></article></div>
-    <section class="forecast-card">${icon('calendar')}<div><span>예상 완료일</span><strong>${s.forecast.end || '업무를 등록해 주세요'}</strong><small>${s.forecast.observed ? '최근 완료 속도를 반영했습니다.' : '현재 계획과 공수를 기준으로 계산합니다.'}</small></div></section>
+    <div class="metric-grid"><article><span>완료 업무</span><strong>${s.completed}<small> / ${taskLeaves(p).length}</small></strong></article><article><span>지연 업무</span><strong class="${s.overdue ? 'late-text' : ''}">${s.overdue}<small>건</small></strong></article></div>
+    <section class="forecast-card">${icon('calendar')}<div><span>예상 완료일</span><strong>${s.forecast.end || '업무를 등록해 주세요'}</strong><small>보고 기준일 업무 종료 기준 · ${s.forecast.observed ? '최근 완료 속도를 반영했습니다.' : '현재 계획과 공수를 기준으로 계산합니다.'}</small></div></section>
     <div class="section-heading"><h2>다가오는 업무</h2><a href="#tasks/${esc(p.id)}">모두 보기 →</a></div>
     ${
       p.tasks.length
         ? `<div class="task-list">${
-            p.tasks
+            taskLeaves(p)
               .filter((task) => progress(task, today()) < 1)
               .sort((a, b) => a.end.localeCompare(b.end))
               .slice(0, 4)
@@ -181,7 +188,13 @@ function tasks(p, daily) {
 }
 function taskList(p, daily) {
   const tasks = filtered(p).filter(
-    (task) => !daily || !onlyOpen || task.items.some((item) => !item.doneDate),
+    (task) =>
+      !daily ||
+      (!summaryIds(p).has(task.id) &&
+        (!onlyOpen ||
+          (task.kind === 'milestone'
+            ? !task.doneDate
+            : task.items.some((item) => !item.doneDate)))),
   );
   if (!p.tasks.length)
     return empty(
@@ -205,7 +218,7 @@ function more(p) {
     <section class="settings-card"><div class="section-heading"><h2>참여인력 <span>${p.members.length}</span></h2>${button('＋ 추가', 'add-member')}</div><div class="member-list">${p.members.map((m) => `<button class="member-row" data-action="edit-member" data-id="${esc(m.id)}"><span class="member-avatar">${esc(m.name.slice(-2))}</span><span><strong>${esc(m.name)}</strong><small>${esc(m.role || '참여인력')} · ${num(m.hours)}h / 일 · ${m.allocation}%</small></span><span aria-hidden="true">›</span></button>`).join('') || '<p class="muted">함께할 사람을 추가해 보세요.</p>'}</div></section>
     <section class="settings-card"><h2>파일 · 보고서</h2><p>프로젝트 파일은 웹과 데스크톱에서도 가져올 수 있습니다.</p><div class="stack-actions">${button(icon('download') + ' 프로젝트 내보내기', 'export')}${button(icon('download') + ' 업무 보고서 CSV', 'csv')}${button(icon('upload') + ' 프로젝트 가져오기', 'import')}</div></section>
     <section class="settings-card"><h2>업무 기준 시간대</h2><p>${esc(getBusinessTimeZone())} 기준으로 오늘과 완료일을 계산합니다.</p>${button('시간대 변경', 'timezone')}</section>
-    <p class="privacy-note">PM Canvas Mobile 0.1.0 · 기기에 자동 저장<br>계정이나 서버 연결 없이 동작합니다. 앱을 삭제하면 기기의 프로젝트도 삭제될 수 있으므로 파일을 내보내 보관하세요.</p>
+    <p class="privacy-note">PM Canvas 0.1.0 · 기기에 자동 저장<br>계정이나 서버 연결 없이 동작합니다. 앱을 삭제하면 기기의 프로젝트도 삭제될 수 있으므로 파일을 내보내 보관하세요.</p>
     <p class="privacy-note">${button('개인정보처리방침', 'privacy', 'ghost')}</p>
     <div class="delete-project">${button('이 프로젝트 삭제', 'delete-project', 'danger ghost')}</div>`;
 }
@@ -305,6 +318,17 @@ $('#editor').addEventListener('cancel', (event) => {
 $('#closeEditor').onclick = $('#cancelEditor').onclick = () => {
   if (!busy) closeEditor();
 };
+if (Capacitor.getPlatform() === 'android') {
+  // Keep the IME open until the button action. Blurring on pointer-down can
+  // resize the dialog before pointer-up and swallow Save, Delete or Cancel.
+  $('#editor').addEventListener('pointerdown', (event) => {
+    if (
+      event.target.closest('.dialog-actions button, #closeEditor') &&
+      document.activeElement?.matches('input, textarea, select')
+    )
+      event.preventDefault();
+  });
+}
 $('#editorBody').addEventListener('click', (event) => {
   if (event.target.closest('#addItem')) {
     if ($('#itemEditors').children.length >= 200)

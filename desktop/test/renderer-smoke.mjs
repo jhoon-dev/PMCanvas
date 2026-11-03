@@ -38,7 +38,11 @@ try {
     if (method === 'exportReport') {
       const [options, revision] = args;
       assert.equal(revision, document.revision);
-      atomicWrite(path.join(temporary, 'Report.csv'), buildReport(document.project, options).csv);
+      const report = buildReport(document.project, options);
+      atomicWrite(
+        path.join(temporary, options.kind === 'weekly' ? 'Report.html' : 'Report.csv'),
+        options.kind === 'weekly' ? report.html : report.csv,
+      );
       return true;
     }
     throw Error('Unexpected test call: ' + method);
@@ -176,8 +180,9 @@ try {
   await page.locator('[name="itemHours"]').fill('4');
   await page.getByRole('button', { name: '적용', exact: true }).click();
   const parentId = document.project.tasks[0].id,
-    childId = document.project.tasks[1].id;
-  assert.equal(document.project.tasks[1].parentId, parentId);
+    childId = document.project.tasks.find((task) => task.name === '하위 업무').id,
+    ownId = parentId + '-work';
+  assert.equal(document.project.tasks.find((task) => task.id === childId).parentId, parentId);
   await page
     .locator('[data-wbs-row="' + parentId + '"]')
     .getByText('24h', { exact: true })
@@ -190,20 +195,22 @@ try {
   assert.equal(await page.locator('[data-wbs-row]').count(), 1);
   await page.getByRole('button', { name: '모두 펼치기', exact: true }).click();
   await page.getByRole('button', { name: '하위 업무 내어쓰기', exact: true }).click();
-  await page.waitForFunction(
-    () => document.querySelectorAll('.desktop-wbs-number')[1]?.textContent === '2',
-  );
-  assert.equal(document.project.tasks[1].parentId, undefined);
+  await page
+    .locator('[data-wbs-row="' + childId + '"] .desktop-wbs-number')
+    .filter({ hasText: /^2$/ })
+    .waitFor();
+  assert.equal(document.project.tasks.find((task) => task.id === childId).parentId, undefined);
   await page.getByRole('button', { name: '하위 업무 들여쓰기', exact: true }).click();
-  await page.waitForFunction(
-    () => document.querySelectorAll('.desktop-wbs-number')[1]?.textContent === '1.1',
-  );
+  await page
+    .locator('[data-wbs-row="' + childId + '"] .desktop-wbs-number')
+    .filter({ hasText: /^1\.2$/ })
+    .waitFor();
   await page.getByRole('button', { name: '기준 계획 저장', exact: true }).click();
   await page.locator('[name="baselineName"]').fill('승인 계획 <기준>');
   await page.getByRole('button', { name: '적용', exact: true }).click();
   await page.getByText('승인 계획 <기준>', { exact: true }).waitFor();
   await page.getByRole('button', { name: '하위 업무', exact: true }).click();
-  assert.equal(await page.locator('[name="parentId"] option').count(), 2);
+  assert.equal(await page.locator('[name="parentId"] option').count(), 3);
   await page.locator('[name="end"]').fill('2026-11-02');
   await page.locator('[name="itemHours"]').fill('6');
   await page.getByRole('button', { name: '적용', exact: true }).click();
@@ -224,13 +231,16 @@ try {
   await page.getByRole('button', { name: '취소', exact: true }).click();
   await page.getByRole('button', { name: '기준 계획 교체', exact: true }).click();
   await page.getByRole('button', { name: '취소', exact: true }).click();
-  assert.equal(document.project.baseline.tasks[1].hours, 4);
+  assert.equal(document.project.baseline.tasks.find((task) => task.id === childId).hours, 4);
   await page.getByRole('button', { name: '저장', exact: true }).click();
   await page.getByText('파일에 저장됨', { exact: true }).waitFor();
   await page.reload();
   await page.getByRole('button', { name: 'WBS · 기준 계획', exact: true }).click();
   await page.getByText('승인 계획 <기준>', { exact: true }).waitFor();
-  assert.equal(document.project.tasks[0].items[0].doneDate, '2026-10-21');
+  assert.equal(
+    document.project.tasks.find((task) => task.id === ownId).items[0].doneDate,
+    '2026-10-21',
+  );
   await page.screenshot({
     path: path.resolve('test-results/desktop-planning.png'),
     fullPage: true,
@@ -246,8 +256,11 @@ try {
   await page.locator('[name="baselineName"]').fill('변경 승인 계획');
   await page.getByRole('button', { name: '적용', exact: true }).click();
   await page.getByText('변경 승인 계획', { exact: true }).waitFor();
-  assert.equal(document.project.baseline.tasks[1].hours, 6);
-  assert.equal(document.project.baseline.tasks[1].end, '2026-11-02');
+  assert.equal(document.project.baseline.tasks.find((task) => task.id === childId).hours, 6);
+  assert.equal(
+    document.project.baseline.tasks.find((task) => task.id === childId).end,
+    '2026-11-02',
+  );
   await page
     .locator('[data-baseline-row="' + childId + '"]')
     .getByText('변경 없음', { exact: true })
@@ -258,7 +271,7 @@ try {
   await page.getByRole('button', { name: 'WBS · 기준 계획', exact: true }).click();
   assert.ok(await page.locator('.desktop-critical').count());
   await page.getByRole('button', { name: '하위 업무', exact: true }).click();
-  await page.locator('[name="predecessor"]').selectOption(parentId);
+  await page.locator('[name="predecessor"]').selectOption(ownId);
   await page.getByRole('button', { name: '적용', exact: true }).click();
   await page.locator('[data-dependency="' + childId + '"]').waitFor();
   const beforeSchedule = structuredClone(document.project);
@@ -266,7 +279,7 @@ try {
   await page.getByRole('button', { name: '적용', exact: true }).click();
   await page.locator('#formError').filter({ hasText: '미리보기' }).waitFor();
   await page.locator('#previewSchedule').click();
-  await page.getByText('변경할 일정 1개 · 아직 적용하지 않았습니다.', { exact: true }).waitFor();
+  await page.getByText('변경할 일정 2개 · 아직 적용하지 않았습니다.', { exact: true }).waitFor();
   assert.deepEqual(document.project, beforeSchedule);
   await page.locator('[name="scheduleDays"]').fill('2');
   assert.equal(await page.locator('#schedulePreview').textContent(), '');
@@ -278,17 +291,20 @@ try {
   await page.locator('[name="scheduleMode"]').selectOption('align');
   assert.equal(await page.locator('[name="scheduleDays"]').isDisabled(), true);
   await page.locator('#previewSchedule').click();
-  await page.getByText('변경할 일정 1개 · 아직 적용하지 않았습니다.', { exact: true }).waitFor();
+  await page.getByText('변경할 일정 2개 · 아직 적용하지 않았습니다.', { exact: true }).waitFor();
   await page.screenshot({
     path: path.resolve('test-results/desktop-schedule-preview.png'),
     fullPage: true,
   });
   await page.getByRole('button', { name: '적용', exact: true }).click();
   await page.waitForFunction(() => !document.querySelector('#editorDialog').open);
-  assert.equal(document.project.tasks[1].start, '2026-11-02');
+  assert.equal(document.project.tasks.find((task) => task.id === childId).start, '2026-11-02');
   assert.equal(await page.locator('[data-dependency]').count(), 0);
   assert.deepEqual(document.project.baseline, beforeSchedule.baseline);
-  assert.equal(document.project.tasks[0].items[0].doneDate, '2026-10-21');
+  assert.equal(
+    document.project.tasks.find((task) => task.id === ownId).items[0].doneDate,
+    '2026-10-21',
+  );
   await page.getByRole('button', { name: '하위 업무 일정 조정', exact: true }).click();
   await page.locator('[name="scheduleMode"]').selectOption('align');
   await page.locator('#previewSchedule').click();
@@ -300,7 +316,7 @@ try {
   await page.getByText('파일에 저장됨', { exact: true }).waitFor();
   await page.reload();
   await page.getByRole('button', { name: 'WBS · 기준 계획', exact: true }).click();
-  assert.equal(document.project.tasks[1].start, '2026-11-02');
+  assert.equal(document.project.tasks.find((task) => task.id === childId).start, '2026-11-02');
   await page.screenshot({
     path: path.resolve('test-results/desktop-schedule.png'),
     fullPage: true,
@@ -322,12 +338,12 @@ try {
     path: path.resolve('test-results/ux-desktop-completion.png'),
     fullPage: true,
   });
-  assert.equal(document.project.tasks[0].items[0].doneDate, null);
+  assert.equal(document.project.tasks.find((task) => task.id === ownId).items[0].doneDate, null);
   await page.getByRole('button', { name: '실행 취소', exact: true }).click();
   await page.getByText('파일에 저장됨', { exact: true }).waitFor();
   assert.deepEqual(document.project, savedProject);
   await page.getByRole('button', { name: '다시 실행', exact: true }).click();
-  assert.equal(document.project.tasks[0].items[0].doneDate, null);
+  assert.equal(document.project.tasks.find((task) => task.id === ownId).items[0].doneDate, null);
   await page.getByRole('button', { name: '실행 취소', exact: true }).click();
   await page.getByText('파일에 저장됨', { exact: true }).waitFor();
   assert.deepEqual(readFileSync(path.join(temporary, 'Project.pmcanvas')), savedBytes);
@@ -360,14 +376,14 @@ try {
   assert.deepEqual(document.project, savedProject);
   await page.getByRole('button', { name: 'WBS · 기준 계획', exact: true }).click();
   await page.locator('[data-select-visible]').check();
-  await page.getByText('선택 2개', { exact: true }).waitFor();
+  await page.getByText('선택 3개', { exact: true }).waitFor();
   await page.getByRole('button', { name: '선택 복제', exact: true }).click();
   assert.deepEqual(document.project, savedProject);
   await page.getByRole('button', { name: '취소', exact: true }).click();
   await page.getByRole('button', { name: '선택 복제', exact: true }).click();
   await page.getByRole('button', { name: '적용', exact: true }).click();
   await page.waitForFunction(() => !document.querySelector('#editorDialog').open);
-  assert.equal(document.project.tasks.length, 4);
+  assert.equal(document.project.tasks.length, 6);
   const copies = document.project.tasks.filter(
     (task) => !savedProject.tasks.some((old) => old.id === task.id),
   );
@@ -385,7 +401,7 @@ try {
   assert.deepEqual(document.project, copiedProject);
   await page.locator('[data-select-task="' + copies[0].id + '"]').check();
   await page.getByRole('button', { name: '선택 삭제', exact: true }).click();
-  await page.getByText(/미선택 하위 업무 1개는 최상위로/).waitFor();
+  await page.getByText(/미선택 하위 업무 2개는 최상위로/).waitFor();
   await page.screenshot({
     path: path.resolve('test-results/desktop-bulk-delete.png'),
     fullPage: true,
@@ -393,10 +409,10 @@ try {
   assert.deepEqual(document.project, copiedProject);
   await page.getByRole('button', { name: '선택 업무 삭제', exact: true }).click();
   await page.waitForFunction(() => !document.querySelector('#editorDialog').open);
-  assert.equal(document.project.tasks.length, 3);
+  assert.equal(document.project.tasks.length, 5);
   assert.equal(document.project.tasks.find((task) => task.id === copies[1].id).parentId, undefined);
   assert.equal(
-    document.project.tasks.find((task) => task.id === parentId).items[0].doneDate,
+    document.project.tasks.find((task) => task.id === ownId).items[0].doneDate,
     '2026-10-21',
   );
   await page.getByRole('button', { name: '실행 취소', exact: true }).click();
@@ -434,6 +450,36 @@ try {
     true,
   );
   await page.screenshot({ path: screenshot, fullPage: true });
+  await page.getByRole('button', { name: 'WBS · 기준 계획', exact: true }).click();
+  const beforeSummary = structuredClone(document.project);
+  await page.getByRole('button', { name: '요약 업무 추가', exact: true }).click();
+  await page.getByRole('button', { name: '새 요약 업무', exact: true }).waitFor();
+  assert.equal(document.project.tasks.at(-1).kind, 'summary');
+  assert.deepEqual(document.project.tasks.at(-1).items, []);
+  await page.getByRole('button', { name: '실행 취소', exact: true }).click();
+  assert.deepEqual(document.project, beforeSummary);
+  await page.getByRole('button', { name: '이슈 · 보고', exact: true }).click();
+  const issue = page.locator('[data-pm-form=issue]').first();
+  await issue.locator('xpath=ancestor::details[1]').locator('summary').first().click();
+  await issue.locator('[name=title]').fill('데스크톱 이슈');
+  await issue.locator('button[type=submit]').click();
+  await page.getByText('데스크톱 이슈', { exact: false }).first().waitFor();
+  assert.equal(document.project.issues[0].title, '데스크톱 이슈');
+  const weekly = page.locator('[data-pm-form=weekly]');
+  await weekly.locator('[name=notes]').fill('데스크톱 발행 검증');
+  await weekly.locator('button[type=submit]').click();
+  await page.locator('[data-pm-publish]').click();
+  await page.locator('[data-pm-report]').waitFor();
+  assert.equal(document.project.weeklyReports.length, 1);
+  await page.locator('[data-pm-report] > summary').click();
+  await page.locator('[data-pm-export]').click();
+  await page.waitForTimeout(100);
+  assert.ok(
+    readFileSync(path.join(temporary, 'Report.html'), 'utf8').includes('데스크톱 발행 검증'),
+  );
+  const published = structuredClone(document.project.weeklyReports[0]);
+  await page.getByRole('button', { name: '실행 취소', exact: true }).click();
+  assert.deepEqual(document.project.weeklyReports[0], published);
   assert.deepEqual(errors, []);
   console.log(
     'PASS: editing, reports, WBS, schedule, history, bulk copy/order/delete previews, filtering, save/reload and preservation',

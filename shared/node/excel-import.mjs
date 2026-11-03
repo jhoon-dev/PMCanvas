@@ -1,3 +1,6 @@
+import { LIMITS } from '../browser/task-model.js';
+import { ui } from '../browser/i18n.js';
+
 function inspectZip(buffer) {
   let end = -1;
   for (let i = buffer.length - 22; i >= Math.max(0, buffer.length - 65557); i--)
@@ -34,11 +37,11 @@ export async function parseWorkbook(ExcelJS, yauzl, DOMParser, buffer) {
   await book.xlsx.load(buffer);
   if (book.worksheets.length > 12) throw Error('시트는 12개까지 지원합니다.');
   return book.worksheets.map((sheet) => {
-    if (sheet.rowCount > 501 || sheet.columnCount > 40)
+    if (sheet.rowCount > LIMITS.tasks + 1 || sheet.columnCount > 40)
       return {
         name: sheet.name,
         rows: [],
-        error: '이 시트는 머리글 포함 501행·40열 제한을 초과합니다.',
+        error: '이 시트는 머리글 포함 1,001행·40열 제한을 초과합니다.',
       };
     const rows = [];
     for (let n = 1; n <= sheet.rowCount; n++) {
@@ -54,8 +57,20 @@ export async function parseWorkbook(ExcelJS, yauzl, DOMParser, buffer) {
             : typeof v === 'object' && v !== null
               ? cell.text
               : (v ?? '');
-        if (String(value).length > 2000)
-          throw Error(sheet.name + ' ' + cell.address + ': 셀은 2,000자까지 지원합니다.');
+        const header = sheet.getCell(1, c).text.trim(),
+          dependency = ['선행 업무', '선행 업무 ID'].some((label) =>
+            [label, ui(label, 'en')].includes(header),
+          ),
+          limit = dependency ? 32767 : 2000;
+        if (String(value).length > limit)
+          throw Error(
+            sheet.name +
+              ' ' +
+              cell.address +
+              ': 셀은 ' +
+              limit.toLocaleString('en-US') +
+              '자까지 지원합니다.',
+          );
         values.push(value);
       }
       rows.push(values);

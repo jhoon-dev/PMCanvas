@@ -1,3 +1,4 @@
+import { assertReportHistory } from '../../shared/browser/management.js';
 import { normalizeProject } from './model.mjs';
 
 export class ProjectStore {
@@ -28,7 +29,11 @@ export class ProjectStore {
   async transaction(mode, operation) {
     const db = await this.open();
     return new Promise((resolve, reject) => {
-      const transaction = db.transaction('projects', mode);
+      const transaction = db.transaction(
+        'projects',
+        mode,
+        mode === 'readwrite' ? { durability: 'strict' } : undefined,
+      );
       let request;
       try {
         request = operation(transaction.objectStore('projects'));
@@ -55,7 +60,9 @@ export class ProjectStore {
     const project = normalizeProject(input);
     const db = await this.open();
     return new Promise((resolve, reject) => {
-      const tx = db.transaction('projects', 'readwrite');
+      // A native force-stop can interrupt Chromium's relaxed WAL flush. Confirm
+      // the durable commit before publishing "saved" or allowing another action.
+      const tx = db.transaction('projects', 'readwrite', { durability: 'strict' });
       const store = tx.objectStore('projects');
       const request = store.get(project.id);
       let record, failure;
@@ -63,6 +70,13 @@ export class ProjectStore {
         const previous = request.result;
         if (expectedRevision !== null && (previous?.revision ?? 0) !== expectedRevision) {
           failure = Error('다른 창에서 변경되었습니다. 프로젝트 목록에서 다시 열어 주세요.');
+          tx.abort();
+          return;
+        }
+        try {
+          if (previous) assertReportHistory(previous.project, project);
+        } catch (error) {
+          failure = error;
           tx.abort();
           return;
         }

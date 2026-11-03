@@ -38,10 +38,12 @@ export function peopleView(p, s, asOf) {
               esc(m.role) +
               '<span>·</span><span class="grade">' +
               esc(m.grade) +
-              ui('</span></div><div class="member-stats"><div><small>투입률</small><strong>') +
-              m.allocation +
+              ui(
+                '</span></div><div class="member-stats"><div><small>기준일 투입률</small><strong>',
+              ) +
+              num((pc.capacity / m.hours) * 100) +
               ui('<em>%</em></strong></div><div><small>일 가용시간</small><strong>') +
-              num((m.hours * m.allocation) / 100) +
+              num(pc.capacity) +
               ui('<em>h</em></strong></div><div><small>담당 업무</small><strong>') +
               ts.length +
               ui(

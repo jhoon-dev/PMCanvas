@@ -3135,3 +3135,123 @@ button:disabled {
     overflow-wrap: anywhere;
   }
 }
+
+.pm-management {
+  min-width: 0;
+}
+.pm-management > details {
+  margin: 16px 0;
+  padding: 18px;
+  border: 1px solid #dce4ee;
+  border-radius: 12px;
+  background: white;
+}
+.pm-management summary {
+  cursor: pointer;
+  padding: 12px 0;
+  overflow-wrap: anywhere;
+  font-weight: 600;
+}
+.pm-management fieldset {
+  border: 0;
+  padding: 0;
+  min-width: 0;
+}
+.pm-management form {
+  padding: 16px 0;
+  border-bottom: 1px solid #e4eaf3;
+}
+.pm-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+}
+.pm-management input,
+.pm-management select,
+.pm-management textarea {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.pm-management .button {
+  min-height: 44px;
+}
+.pm-management .pm-error {
+  color: #b92938;
+}
+.pm-table-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+}
+.pm-table-scroll table {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 480px;
+}
+.pm-table-scroll th,
+.pm-table-scroll td {
+  text-align: left;
+  padding: 10px;
+  border-bottom: 1px solid #e4eaf3;
+}
+.pm-narrative {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.pm-curve {
+  width: 100%;
+  max-height: 240px;
+}
+.pm-report {
+  overflow-wrap: anywhere;
+  padding: 16px 0;
+}
+.pm-note {
+  font-size: 13px;
+  color: #58677b;
+}
+.my-work-quick {
+  margin: -8px 0 14px;
+  padding: 10px 14px;
+  background: white;
+  border: 1px solid #e4eaf3;
+  border-radius: 0 0 12px 12px;
+}
+.my-work-quick summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+.my-work-quick button {
+  min-height: 44px;
+  display: block;
+  white-space: normal;
+  text-align: left;
+  width: 100%;
+  margin: 8px 0;
+}
+.wbs-plan.milestone {
+  border-radius: 0;
+  border: 2px solid #8554ad;
+  background: #f4edfb;
+}
+.wbs-plan.milestone .wbs-resize {
+  display: none;
+}
+@media (max-width: 760px) {
+  .sidebar nav {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+  .pm-fields {
+    grid-template-columns: 1fr;
+  }
+  .pm-management > details {
+    padding: 12px;
+  }
+  .pm-management input,
+  .pm-management select,
+  .pm-management textarea {
+    font-size: 16px;
+  }
+}
