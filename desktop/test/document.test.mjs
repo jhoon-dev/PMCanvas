@@ -18,7 +18,8 @@ import { DesktopDocument, parseDocument, serializeDocument, MAX_BYTES } from '..
 import { assetPath } from '../assets.mjs';
 import { normalizeTaskModel } from '../app/shared/task-model.js';
 import { summary } from '../app/shared/engine.js';
-import { legacyProject, assertUpgradedProject } from './legacy-project.mjs';
+import { legacyProject, assertUpgradedProject, assertMigratedRecovery } from './legacy-project.mjs';
+import { createHash } from 'node:crypto';
 
 test('installation fixtures retain legacy parent baseline effort and verify lossless in-memory migration', () => {
   const legacy = legacyProject('Legacy installation', 'Legacy baseline');
@@ -33,6 +34,35 @@ test('installation fixtures retain legacy parent baseline effort and verify loss
   tampered.tasks.find((t) => t.id === 't1-work').items[0].doneDate = null;
   assert.throws(() => assertUpgradedProject(tampered, legacy));
   assert.equal(JSON.stringify({ format: 'pm-canvas-project', version: 1, project: legacy }), bytes);
+});
+
+test('opening a legacy file preserves source bytes and writes independently verifiable migrated recovery', (t) => {
+  const root = mkdtempSync(path.join(os.tmpdir(), 'pmcanvas-migration-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const legacy = legacyProject('Legacy recovery', 'Original baseline'),
+    file = path.join(root, 'Legacy.pmcanvas'),
+    recoveryFile = path.join(root, 'recovery.json'),
+    bytes = JSON.stringify({ format: 'pm-canvas-project', version: 1, project: legacy }),
+    savedHash = createHash('sha256').update(bytes).digest('hex');
+  writeFileSync(file, bytes);
+  const doc = new DesktopDocument(recoveryFile);
+  doc.open(file);
+  const recoveryBytes = readFileSync(recoveryFile),
+    recovery = JSON.parse(recoveryBytes);
+  assertMigratedRecovery(recovery, legacy, file, savedHash);
+  assert.equal(readFileSync(file, 'utf8'), bytes);
+  const dirty = structuredClone(recovery);
+  dirty.dirty = true;
+  assert.throws(() => assertMigratedRecovery(dirty, legacy, file, savedHash));
+  const wrongHash = structuredClone(recovery);
+  wrongHash.savedHash = '0'.repeat(64);
+  assert.throws(() => assertMigratedRecovery(wrongHash, legacy, file, savedHash));
+  new DesktopDocument(recoveryFile).open(file);
+  assert.deepEqual(
+    readFileSync(recoveryFile),
+    recoveryBytes,
+    'Later opens use the same canonical recovery.',
+  );
 });
 
 const fixture = () => ({

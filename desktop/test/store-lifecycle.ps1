@@ -24,7 +24,7 @@ function Check-Exit { if ($LASTEXITCODE -ne 0) { throw "Command failed: $LASTEXI
 function Check-Preserved {
   $data = Get-Content -LiteralPath $expected -Raw -Encoding UTF8 | ConvertFrom-Json
   foreach ($file in $data.hashes) {
-    if ((Get-FileHash -LiteralPath $file.file -Algorithm SHA256).Hash.ToLowerInvariant() -ne $file.sha256) { throw 'Project/recovery/preferences changed during MSIX servicing.' }
+    if ((Get-FileHash -LiteralPath $file.file -Algorithm SHA256).Hash.ToLowerInvariant() -ne $file.sha256) { throw ('File changed during MSIX servicing: ' + (Split-Path $file.file -Leaf)) }
   }
 }
 function Run-App($exe, $mode, $version, $registered) {

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { screenProject } from '../../web/test/support/screen-fixtures.mjs';
 import { cleanProject } from '../app/model/project.mjs';
 
@@ -44,4 +45,16 @@ export function assertUpgradedProject(actual, legacy) {
     assert.ok(baseline);
     for (const key of ['hours', 'start', 'end']) assert.equal(baseline[key], original[key]);
   }
+}
+
+export function assertMigratedRecovery(recovery, legacy, file, savedHash) {
+  assert.equal(recovery.version, 1);
+  assert.equal(recovery.file, file);
+  assert.equal(recovery.savedHash, savedHash);
+  assert.equal(recovery.dirty, false);
+  assertUpgradedProject(recovery.project, legacy);
+  assert.equal(
+    recovery.savedProjectHash,
+    createHash('sha256').update(JSON.stringify(recovery.project)).digest('hex'),
+  );
 }

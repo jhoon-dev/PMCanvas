@@ -4,7 +4,7 @@ import path from 'node:path';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { createHash } from 'node:crypto';
-import { legacyProject, assertUpgradedProject } from './legacy-project.mjs';
+import { legacyProject, assertUpgradedProject, assertMigratedRecovery } from './legacy-project.mjs';
 const { _electron: electron } = createRequire(new URL('../../web/package.json', import.meta.url))(
   '@playwright/test',
 );
@@ -121,6 +121,26 @@ try {
     assert.ok(fs.statSync(file).size > 1000, 'Packaged Store Excel export must complete.');
     await app.close();
     app = null;
+    // Opening a legacy document rewrites recovery in the current schema. Servicing
+    // must preserve that verified new recovery, not its pre-launch legacy bytes.
+    const recoveryFile = path.join(runtime.profile, 'recovery.json'),
+      hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex'),
+      recoveryEntry = expected.hashes.find((entry) => entry.file === recoveryFile);
+    assert.ok(recoveryEntry, 'Recovery must be part of the installation preservation checks.');
+    for (const entry of expected.hashes.filter((entry) => entry.file !== recoveryFile))
+      assert.equal(
+        hash(entry.file),
+        entry.sha256,
+        'Opening/exporting must preserve project and preference bytes.',
+      );
+    assertMigratedRecovery(
+      JSON.parse(fs.readFileSync(recoveryFile)),
+      expected.project,
+      expected.file,
+      expected.hashes.find((entry) => entry.file === expected.file).sha256,
+    );
+    recoveryEntry.sha256 = hash(recoveryFile);
+    fs.writeFileSync(request.expected, JSON.stringify(expected));
   }
   fs.writeFileSync(
     resultFile,
