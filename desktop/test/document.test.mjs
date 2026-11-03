@@ -18,6 +18,22 @@ import { DesktopDocument, parseDocument, serializeDocument, MAX_BYTES } from '..
 import { assetPath } from '../assets.mjs';
 import { normalizeTaskModel } from '../app/shared/task-model.js';
 import { summary } from '../app/shared/engine.js';
+import { legacyProject, assertUpgradedProject } from './legacy-project.mjs';
+
+test('installation fixtures retain legacy parent baseline effort and verify lossless in-memory migration', () => {
+  const legacy = legacyProject('Legacy installation', 'Legacy baseline');
+  const bytes = JSON.stringify({ format: 'pm-canvas-project', version: 1, project: legacy }),
+    upgraded = parseDocument(bytes);
+  assert.equal(legacy.baseline.tasks.find((t) => t.id === 't1').hours, 32);
+  assert.equal(upgraded.tasks.length, 4);
+  assert.equal(upgraded.baseline.tasks.find((t) => t.id === 't1').hours, 48);
+  assert.equal(upgraded.baseline.tasks.find((t) => t.id === 't1-work').hours, 32);
+  assertUpgradedProject(upgraded, legacy);
+  const tampered = structuredClone(upgraded);
+  tampered.tasks.find((t) => t.id === 't1-work').items[0].doneDate = null;
+  assert.throws(() => assertUpgradedProject(tampered, legacy));
+  assert.equal(JSON.stringify({ format: 'pm-canvas-project', version: 1, project: legacy }), bytes);
+});
 
 const fixture = () => ({
   id: 'project1',

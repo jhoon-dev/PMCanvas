@@ -4,8 +4,7 @@ import path from 'node:path';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { createHash } from 'node:crypto';
-import { screenProject } from '../../web/test/support/screen-fixtures.mjs';
-import { captureBaseline } from '../app/shared/planning.js';
+import { legacyProject, assertUpgradedProject } from './legacy-project.mjs';
 const { _electron: electron } = createRequire(new URL('../../web/package.json', import.meta.url))(
   '@playwright/test',
 );
@@ -40,13 +39,7 @@ try {
   page.setDefaultTimeout(20000);
   await page.locator('#content').waitFor();
   if (request.mode === 'seed') {
-    const project = screenProject();
-    delete project._role;
-    delete project._revision;
-    project.name = 'Store 전환 데이터 보존';
-    project.tasks[1].predecessor = '';
-    project.tasks[1].parentId = project.tasks[0].id;
-    project.baseline = captureBaseline(project, 'Store 설치 전');
+    const project = legacyProject('Store 전환 데이터 보존', 'Store 설치 전');
     const file = path.join(request.work, 'Documents', 'Preserved.pmcanvas');
     fs.mkdirSync(path.dirname(file), { recursive: true });
     await app.evaluate(({ dialog }, file) => {
@@ -87,7 +80,7 @@ try {
     await page.waitForFunction(
       () => document.querySelector('#projectName')?.textContent === 'Store 전환 데이터 보존',
     );
-    assert.deepEqual(
+    assertUpgradedProject(
       (await page.evaluate(() => window.desktop.snapshot())).project,
       expected.project,
     );
