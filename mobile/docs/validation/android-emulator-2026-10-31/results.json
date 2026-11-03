@@ -1,0 +1,84 @@
+{
+  "appId": "dev.jhoon.pmcanvas",
+  "project": "PMCanvas-Android-2026-10-31T02-27-44-076Z",
+  "apk": "android/app/build/outputs/apk/debug/app-debug.apk",
+  "serial": "emulator-5566",
+  "model": "Android SDK built for x86_64",
+  "environment": {
+    "android": "15",
+    "sdk": "35",
+    "fingerprint": "Android/sdk_phone64_x86_64/emu64x:15/AE3A.240806.019/12368160:userdebug/test-keys",
+    "apkSha256": "f2595b4db15662780595ec15dba20de2ad7700b8fcfd97c5b7bbcd045bb769cb",
+    "userAgent": "Mozilla/5.0 (Linux; Android 15; Android SDK built for x86_64 Build/AE3A.240806.019; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/124.0.6367.219 Mobile Safari/537.36"
+  },
+  "steps": [
+    {
+      "label": "wait for Android system startup to finish",
+      "status": "passed",
+      "durationMs": 1007
+    },
+    {
+      "label": "install and launch the real APK",
+      "status": "passed",
+      "durationMs": 14560
+    },
+    {
+      "label": "create a durable project, immediately restart, then create and edit a member",
+      "status": "passed",
+      "durationMs": 39863
+    },
+    {
+      "label": "create and edit a task with a weighted checklist",
+      "status": "passed",
+      "durationMs": 21161
+    },
+    {
+      "label": "check an item, filter tasks and calculate 25 percent progress",
+      "status": "passed",
+      "durationMs": 17625
+    },
+    {
+      "label": "undo and redo while network requests are offline",
+      "status": "passed",
+      "durationMs": 4483
+    },
+    {
+      "label": "Android Back cancels editing without losing the saved project",
+      "status": "passed",
+      "durationMs": 5786
+    },
+    {
+      "label": "force-stop and relaunch restore persisted project and completion",
+      "status": "passed",
+      "durationMs": 9844
+    },
+    {
+      "label": "native project sharing writes a valid backup and opens Android Sharesheet",
+      "status": "passed",
+      "durationMs": 12255
+    },
+    {
+      "label": "native CSV sharing writes a report",
+      "status": "passed",
+      "durationMs": 6679
+    },
+    {
+      "label": "the Android document picker imports an exported pmcanvas file",
+      "status": "passed",
+      "durationMs": 23346
+    },
+    {
+      "label": "delete task, member and imported project without changing the original",
+      "status": "passed",
+      "durationMs": 60026
+    }
+  ],
+  "errors": [],
+  "consoleErrors": [
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "{message: Share canceled}",
+    "{message: Share canceled}"
+  ]
+}
