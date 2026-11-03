@@ -395,6 +395,9 @@ try {
   });
   const info = await page.evaluate(() => window.desktop.info());
   assert.equal(info.version, JSON.parse(readFileSync(path.join(root, 'package.json'))).version);
+  assert.equal(info.displayName, 'PM Canvas');
+  assert.equal(info.developer, 'jhoon-dev');
+  assert.equal(info.brand, 'Toolmoa');
   await assert.rejects(
     page.evaluate(() => window.desktop.setLanguage('invalid')),
     /언어/,

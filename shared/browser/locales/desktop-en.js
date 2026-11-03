@@ -209,8 +209,8 @@ export default {
   '종료일 차이': 'Finish difference',
   '공수 차이': 'Effort difference',
   '비교할 업무가 없습니다.': 'No tasks to compare.',
-  '전체 업무를 비교합니다. 날짜는 달력 일수이며 +는 늦어짐, −는 앞당김입니다. 공수는 각 업무 자체의 세부 작업 합계입니다.':
-    'Compares all tasks. Date differences use calendar days: + is later, − is earlier. Effort totals each task’s own checklist.',
+  '전체 업무를 비교합니다. 날짜는 달력 일수이며 +는 늦어짐, −는 앞당김입니다. 요약 업무의 공수는 하위 실제 업무의 합계입니다.':
+    'Compares all tasks. Date differences use calendar days: + is later, − is earlier. Summary effort totals executable subtasks.',
   ' 하위 업무': ' children',
   들여쓰기: 'Indent',
   내어쓰기: 'Outdent',

@@ -1,4 +1,4 @@
-package dev.jhoon.pmcanvas;
+package app.toolmoa.pmcanvas;
 
 import com.getcapacitor.BridgeActivity;
 

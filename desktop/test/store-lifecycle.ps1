@@ -50,14 +50,18 @@ function Run-App($exe, $mode, $version, $registered) {
   if (!$testResult.ok) { throw $testResult.error }
 }
 try {
-  Write-Output 'Store lifecycle: download and seed legacy installer'
-  $baseline = Join-Path $work 'PMCanvas-Desktop-0.7.1-Windows-x64.exe'
-  Invoke-WebRequest -UseBasicParsing -Uri 'https://github.com/jhoon-dev/PMCanvas/releases/download/desktop-v0.7.1/PMCanvas-Desktop-0.7.1-Windows-x64.exe' -OutFile $baseline
-  if ((Get-FileHash -LiteralPath $baseline -Algorithm SHA256).Hash.ToLowerInvariant() -ne '82ca271d86dff7e87a7e1d47850d378aae817994cc2ed168b79e0e89d7c6666c') { throw 'Baseline hash mismatch.' }
+  Write-Output 'Store lifecycle: recreate and seed CI-only legacy fixture'
+  $fixtureFile = Join-Path $work 'legacy-fixture.json'
+  & $node (Join-Path $PSScriptRoot 'legacy-fixture.mjs') $fixtureFile
+  Check-Exit
+  $fixture = Get-Content -LiteralPath $fixtureFile -Raw -Encoding UTF8 | ConvertFrom-Json
+  if ($fixture.sourceCommit -ne '7c57c3d10129a761b61dfc5ae06f55e8103570b0' -or !$fixture.recreatedFromSource) { throw 'Unexpected legacy fixture source.' }
+  $baseline = $fixture.installer
+  if ((Get-FileHash -LiteralPath $baseline -Algorithm SHA256).Hash.ToLowerInvariant() -ne $fixture.sha256) { throw 'Legacy fixture changed after verification.' }
   $legacy = Join-Path $work 'legacy'
   Start-Process -FilePath $baseline -ArgumentList @('/S', '/currentuser', ('/D=' + $legacy)) -Wait -WindowStyle Hidden
   Run-App (Join-Path $legacy 'PM Canvas Desktop.exe') 'seed' '0.7.1' $false
-  $checks.Add('Installed pinned NSIS 0.7.1 and saved Korean tasks, hierarchy, baseline, language and time zone.')
+  $checks.Add('Recreated NSIS 0.7.1 from its pinned source and saved Korean tasks, hierarchy, baseline, language and time zone.')
   $tools = Get-Content -LiteralPath (Join-Path $output 'ci-tools.json') -Raw | ConvertFrom-Json
   $makeappx = Join-Path $tools.kit 'makeappx.exe'
   $signtool = Join-Path $tools.kit 'signtool.exe'
@@ -87,13 +91,13 @@ try {
   Add-AppxPackage -Path $old
   Check-Preserved
   $installed = Get-AppxPackage -Name $identity
-  Run-App (Join-Path $installed.InstallLocation 'app\PM Canvas Desktop.exe') 'check' $package.version $true
+  Run-App (Join-Path $installed.InstallLocation 'app\PM Canvas.exe') 'check' $package.version $true
   $checks.Add('Migrated the NSIS profile to a registered MSIX and verified Store identity, data and Excel export.')
   Write-Output 'Store lifecycle: update MSIX'
   Add-AppxPackage -Path $new
   Check-Preserved
   $installed = Get-AppxPackage -Name $identity
-  Run-App (Join-Path $installed.InstallLocation 'app\PM Canvas Desktop.exe') 'check' $package.version $true
+  Run-App (Join-Path $installed.InstallLocation 'app\PM Canvas.exe') 'check' $package.version $true
   $checks.Add('Updated MSIX package version while preserving external project, recovery, preferences and language.')
   Write-Output 'Store lifecycle: remove MSIX'
   Get-AppxPackage -Name $identity | Remove-AppxPackage
@@ -103,9 +107,9 @@ try {
   Add-AppxPackage -Path $new
   Check-Preserved
   $installed = Get-AppxPackage -Name $identity
-  Run-App (Join-Path $installed.InstallLocation 'app\PM Canvas Desktop.exe') 'check' $package.version $true
+  Run-App (Join-Path $installed.InstallLocation 'app\PM Canvas.exe') 'check' $package.version $true
   $checks.Add('Reinstalled MSIX and reopened the same project and settings with Store update routing.')
-  $report = @{ version=$package.version; commit=$evidence.commit; packageVersion=$evidence.packageVersion; mode='ci-test-only'; msixSha256=$evidence.artifacts[0].sha256; checks=$checks.ToArray(); verifiedAt=(Get-Date).ToUniversalTime().ToString('o') }
+  $report = @{ version=$package.version; commit=$evidence.commit; packageVersion=$evidence.packageVersion; mode='ci-test-only'; legacySourceCommit=$fixture.sourceCommit; legacyInstallerSha256=$fixture.sha256; msixSha256=$evidence.artifacts[0].sha256; checks=$checks.ToArray(); verifiedAt=(Get-Date).ToUniversalTime().ToString('o') }
   [IO.Directory]::CreateDirectory((Join-Path $desktopRoot 'test-results')) | Out-Null
   [IO.File]::WriteAllText((Join-Path $desktopRoot 'test-results/store-install-validation.json'), ($report | ConvertTo-Json -Depth 5), [Text.UTF8Encoding]::new($false))
   $checks | ForEach-Object { Write-Output ('PASS: ' + $_) }

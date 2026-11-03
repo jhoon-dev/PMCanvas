@@ -1,12 +1,14 @@
-# PM Canvas Mobile 개인정보처리방침 / Privacy policy
+# PM Canvas 개인정보처리방침 / Privacy policy
 
 시행일 / Effective date: 2026-10-31
 
-개발자 / Publisher: JIN HOON KIM
+개발자 / Developer: jhoon-dev
+
+브랜드 / Brand: Toolmoa
 
 ## 한국어
 
-이 방침은 iPhone·iPad·Android용 PM Canvas Mobile에 적용됩니다. 앱은 계정이나 서버 연결 없이 프로젝트·참여인력·업무·일정·메모·예상 공수와 완료 기록을 관리합니다. 참여인력 이름과 메모에는 개인정보가 포함될 수 있습니다.
+이 방침은 iPhone·iPad·Android용 PM Canvas에 적용됩니다. 앱은 계정이나 서버 연결 없이 프로젝트·참여인력·업무·일정·메모·예상 공수와 완료 기록을 관리합니다. 참여인력 이름과 메모에는 개인정보가 포함될 수 있습니다.
 
 프로젝트는 기기의 앱 저장소에 보관하며 업무 기준 시간대는 로컬 설정에 저장합니다. 개발자는 프로젝트 내용, 참여인력 정보나 파일 경로를 개발자 서버로 자동 수집·전송하지 않습니다. 앱에 광고, 행동 추적, 자동 오류 보고 기능은 없습니다. 연락처·위치·카메라·마이크 접근 권한을 요구하지 않습니다.
 
@@ -20,7 +22,7 @@
 
 ## English
 
-This policy covers PM Canvas Mobile for iPhone, iPad and Android. The app manages projects, team members, tasks, schedules, notes, estimated hours and completion records without its own account or server connection. Names and notes may include personal information.
+This policy covers PM Canvas for iPhone, iPad and Android. The app manages projects, team members, tasks, schedules, notes, estimated hours and completion records without its own account or server connection. Names and notes may include personal information.
 
 Projects are stored in the device's app storage; the business time zone is saved in local settings. The developer does not automatically collect or upload project contents, team member information or file paths to a developer server. The app has no advertising, usage tracking or automatic crash reporting. It does not request contacts, location, camera or microphone access.
 

@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { screenProject } from '../../web/test/support/screen-fixtures.mjs';
 import { captureBaseline } from '../app/shared/planning.js';
 import { verifyWindowsSignature, verifyMacApp } from '../scripts/verify-signatures.mjs';
+import { buildLegacyFixture } from './legacy-fixture.mjs';
 const { _electron: electron } = createRequire(new URL('../../web/package.json', import.meta.url))(
   '@playwright/test',
 );
@@ -17,7 +18,8 @@ if (process.env.CI !== 'true' || process.env.GITHUB_ACTIONS !== 'true' || !proce
   throw Error('Installation lifecycle tests require an isolated GitHub-hosted runner.');
 if (!['win32', 'darwin'].includes(process.platform)) throw Error('Windows or macOS required.');
 const desktop = fileURLToPath(new URL('../', import.meta.url));
-const version = JSON.parse(fs.readFileSync(path.join(desktop, 'package.json'))).version;
+const pkg = JSON.parse(fs.readFileSync(path.join(desktop, 'package.json')));
+const { version } = pkg;
 const platform = process.platform === 'win32' ? 'win' : 'mac';
 const mode = process.env.PM_INSTALLER_MODE || 'unsigned';
 assert.ok(['signed', 'unsigned'].includes(mode));
@@ -26,18 +28,15 @@ const name = (v) =>
   'PMCanvas-Desktop-' +
   v +
   (platform === 'win' ? '-Windows-x64.exe' : '-macOS-' + process.arch + '.dmg');
-const baselineHashes = {
-  win: '82ca271d86dff7e87a7e1d47850d378aae817994cc2ed168b79e0e89d7c6666c',
-  arm64: '118a23853c93414f080ead5399343099255f591eb22a1f2f258ebbb7e80239db',
-  x64: '28cf717bb545d019dff7399e75df057e679ee26f0fd26c529acb7a80a2f69d8a',
-};
+
 const work = fs.mkdtempSync(path.join(process.env.RUNNER_TEMP, 'pmcanvas-install-'));
 const install = path.join(work, platform === 'win' ? 'installed' : 'PM Canvas Desktop.app');
 const projectFile = path.join(work, 'Documents', 'Preserved.pmcanvas');
-const executable =
+let installedProductName = 'PM Canvas Desktop';
+const executable = () =>
   platform === 'win'
-    ? path.join(install, 'PM Canvas Desktop.exe')
-    : path.join(install, 'Contents/MacOS/PM Canvas Desktop');
+    ? path.join(install, installedProductName + '.exe')
+    : path.join(install, 'Contents/MacOS', installedProductName);
 const registry =
   'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\df0635bf-66e1-510a-b0e5-9ed63f670162';
 const run = (command, args, options = {}) =>
@@ -78,31 +77,12 @@ function absentInstallation() {
     );
   }
 }
-async function downloadBaseline() {
-  const file = path.join(work, name('0.7.1'));
-  const res = await fetch(
-    'https://github.com/jhoon-dev/PMCanvas/releases/download/desktop-v0.7.1/' + name('0.7.1'),
-    { signal: AbortSignal.timeout(180000) },
-  );
-  assert.equal(res.ok, true, 'Baseline installer download failed.');
-  const fd = fs.openSync(file, 'wx', 0o600);
-  let size = 0;
-  try {
-    for await (const chunk of res.body) {
-      size += chunk.length;
-      assert.ok(size < 256 * 1024 * 1024);
-      fs.writeSync(fd, chunk);
-    }
-  } finally {
-    fs.closeSync(fd);
-  }
-  assert.equal(
-    hash(file),
-    baselineHashes[platform === 'win' ? 'win' : process.arch],
-    'Pinned baseline checksum mismatch.',
-  );
-  return file;
+async function prepareBaseline() {
+  const fixture = buildLegacyFixture();
+  assert.equal(hash(fixture.installer), fixture.sha256);
+  return fixture;
 }
+
 function findCurrent(folder, expectedName = name(version)) {
   const matches = [];
   const visit = (dir) => {
@@ -122,7 +102,9 @@ function findCurrent(folder, expectedName = name(version)) {
 }
 function installPackage(file) {
   safeInstallPath();
-  const currentSigned = signed && path.basename(file) === name(version);
+  const current = path.basename(file) === name(version);
+  installedProductName = current ? pkg.build.productName : 'PM Canvas Desktop';
+  const currentSigned = signed && current;
   if (currentSigned && platform === 'win') verifyWindowsSignature(file);
   if (platform === 'win') run(file, ['/S', '/currentuser', '/D=' + install]);
   else {
@@ -134,19 +116,26 @@ function installPackage(file) {
         safeInstallPath();
         fs.rmSync(install, { recursive: true });
       }
-      run('ditto', [path.join(mount, 'PM Canvas Desktop.app'), install]);
+      run('ditto', [path.join(mount, installedProductName + '.app'), install]);
     } finally {
       run('hdiutil', ['detach', mount]);
     }
   }
-  assert.ok(fs.existsSync(executable));
+  assert.ok(fs.existsSync(executable()));
   if (currentSigned) {
-    if (platform === 'win') verifyWindowsSignature(executable);
+    if (platform === 'win') verifyWindowsSignature(executable());
     else verifyMacApp(install);
   }
 }
 async function launch(expectedVersion) {
-  application = await electron.launch({ executablePath: executable, args: [], timeout: 40000 });
+  application = await electron.launch({
+    executablePath: executable(),
+    args: [],
+    timeout: 40000,
+    env: Object.fromEntries(
+      Object.entries(process.env).filter(([key]) => !['GH_TOKEN', 'GITHUB_TOKEN'].includes(key)),
+    ),
+  });
   const details = await application.evaluate(({ app }) => ({
     version: app.getVersion(),
     profile: app.getPath('userData'),
@@ -179,7 +168,7 @@ function unchanged(before) {
 function removeInstallation() {
   safeInstallPath();
   if (platform === 'win')
-    run(path.join(install, 'Uninstall PM Canvas Desktop.exe'), ['/S', '/currentuser'], {
+    run(path.join(install, 'Uninstall ' + installedProductName + '.exe'), ['/S', '/currentuser'], {
       cwd: work,
     });
   else fs.rmSync(install, { recursive: true });
@@ -199,7 +188,7 @@ async function waitRemoved() {
 }
 try {
   absentInstallation();
-  const baseline = await downloadBaseline();
+  const baseline = await prepareBaseline();
   const artifactFolder = path.resolve(
     process.argv[2] || path.join(desktop, 'dist/lifecycle-artifact'),
   );
@@ -209,11 +198,11 @@ try {
     const zip = findCurrent(artifactFolder, name(version).replace(/\.dmg$/, '.zip'));
     const extracted = path.join(work, 'verified-zip');
     run('ditto', ['-x', '-k', zip, extracted]);
-    verifyMacApp(path.join(extracted, 'PM Canvas Desktop.app'));
+    verifyMacApp(path.join(extracted, pkg.build.productName + '.app'));
     zipSha256 = hash(zip);
   }
-  installPackage(baseline);
-  checks.push('Installed the checksum-pinned 0.7.1 installer.');
+  installPackage(baseline.installer);
+  checks.push('Installed a CI-only 0.7.1 fixture recreated from its pinned source commit.');
   let page = await launch('0.7.1');
   await page.locator('[data-command="new"]').first().waitFor();
   const project = screenProject();
@@ -277,6 +266,8 @@ try {
     platform: process.platform,
     arch: process.arch,
     baseline: '0.7.1',
+    baselineSourceCommit: baseline.sourceCommit,
+    baselineInstallerSha256: baseline.sha256,
     version,
     mode,
     installerSha256: hash(current),

@@ -2,7 +2,7 @@ param(
   [Parameter(Mandatory = $true)]
   [ValidateSet('Baseline', 'Installed', 'Removed')]
   [string]$Mode,
-  [string]$InstallDirectory = (Join-Path $env:LOCALAPPDATA 'Programs\PM Canvas Desktop'),
+  [string]$InstallDirectory = (Join-Path $env:LOCALAPPDATA 'Programs\PM Canvas'),
   [string]$Snapshot = (Join-Path $PSScriptRoot '..\test-results\windows-install-baseline.json'),
   [string]$RegistryEvidence = '',
   [string]$ExpectedArchive = (Join-Path $PSScriptRoot '..\dist\win-unpacked\resources\app.asar'),
@@ -15,14 +15,14 @@ $ErrorActionPreference = 'Stop'
 if ($env:OS -ne 'Windows_NT') { throw 'Windows is required.' }
 $InstallDirectory = [IO.Path]::GetFullPath($InstallDirectory)
 $Snapshot = [IO.Path]::GetFullPath($Snapshot)
-$executable = Join-Path $InstallDirectory 'PM Canvas Desktop.exe'
-$uninstaller = Join-Path $InstallDirectory 'Uninstall PM Canvas Desktop.exe'
+$executable = Join-Path $InstallDirectory 'PM Canvas.exe'
+$uninstaller = Join-Path $InstallDirectory 'Uninstall PM Canvas.exe'
 $archive = Join-Path $InstallDirectory 'resources\app.asar'
 $expectedArchive = [IO.Path]::GetFullPath($ExpectedArchive)
 $expectedVersion = (Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\package.json') -Raw | ConvertFrom-Json).version
 $linkPaths = @(
-  (Join-Path ([Environment]::GetFolderPath('Desktop')) 'PM Canvas Desktop.lnk'),
-  (Join-Path ([Environment]::GetFolderPath('Programs')) 'PM Canvas Desktop.lnk')
+  (Join-Path ([Environment]::GetFolderPath('Desktop')) 'PM Canvas.lnk'),
+  (Join-Path ([Environment]::GetFolderPath('Programs')) 'PM Canvas.lnk')
 )
 
 function Get-InstallEntries {
@@ -35,7 +35,7 @@ function Get-InstallEntries {
     if (!(Test-Path -LiteralPath $root.Path)) { continue }
     foreach ($key in Get-ChildItem -LiteralPath $root.Path) {
       $entry = Get-ItemProperty -LiteralPath $key.PSPath
-      if ($entry.DisplayName -like 'PM Canvas Desktop *') {
+      if ($entry.DisplayName -like 'PM Canvas *') {
         [PSCustomObject]@{
           Scope = $root.Scope
           Key = $key.PSPath

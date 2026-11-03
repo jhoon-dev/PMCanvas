@@ -2,6 +2,8 @@
 
 현재 CI는 Mac ARM64·Intel DMG/ZIP을 Developer ID로 서명하고 Apple에 공증을 요청합니다. 두 Mac의 설치 검증과 파일 해시 검증을 통과한 뒤 GitHub Release를 공개합니다. Apple 로그인·회원 가입·약관 동의·인증서 발급은 계정 소유자가 진행합니다. Apple 계정 이메일만 등록한 상태로는 서명할 수 없습니다.
 
+출시 앱의 Bundle ID는 `app.toolmoa.pmcanvas`입니다. `package.json`의 `build.appId`와 `build.mac.appId`가 같은 값을 사용하며, Mac App Store·iOS·Android 설정도 이 식별자로 통일합니다. Mac App Store의 앱 등록·프로비저닝 확인 절차는 [Store 배포 문서](MAC-APP-STORE.md)를 확인하세요.
+
 ## Windows 자동 설정 도구 — Mac이 없는 경우
 
 저장소 루트의 PowerShell에서 실행합니다. Node.js와 Git for Windows의 OpenSSL 3, GitHub CLI가 필요합니다. 이 PC의 기본 Git OpenSSL 경로는 도구가 자동으로 찾습니다.
@@ -16,7 +18,7 @@ npm --prefix desktop run signing:setup
 4. 메뉴 **2**에서 `.cer` 경로, 원래 개인 키 암호 A, 새 P12 암호 B를 입력합니다. 인증서 종류·유효기간·키 일치·Apple 중간 인증서 서명과 고정 SHA-256을 확인한 뒤 P12를 생성합니다. 기존 키·완성된 P12는 덮어쓰지 않습니다.
 5. GitHub CLI 로그인이 필요하면 다른 터미널에서 `gh auth login`을 완료합니다. 메뉴 **3**에서 P12 암호 B를 입력하면 `jhoon-dev/PMCanvas`의 **desktop-release Environment**에 `MAC_CSC_LINK`, `MAC_CSC_KEY_PASSWORD`를 등록합니다.
 6. 메뉴 **4**에서 공증 방식을 선택합니다. Apple 계정 방식은 앱 전용 암호·Team ID를, API 방식은 App Manager 권한의 Team Key P8·Key ID·Issuer ID를 입력합니다. 키 발급 위치와 정확한 Secret 이름은 아래 5·6절에 설명합니다.
-7. 등록 후 **Actions → Desktop verification and builds**에서 `platform=mac`, `signed=true`, `unsigned=false`, `publish=false`로 먼저 확인합니다. 성공 실행을 확인한 뒤 공개합니다.
+7. 등록 후 **Actions → Desktop verification and builds**에서 `platform=mac`, `signed=true`, `publish=false`로 먼저 확인합니다. 성공 실행을 확인한 뒤 공개합니다.
 
 개인 키·CSR·P12와 지문만 담은 상태 파일은 `%LOCALAPPDATA%` 아래의 무작위 `PMCanvas-MacSigning-` 작업 폴더에 보관합니다. 폴더는 현재 Windows 사용자만 접근하도록 ACL을 제한합니다. 도구는 Git 저장소·worktree 내부, 정션·심볼릭 링크, 공유 접근 권한이 있는 작업 폴더를 거부합니다. 여러 작업을 동시에 실행하면 잠금으로 중복 생성을 막습니다.
 
@@ -171,7 +173,6 @@ gh secret list --env desktop-release --repo jhoon-dev/PMCanvas
 | Branch      | `main`  | `main`                                 |
 | platform    | `mac`   | `mac`                                  |
 | signed      | `true`  | `true`                                 |
-| unsigned    | `false` | `false`                                |
 | publish     | `false` | `true`                                 |
 | release_run | 비워 둠 | 이전 성공 실행 ID로 공개만 재시도 가능 |
 

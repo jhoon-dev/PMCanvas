@@ -15,6 +15,39 @@ import {
 
 const inspect = (file, text) => inspectPublicFile(file, Buffer.from(text));
 
+test('official PostgreSQL binary documentation links permit only the exact vendor host', () => {
+  assert.deepEqual(
+    inspect(
+      'web/docs/validation/postgres.md',
+      'https://www.enterprisedb.com/download-postgresql-binaries',
+    ),
+    [],
+  );
+  assert.ok(
+    inspect(
+      'web/docs/validation/postgres.md',
+      'https://www.enterprisedb.com.privatecorp.tld/download',
+    ).length > 0,
+  );
+});
+
+test('release identifiers and labelled MSIX versions are public metadata while private endpoints remain rejected', () => {
+  assert.deepEqual(
+    inspect(
+      'README.md',
+      '`app.toolmoa.{product-id}` `app.toolmoa.pmcanvas` `app.toolmoa.ppm` `build.appId` `build.mac.appId` MSIX **1.8.5.0** https://partner.microsoft.com/',
+    ),
+    [],
+  );
+  for (const value of [
+    'https://app.toolmoa.pmcanvas/',
+    'https://partner.microsoft.com.privatecorp.tld/',
+    'app.toolmoa.privatecorp.tld',
+    '10.21.22.23',
+  ])
+    assert.ok(inspect('README.md', value).length > 0);
+});
+
 test('icon documentation recognizes ICO filenames without treating them as private domains', () => {
   assert.deepEqual(inspect('desktop/build/ICONS.md', '`build/icon.ico` is the Windows icon.'), []);
 });
