@@ -73,10 +73,11 @@ for (const name of ['ic_launcher.xml', 'ic_launcher_round.xml']) {
   assert.ok(xml.includes('@mipmap/ic_launcher_foreground'));
 }
 const { storeManifest } = await import('../../desktop/scripts/store-policy.mjs');
+const desktopVersion = JSON.parse(await read('desktop/package.json')).version;
 assert.ok(
   storeManifest(
     { identityName: 'Test.Identity', publisher: 'CN=Test', publisherDisplayName: 'Test' },
-    '0.8.3',
+    desktopVersion,
   ).includes(`BackgroundColor="${background}"`),
 );
 const browser = await chromium.launch();
