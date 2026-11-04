@@ -11,6 +11,11 @@ export async function appSection(page, section, application) {
 }
 
 export async function rendererCommand(page, name) {
+  // The renderer rejects commands while a save is pending. Wait for the current
+  // mutation before dispatching the next command through the test bridge.
+  await page.waitForFunction(
+    () => document.querySelector('#content').getAttribute('aria-busy') !== 'true',
+  );
   await page.evaluate((value) => (window.testCommand || window.uxCommand)(value), name);
   await page.waitForFunction(
     () => document.querySelector('#content').getAttribute('aria-busy') !== 'true',

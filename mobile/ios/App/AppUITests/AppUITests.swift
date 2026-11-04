@@ -47,6 +47,27 @@ final class AppUITests: XCTestCase {
                        "Input value: \(String(reflecting: field.value)); expected: \(String(reflecting: text))\n\(app.debugDescription)")
     }
 
+    private func reveal(_ element: XCUIElement, in web: XCUIElement, app: XCUIApplication) {
+        // WKWebView can expose a checkbox below the viewport as hittable. Keep
+        // its whole frame between the fixed header and bottom navigation before
+        // sending a native tap, so the navigation cannot intercept the gesture.
+        let visible = CGRect(x: app.frame.minX, y: app.frame.minY + 160,
+                             width: app.frame.width, height: app.frame.height - 290)
+        for _ in 0..<8 {
+            let frame = element.frame
+            if element.isHittable && visible.contains(frame) { return }
+            // A full swipe can move the row past the header and oscillate back
+            // below the footer. Use a bounded drag and stop before lifting.
+            let distance = max(-180, min(180, frame.midY - visible.midY))
+            let start = web.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.55))
+            let end = start.withOffset(CGVector(dx: 0, dy: -distance))
+            start.press(forDuration: 0.1, thenDragTo: end,
+                        withVelocity: .slow, thenHoldForDuration: 0.2)
+        }
+        XCTAssertTrue(element.isHittable && visible.contains(element.frame),
+                      "Control did not enter the visible workspace: \(element.debugDescription)")
+    }
+
     private func keepStoreScreenshot(_ app: XCUIApplication, _ name: String) {
         // Wait for the save toast to disappear so the actual content is unobscured.
         let toast = app.webViews.staticTexts.matching(NSPredicate(format: "label ENDSWITH %@", "했습니다.")).firstMatch
@@ -78,7 +99,9 @@ final class AppUITests: XCTestCase {
         XCTAssertTrue(web.links.matching(NSPredicate(format: "label CONTAINS %@", projectName)).firstMatch.waitForExistence(timeout: 10))
 
         web.links["인력"].tap()
-        web.buttons.matching(identifier: "＋ 참여인력 추가").firstMatch.tap()
+        let addPerson = web.buttons.matching(identifier: "＋ 참여인력 추가").firstMatch
+        XCTAssertTrue(addPerson.wait(for: \.isHittable, toEqual: true, timeout: 10))
+        addPerson.tap()
         let person = web.textFields["이름"]
         XCTAssertTrue(person.waitForExistence(timeout: 5))
         enter("Alex", in: person, app: app)
@@ -104,7 +127,12 @@ final class AppUITests: XCTestCase {
         // WKWebView exposes HTML checkboxes as native accessibility switches.
         let check = web.switches.matching(NSPredicate(format: "label CONTAINS %@", "Review navigation")).firstMatch
         XCTAssertTrue(check.waitForExistence(timeout: 10), app.debugDescription)
+        reveal(check, in: web, app: app)
         check.tap()
+        let checked = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "value == %@", "1"), object: check
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [checked], timeout: 10), .completed, app.debugDescription)
         keepStoreScreenshot(app, "checklist")
         web.links["현황"].tap()
         XCTAssertTrue(web.staticTexts["33%"].waitForExistence(timeout: 10))
