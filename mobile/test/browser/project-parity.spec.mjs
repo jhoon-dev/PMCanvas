@@ -1,3 +1,4 @@
+import { openView } from './navigation.mjs';
 import { test, expect } from '@playwright/test';
 import { createRequire } from 'node:module';
 import { today, addDays } from '../../../shared/browser/engine.js';
@@ -36,12 +37,15 @@ async function start(page) {
       }),
     ),
   });
-  await expect(page.locator('.project-heading .eyebrow')).toHaveText('공통 기능 검증');
+  await expect(page.locator('#activeProjectName')).toHaveText('공통 기능 검증');
 }
 async function move(page, view) {
-  await page.locator('#projectView').selectOption(view);
+  await openView(page, view);
   await expect(page.locator('#content')).toHaveAttribute('aria-busy', 'false');
-  await expect(page.locator('#projectView')).toHaveValue(view);
+  await expect(page.locator('#workspaceNavigation [aria-current="page"]')).toHaveAttribute(
+    'data-view',
+    view,
+  );
   await expect(page.locator('.project-heading h1')).toHaveText(PROJECT_SCREENS[view].title);
 }
 async function stored(page) {
@@ -107,11 +111,14 @@ test('common charts and management screens persist milestones, staffing, risks a
   await page.getByRole('button', { name: '이슈·리스크 추가', exact: true }).click();
   await page.locator('[name="title"]').fill('외부 연동 지연');
   await page.locator('[name="type"]').selectOption('risk');
-  await page.locator('#projectView').selectOption('overview');
+  await openView(page, 'overview');
   await expect(page.locator('#confirmation')).toBeVisible();
   await page.locator('#confirmation').getByRole('button', { name: '취소', exact: true }).click();
   await expect(page.locator('[name="title"]')).toHaveValue('외부 연동 지연');
-  await expect(page.locator('#projectView')).toHaveValue('management');
+  await expect(page.locator('#workspaceNavigation [aria-current="page"]')).toHaveAttribute(
+    'data-view',
+    'management',
+  );
   await page.locator('[data-pm-form="issue"] button[type="submit"]').click();
   await expect(page.locator('.desktop-table')).toContainText('외부 연동 지연');
   await move(page, 'weekly');
@@ -146,9 +153,12 @@ test('mobile WBS editing, guarded navigation, baseline, Excel export and safe Ex
   await move(page, 'planning');
   await page.locator('[data-cell="name"]').first().fill('WBS 수정');
   await page.locator('[data-cell="name"]').first().press('Tab');
-  await page.locator('#projectView').selectOption('overview');
+  await openView(page, 'overview');
   await expect(page.getByRole('status').last()).toContainText('먼저 저장');
-  await expect(page.locator('#projectView')).toHaveValue('planning');
+  await expect(page.locator('#workspaceNavigation [aria-current="page"]')).toHaveAttribute(
+    'data-view',
+    'planning',
+  );
   await page.getByLabel('WBS 더 보기', { exact: true }).click();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.locator('[data-wbs-action="baseline"]').click();

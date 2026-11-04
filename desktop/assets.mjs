@@ -33,6 +33,9 @@ const allowed = new Set([
   'shared/report-clock.js',
   'shared/excel-import-model.js',
   'shared/dashboard-view.js',
+  'shared/local-workspace-view.js',
+  'shared/holiday-picker.js',
+  'shared/project-parent-field.js',
   'shared/project-visuals.css',
   'shared/styles.css',
 ]);

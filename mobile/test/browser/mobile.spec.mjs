@@ -1,3 +1,4 @@
+import { openView } from './navigation.mjs';
 import { test, expect } from '@playwright/test';
 import { today, nextWorkday } from '../../../shared/browser/engine.js';
 
@@ -54,15 +55,18 @@ test('create, edit, check, reopen offline, undo and export a project on a phone'
   await page.getByRole('button', { name: '＋ 새 프로젝트', exact: true }).click();
   await page.locator('[name="name"]').fill('모바일 출시 <검토>');
   await page.getByRole('button', { name: '저장', exact: true }).click();
-  await expect(page.locator('.project-heading .eyebrow')).toHaveText('모바일 출시 <검토>');
+  await expect(page.locator('#activeProjectName')).toHaveText('모바일 출시 <검토>');
   await page.getByRole('link', { name: '인력', exact: true }).click();
-  await page.getByRole('button', { name: '＋ 추가', exact: true }).click();
+  await page
+    .locator('.page-head')
+    .getByRole('button', { name: '＋ 참여인력 추가', exact: true })
+    .click();
   await page.locator('[name="name"]').fill('김담당');
   await page.getByRole('button', { name: '저장', exact: true }).click();
   await expect(page.getByText('김담당', { exact: true })).toBeVisible();
   await page.getByRole('link', { name: '업무', exact: true }).click();
   await page
-    .locator('.section-heading')
+    .locator('.page-head')
     .getByRole('button', { name: '＋ 업무 추가', exact: true })
     .click();
   await page.locator('[name="name"]').fill('아이폰 · 안드로이드 개발');
@@ -81,32 +85,32 @@ test('create, edit, check, reopen offline, undo and export a project on a phone'
   await expect(page.locator('[data-item]')).toHaveCount(2);
   await expect(page.locator('[data-item]:checked')).toHaveCount(1);
   await page.getByRole('link', { name: '현황', exact: true }).click();
-  await expect(page.locator('.hero-progress strong')).toHaveText('25%');
+  await expect(page.locator('.desktop-metric:first-child > strong')).toHaveText('25%');
   await page.evaluate(() => {
     document.documentElement.style.setProperty('--safe-area-inset-top', '28px');
     document.documentElement.style.setProperty('--safe-area-inset-bottom', '24px');
   });
-  await expect(page.locator('.app-header')).toHaveCSS('padding-top', '40px');
+  await expect(page.locator('.app-header')).toHaveCSS('padding-top', '36px');
   await expect(page.locator('.bottom-nav')).toHaveCSS('padding-bottom', '32px');
   await page.screenshot({ path: testInfo.outputPath('overview.png'), fullPage: true });
   await page.context().setOffline(true);
   // The installed app bundles the UI; browser tests prove data access without a server.
-  await page.getByRole('link', { name: '더보기', exact: true }).click();
+  await openView(page, 'more');
   await page.getByRole('button', { name: '↶ 실행 취소', exact: true }).click();
   await page.getByRole('link', { name: '현황', exact: true }).click();
-  await expect(page.locator('.hero-progress strong')).toHaveText('0%');
-  await page.getByRole('link', { name: '더보기', exact: true }).click();
+  await expect(page.locator('.desktop-metric:first-child > strong')).toHaveText('0%');
+  await openView(page, 'more');
   await page.getByRole('button', { name: '↷ 다시 실행', exact: true }).click();
   await expect(page.locator('#content')).toHaveAttribute('aria-busy', 'false');
   await page.context().setOffline(false);
   await page.reload();
   await page.getByRole('link', { name: '현황', exact: true }).click();
-  await expect(page.locator('.hero-progress strong')).toHaveText('25%');
+  await expect(page.locator('.desktop-metric:first-child > strong')).toHaveText('25%');
   await page.getByRole('link', { name: '완료 체크', exact: true }).click();
   await page.getByLabel('할 일만', { exact: true }).uncheck();
   await expect(page.locator('[data-item]:checked')).toHaveCount(1);
   await page.screenshot({ path: testInfo.outputPath('checklist.png'), fullPage: true });
-  await page.getByRole('link', { name: '더보기', exact: true }).click();
+  await openView(page, 'more');
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: '프로젝트 내보내기', exact: true }).click();
   const download = await downloadPromise;
@@ -127,20 +131,20 @@ test('imports make independent copies and malformed input preserves existing pro
 }) => {
   await page.goto('/');
   await importProject(page, backup());
-  await expect(page.locator('.project-heading .eyebrow')).toHaveText('가져온 프로젝트');
-  await page.getByRole('link', { name: '← 프로젝트', exact: true }).click();
+  await expect(page.locator('#activeProjectName')).toHaveText('가져온 프로젝트');
+  await page.getByRole('link', { name: '프로젝트 목록', exact: true }).click();
   await importProject(page, backup());
-  await expect(page.locator('.project-heading .eyebrow')).toHaveText('가져온 프로젝트');
-  await page.getByRole('link', { name: '← 프로젝트', exact: true }).click();
+  await expect(page.locator('#activeProjectName')).toHaveText('가져온 프로젝트');
+  await page.getByRole('link', { name: '프로젝트 목록', exact: true }).click();
   await expect(page.locator('.project-card')).toHaveCount(2);
   await importProject(page, '{broken');
   await expect(page.getByRole('status')).toContainText('JSON');
   await expect(page.locator('.project-card')).toHaveCount(2);
   await page.locator('.project-card').first().click();
-  await page.getByRole('link', { name: '더보기', exact: true }).click();
+  await openView(page, 'more');
   await page.getByRole('button', { name: '이 프로젝트 삭제', exact: true }).click();
   await page.locator('#confirmation').getByRole('button', { name: '취소', exact: true }).click();
-  await expect(page.locator('.project-heading .eyebrow')).toHaveText('가져온 프로젝트');
+  await expect(page.locator('#activeProjectName')).toHaveText('가져온 프로젝트');
   await page.getByRole('button', { name: '이 프로젝트 삭제', exact: true }).click();
   await page.locator('#confirmation').getByRole('button', { name: '삭제', exact: true }).click();
   await expect(page.locator('.project-card')).toHaveCount(1);
@@ -154,7 +158,7 @@ test('small screens, malicious text and failed writes keep a usable editor', asy
   const value = backup();
   value.project.name = '<img src=x onerror=alert(1)>';
   await importProject(page, value);
-  await expect(page.locator('.project-heading .eyebrow')).toHaveText(value.project.name);
+  await expect(page.locator('#activeProjectName')).toHaveText(value.project.name);
   await expect(page.locator('#content img')).toHaveCount(0);
   await page.getByRole('link', { name: '업무', exact: true }).click();
   await page.getByRole('button', { name: '배포 확인', exact: true }).click();
@@ -199,8 +203,8 @@ test('changing the business timezone cannot invalidate saved completion records'
   value.project.tasks[0].end = '2026-10-31';
   value.project.tasks[0].items[0].doneDate = '2026-10-31';
   await importProject(page, value);
-  await expect(page.locator('.project-heading .eyebrow')).toHaveText('가져온 프로젝트');
-  await page.getByRole('link', { name: '더보기', exact: true }).click();
+  await expect(page.locator('#activeProjectName')).toHaveText('가져온 프로젝트');
+  await openView(page, 'more');
   await page.getByRole('button', { name: '시간대 변경', exact: true }).click();
   await page.locator('[name="timeZone"]').fill('UTC');
   await page.getByRole('button', { name: '저장', exact: true }).click();
@@ -210,7 +214,7 @@ test('changing the business timezone cannot invalidate saved completion records'
   await page.reload();
   await expect(page.locator('.date-caption')).toContainText('Asia/Seoul');
   await page.getByRole('link', { name: '현황', exact: true }).click();
-  await expect(page.locator('.hero-progress strong')).toHaveText('100%');
+  await expect(page.locator('.desktop-metric:first-child > strong')).toHaveText('100%');
 });
 
 test('peer screens open directly and personnel and reports stay out of settings', async ({
@@ -228,15 +232,25 @@ test('peer screens open directly and personnel and reports stay out of settings'
     ['보고서', '업무 · 완료 기록'],
     ['더보기', '설정 · 파일'],
   ]) {
-    await page.getByRole('link', { name: label, exact: true }).click();
+    await openView(
+      page,
+      {
+        현황: 'overview',
+        업무: 'tasks',
+        '완료 체크': 'daily',
+        인력: 'people',
+        보고서: 'reports',
+        더보기: 'more',
+      }[label],
+    );
     await expect(page.locator('.project-heading h1')).toHaveText(heading);
-    await expect(page.locator('#navigation [aria-current="page"]')).toHaveCount(1);
-    await expect(page.locator('.project-heading .eyebrow')).toHaveText('가져온 프로젝트');
+    await expect(page.locator('#workspaceNavigation [aria-current="page"]')).toHaveCount(1);
+    await expect(page.locator('#activeProjectName')).toHaveText('가져온 프로젝트');
     await noOverflow(page);
   }
-  await expect(page.locator('.member-list')).toHaveCount(0);
+  await expect(page.locator('.team-grid')).toHaveCount(0);
   await expect(page.getByRole('button', { name: '업무 보고서 CSV', exact: true })).toHaveCount(0);
-  await page.getByRole('link', { name: '보고서', exact: true }).click();
+  await openView(page, 'reports');
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: '업무 보고서 CSV', exact: true }).click();
   expect((await download).suggestedFilename()).toMatch(/\.csv$/);
@@ -246,7 +260,7 @@ test('peer screens open directly and personnel and reports stay out of settings'
   expect((await completedDownload).suggestedFilename()).toContain('완료기록');
   await page.setViewportSize({ width: 320, height: 640 });
   await noOverflow(page);
-  for (const link of await page.locator('#navigation a').all()) {
+  for (const link of await page.locator('#navigation a, #navigation button').all()) {
     const box = await link.boundingBox();
     expect(box.width).toBeGreaterThanOrEqual(44);
     expect(box.height).toBeGreaterThanOrEqual(44);
@@ -261,10 +275,11 @@ test('quick task entry, draft protection, completion undo and filter recovery', 
   await page.getByRole('button', { name: '＋ 새 프로젝트', exact: true }).click();
   await page.locator('[name="name"]').fill('간단한 프로젝트');
   await page.getByRole('button', { name: '저장', exact: true }).click();
-  await expect(
-    page.getByRole('heading', { name: '첫 업무만 적으면 시작할 수 있어요' }),
-  ).toBeVisible();
-  await page.getByRole('button', { name: '＋ 업무 추가', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '첫 업무부터 시작해 보세요' })).toBeVisible();
+  await page
+    .locator('.page-head')
+    .getByRole('button', { name: '＋ 업무 추가', exact: true })
+    .click();
   await page.locator('[name="name"]').fill('회의 준비');
   await page.getByRole('button', { name: '입력 취소', exact: true }).click();
   await expect(page.getByRole('heading', { name: '변경사항을 버릴까요?' })).toBeVisible();
@@ -274,15 +289,19 @@ test('quick task entry, draft protection, completion undo and filter recovery', 
   await page.getByRole('button', { name: '저장', exact: true }).click();
   await page.getByRole('link', { name: '완료 체크', exact: true }).click();
   await page.getByRole('checkbox', { name: /회의 준비/ }).check();
-  await expect(page.locator('.completion-summary')).toContainText('100%');
+  await expect(page.locator('.check-task-head > strong')).toContainText('100%');
   await expect(page.getByRole('checkbox', { name: /회의 준비/ })).toBeChecked();
+  await expect(page.locator('#toast')).toHaveCSS('opacity', '1');
   await page.getByRole('button', { name: '되돌리기', exact: true }).click();
   await expect(page.getByRole('checkbox', { name: /회의 준비/ })).not.toBeChecked();
-  await expect(page.locator('.completion-summary')).toContainText('0%');
+  await expect(page.locator('.check-task-head > strong')).toContainText('0%');
   await page.getByRole('searchbox', { name: '업무 검색' }).fill('없는 업무');
-  await expect(page.locator('.task-card')).toHaveCount(0);
-  await page.getByRole('button', { name: '필터 초기화', exact: true }).click();
-  await expect(page.locator('.task-card')).toHaveCount(1);
+  await expect(page.locator('.check-panel')).toHaveCount(0);
+  await page
+    .locator('.workspace-filters')
+    .getByRole('button', { name: '필터 초기화', exact: true })
+    .click();
+  await expect(page.locator('.check-panel')).toHaveCount(1);
   await page.reload();
   await expect(page.getByRole('checkbox', { name: /회의 준비/ })).not.toBeChecked();
 });
@@ -293,7 +312,10 @@ test('long forms keep actions reachable in a short viewport and reveal invalid f
   await page.setViewportSize({ width: 320, height: 480 });
   await page.goto('/');
   await importProject(page, backup());
-  await page.getByRole('button', { name: '＋ 업무 추가', exact: true }).click();
+  await page
+    .locator('.page-head')
+    .getByRole('button', { name: '＋ 업무 추가', exact: true })
+    .click();
   await page.locator('[name="name"]').fill('짧은 화면에서도 저장');
   for (let index = 0; index < 5; index++) {
     await page.getByRole('button', { name: '＋ 세부 작업 추가', exact: true }).click();
@@ -304,11 +326,12 @@ test('long forms keep actions reachable in a short viewport and reveal invalid f
   await noOverflow(page);
   await page.getByRole('button', { name: '입력 취소', exact: true }).click();
   await page.getByRole('button', { name: '버리기', exact: true }).click();
-  await page.getByRole('button', { name: '＋ 업무 추가', exact: true }).click();
+  await page
+    .locator('.page-head')
+    .getByRole('button', { name: '＋ 업무 추가', exact: true })
+    .click();
   await page.locator('[name="name"]').fill('일정 확인');
-  await page.locator('summary').filter({ hasText: '담당자 · 일정' }).click();
   await page.locator('[name="start"]').fill('');
-  await page.locator('summary').filter({ hasText: '담당자 · 일정' }).click();
   await page.getByRole('button', { name: '저장', exact: true }).click();
   await expect(page.locator('[name="start"]')).toBeVisible();
   await expect(page.locator('#editor')).toBeVisible();

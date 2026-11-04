@@ -78,7 +78,7 @@ final class AppUITests: XCTestCase {
         XCTAssertTrue(web.staticTexts[projectName].waitForExistence(timeout: 10))
 
         web.links["인력"].tap()
-        web.buttons["＋ 추가"].tap()
+        web.buttons.matching(identifier: "＋ 참여인력 추가").firstMatch.tap()
         let person = web.textFields["이름"]
         XCTAssertTrue(person.waitForExistence(timeout: 5))
         enter("Alex", in: person, app: app)

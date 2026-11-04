@@ -1,3 +1,12 @@
+import { mountHolidayPicker } from '../../shared/browser/holiday-picker.js';
+import { parentField } from '../../shared/browser/project-parent-field.js';
+import {
+  workspaceOverview,
+  workspaceTasks,
+  workspaceDaily,
+} from '../../shared/browser/local-workspace-view.js';
+import { peopleView } from '../../shared/browser/people-view.js';
+import { pageHead } from '../../shared/browser/view-ui.js';
 import { ProjectTools } from './project-tools.js';
 import { PROJECT_SCREENS, projectNavigation } from '../../shared/browser/project-navigation.js';
 import { taskView, taskLeaves, summaryIds } from '../../shared/browser/task-model.js';
@@ -57,7 +66,7 @@ let undo = [],
 const scrollPositions = new Map();
 const mobileViews = projectNavigation('mobile').flatMap((group) => group.views);
 const titles = Object.fromEntries(mobileViews.map((id) => [id, PROJECT_SCREENS[id].title]));
-const tabs = ['overview', 'tasks', 'daily', 'people', 'reports', 'more'].map((id) => [
+const tabs = ['overview', 'tasks', 'daily', 'people'].map((id) => [
   id,
   PROJECT_SCREENS[id].short,
   PROJECT_SCREENS[id].icon,
@@ -126,16 +135,6 @@ function empty(title, text, action = '') {
 function meter(value) {
   return `<div class="meter" role="meter" aria-label="진척률" aria-valuenow="${Math.round(value * 100)}" aria-valuemin="0" aria-valuemax="100"><span style="width:${value * 100}%"></span></div>`;
 }
-function status(task) {
-  if (task.kind === 'summary' && !task.items.length) return ['active', '요약 업무'];
-  return progress(task, projectTools.at) === 1
-    ? ['done', '완료']
-    : task.end < projectTools.at
-      ? ['late', '지연']
-      : progress(task, projectTools.at) > 0
-        ? ['active', '진행 중']
-        : ['active', '예정'];
-}
 function filtered(project) {
   return project.tasks.filter(
     (task) =>
@@ -143,23 +142,8 @@ function filtered(project) {
       (!owner || task.owner === owner),
   );
 }
-function taskCard(project, task, daily = false) {
-  task = taskView(project, task);
-  const [style, label] = status(task);
-  const member = project.members.find((member) => member.id === task.owner);
-  const entries =
-    task.kind === 'milestone'
-      ? [{ id: '__milestone', title: '마일스톤 완료', hours: 0, doneDate: task.doneDate }]
-      : task.items;
-  const items = daily ? entries.filter((item) => !onlyOpen || !item.doneDate) : [];
-  return `<article class="task-card"><div class="card-top"><span class="phase">${esc(task.phase || '일반')}</span><span class="badge ${style}">${label}</span></div>
-    <button class="task-title" data-action="edit-task" data-id="${esc(task.id)}">${esc(task.name)}</button>
-    <p class="task-meta">${icon('users')}${esc(task.kind === 'summary' ? '요약 업무' : member?.name || '미지정')}<span>·</span>${task.start.slice(5)} – ${task.end.slice(5)}</p>
-    ${daily ? `<div class="checklist">${items.map((item) => `<label class="check-row"><input type="checkbox" data-task="${esc(task.id)}" data-item="${esc(item.id)}" ${item.doneDate ? 'checked' : ''}><span>${esc(item.title)}${item.doneDate ? `<small>완료 ${item.doneDate}</small>` : ''}</span><small>${num(item.hours)}h</small></label>`).join('') || '<p class="muted">모든 세부 작업을 완료했습니다.</p>'}</div>` : `<div class="progress-line">${meter(progress(task, projectTools.at))}<strong>${pct(progress(task, projectTools.at))}</strong></div>`}
-  </article>`;
-}
 function projectList() {
-  return `<section class="page-heading"><div><span class="eyebrow">YOUR WORKSPACE</span><h1>나의 프로젝트</h1><p>한 번의 체크로, 오늘의 진척을 기록하세요.</p></div></section>
+  return `<section class="page-heading"><div><span class="eyebrow">YOUR WORKSPACE</span><h1>나의 프로젝트</h1><p>데스크톱과 같은 프로젝트를 이 기기에서 이어서 관리하세요.</p></div></section>
     <div class="project-actions">${button('＋ 새 프로젝트', 'new', 'primary')}${button(icon('upload') + ' 가져오기', 'import')}</div>
     ${
       records.length
@@ -170,7 +154,7 @@ function projectList() {
                   s = summary(p, today());
                 return `<button class="project-card" data-action="open" data-index="${index}"><span class="project-monogram">${esc(p.name.slice(0, 1))}</span><span class="project-card-body"><strong>${esc(p.name)}</strong><small>업무 ${p.tasks.length}개 · 참여인력 ${p.members.length}명</small>${meter(s.progress)}<span class="project-card-foot"><span>진척률 ${pct(s.progress)}</span><span>${s.overdue ? `지연 ${s.overdue}건` : '기기에 저장됨'}</span></span></span>${icon('arrow')}</button>`;
               } catch {
-                return '<article class="task-card"><h2>읽을 수 없는 프로젝트</h2><p>저장된 원본은 보존했습니다. 백업 파일을 가져와 복구해 주세요.</p></article>';
+                return '<article class="settings-card"><h2>읽을 수 없는 프로젝트</h2><p>저장된 원본은 보존했습니다. 백업 파일을 가져와 복구해 주세요.</p></article>';
               }
             })
             .join('')}</div>`
@@ -179,45 +163,17 @@ function projectList() {
             '업무와 일정을 등록하고, 완료한 작업을 바로 체크하세요. 인터넷 연결 없이 사용할 수 있습니다.',
           )
     }
-    <aside class="storage-note">${icon('check')}<div><strong>내 기기 안의 작은 작업실</strong><p>변경 내용은 이 기기에 자동 저장됩니다. 설정 · 파일에서 파일을 내보내 다른 기기로 옮길 수 있습니다.</p></div></aside>
+    <aside class="storage-note">${icon('check')}<div><strong>기기에 저장되는 프로젝트</strong><p>변경 내용은 이 기기에 자동 저장됩니다. 프로젝트 파일을 내보내 웹이나 데스크톱에서 이어서 사용할 수 있습니다.</p></div></aside>
     <p class="privacy-note">${button('개인정보처리방침', 'privacy', 'ghost')}</p>`;
 }
 function overview(p) {
-  const s = summary(p, projectTools.at);
-  if (!p.tasks.length) {
-    return `<section class="setup-card"><span class="eyebrow">프로젝트 시작하기</span><h2>첫 업무만 적으면 시작할 수 있어요</h2><p>담당자와 세부 일정은 나중에 정해도 됩니다.</p>${button('＋ 업무 추가', 'add-task', 'primary')}<div class="setup-step"><span>1</span><div><strong>해야 할 업무를 적으세요</strong><p>업무명만 입력해도 저장할 수 있습니다.</p></div></div><div class="setup-step"><span>2</span><div><strong>완료한 작업을 체크하세요</strong><p>완료 체크에서 진척률을 기록합니다.</p></div></div><div class="setup-step"><span>3</span><div><strong>필요할 때 담당자를 추가하세요</strong><p>혼자 사용한다면 미지정으로 두어도 됩니다.</p></div></div>${button('참여인력 추가', 'add-member', 'ghost')}</section>`;
-  }
-  return `<section class="hero"><span class="eyebrow">PROJECT PULSE</span><div class="hero-progress"><strong>${pct(s.progress)}</strong><span>전체 진척률</span></div>${meter(s.progress)}<div class="hero-foot"><span>계획 ${pct(s.planned)}</span><span>${num(s.done)} / ${num(s.total)}h 완료</span></div></section>
-    <div class="quick-actions">${button('＋ 업무 추가', 'add-task', 'primary')}<a class="button" href="#daily/${esc(p.id)}">${icon('check')}완료 기록</a></div>
-    <div class="metric-grid"><article><span>완료 업무</span><strong>${s.completed}<small> / ${taskLeaves(p).length}</small></strong></article><article><span>지연 업무</span><strong class="${s.overdue ? 'late-text' : ''}">${s.overdue}<small>건</small></strong></article></div>
-    <section class="forecast-card">${icon('calendar')}<div><span>예상 완료일</span><strong>${s.forecast.end || '업무를 등록해 주세요'}</strong><small>보고 기준일 업무 종료 기준 · ${s.forecast.observed ? '최근 완료 속도를 반영했습니다.' : '현재 계획과 공수를 기준으로 계산합니다.'}</small></div></section>
-    ${projectTools.visuals(p)}<div class="section-heading"><h2>다가오는 업무</h2><a href="#tasks/${esc(p.id)}">모두 보기 →</a></div>
-    ${
-      p.tasks.length
-        ? `<div class="task-list">${
-            taskLeaves(p)
-              .filter((task) => progress(task, projectTools.at) < 1)
-              .sort((a, b) => a.end.localeCompare(b.end))
-              .slice(0, 4)
-              .map((task) => taskCard(p, task))
-              .join('') || '<p class="notice">모든 업무를 완료했습니다.</p>'
-          }</div>`
-        : empty(
-            '첫 업무를 등록해 보세요',
-            '담당자와 일정, 체크할 세부 작업을 추가합니다.',
-            button('＋ 업무 추가', 'add-task', 'primary'),
-          )
-    }`;
-}
-function filters(p) {
-  return `<div class="filters"><label class="search-box">${icon('layers')}<input id="search" type="search" placeholder="업무 검색" aria-label="업무 검색" value="${esc(query)}"></label><select id="owner" aria-label="담당자 필터"><option value="">전체 담당자</option>${p.members.map((m) => `<option value="${esc(m.id)}" ${owner === m.id ? 'selected' : ''}>${esc(m.name)}</option>`).join('')}</select></div><div id="filterStatus" class="filter-status" ${query || owner ? '' : 'hidden'}><span>${filtered(p).length}개 업무</span>${button('필터 초기화', 'clear-filters', 'ghost')}</div>`;
+  return workspaceOverview(p, summary(p, projectTools.at), {
+    asOf: projectTools.at,
+    controls: projectTools.controls('overview'),
+  });
 }
 function tasks(p, daily) {
-  const items = p.tasks.flatMap((task) => task.items);
-  return `${daily ? `<div class="completion-summary"><div><strong>${items.filter((item) => item.doneDate).length}<span> / ${items.length}개 완료</span></strong><p>체크를 다시 누르면 완료를 취소합니다.</p></div><strong>${pct(summary(p, today()).progress)}</strong></div><div class="daily-options"><label>완료일<input type="date" id="completionDate" aria-label="완료일" value="${esc(completionDate)}" max="${today()}" required></label><label class="switch-label"><input id="onlyOpen" type="checkbox" ${onlyOpen ? 'checked' : ''}>할 일만</label></div>` : `<div class="section-heading"><p>전체 업무 ${p.tasks.length}개</p>${button('＋ 업무 추가', 'add-task', 'primary')}</div>`}${filters(p)}<div id="taskList" class="task-list">${taskList(p, daily)}</div>`;
-}
-function taskList(p, daily) {
-  const tasks = filtered(p).filter(
+  const shown = filtered(p).filter(
     (task) =>
       !daily ||
       (!summaryIds(p).has(task.id) &&
@@ -226,24 +182,29 @@ function taskList(p, daily) {
             ? !task.doneDate
             : task.items.some((item) => !item.doneDate)))),
   );
-  if (!p.tasks.length)
-    return empty(
-      '등록된 업무가 없습니다',
-      '작은 업무부터 하나씩 계획해 보세요.',
-      button('＋ 업무 추가', 'add-task', 'primary'),
-    );
+  const controls = filters(p, daily);
+  const markup = daily
+    ? workspaceDaily(p, { asOf: projectTools.at, tasks: shown, controls })
+    : workspaceTasks(p, summary(p, projectTools.at), {
+        asOf: projectTools.at,
+        tasks: shown,
+        controls,
+      });
+  const offset = markup.indexOf(controls) + controls.length;
   return (
-    tasks.map((task) => taskCard(p, task, daily)).join('') ||
-    empty(
-      daily ? '표시할 할 일이 없습니다' : '검색 결과가 없습니다',
-      daily
-        ? '필터를 바꾸거나 할 일만 옵션을 꺼 완료 기록을 확인하세요.'
-        : '다른 검색어나 담당자를 선택해 보세요.',
-    )
+    markup.slice(0, offset) +
+    '<div id="workspaceResults" class="workspace-results">' +
+    markup.slice(offset) +
+    '</div>'
   );
 }
+function filters(p, daily) {
+  return `<div class="desktop-controls workspace-filters"><label class="search-control"><span>업무 검색</span><input id="search" type="search" placeholder="업무 검색" aria-label="업무 검색" value="${esc(query)}"></label><label><span>담당자</span><select id="owner" aria-label="담당자 필터"><option value="">전체 담당자</option>${p.members.map((m) => `<option value="${esc(m.id)}" ${owner === m.id ? 'selected' : ''}>${esc(m.name)}</option>`).join('')}</select></label>${projectTools.dateControl()}${daily ? `<label class="switch-label"><input id="onlyOpen" type="checkbox" ${onlyOpen ? 'checked' : ''}>할 일만</label>` : ''}<div class="filter-status"><span>검색 결과 ${filtered(p).length} / 전체 ${p.tasks.length}</span>${query || owner ? button('필터 초기화', 'clear-filters', 'small ghost') : ''}</div></div>`;
+}
 function people(p) {
-  return `<section class="settings-card"><div class="section-heading"><h2>참여인력 <span>${p.members.length}</span></h2>${button('＋ 추가', 'add-member')}</div><div class="member-list">${p.members.map((m) => `<button class="member-row" data-action="edit-member" data-id="${esc(m.id)}"><span class="member-avatar">${esc(m.name.slice(-2))}</span><span><strong>${esc(m.name)}</strong><small>${esc(m.role || '참여인력')} · ${num(m.hours)}h / 일 · ${m.allocation}%</small></span><span aria-hidden="true">›</span></button>`).join('') || '<p class="muted">함께할 사람을 추가해 보세요.</p>'}</div></section>`;
+  return peopleView(p, summary(p, projectTools.at), projectTools.at, {
+    controls: projectTools.controls('people'),
+  });
 }
 function reports() {
   return projectTools.reports();
@@ -254,31 +215,74 @@ function more(p) {
 
     <section class="settings-card"><h2>파일 가져오기 · 내보내기</h2><p>프로젝트 파일은 웹과 데스크톱에서도 가져올 수 있습니다.</p><div class="stack-actions">${button(icon('download') + ' 프로젝트 내보내기', 'export')}${button(icon('upload') + ' 프로젝트 가져오기', 'import')}</div></section>
     <section class="settings-card"><h2>업무 기준 시간대</h2><p>${esc(getBusinessTimeZone())} 기준으로 오늘과 완료일을 계산합니다.</p>${button('시간대 변경', 'timezone')}</section>
-    <p class="privacy-note">PM Canvas 0.2.0 · 기기에 자동 저장<br>계정이나 서버 연결 없이 동작합니다. 앱을 삭제하면 기기의 프로젝트도 삭제될 수 있으므로 파일을 내보내 보관하세요.</p>
+    <p class="privacy-note">PM Canvas 0.3.0 · 기기에 자동 저장<br>계정이나 서버 연결 없이 동작합니다. 앱을 삭제하면 기기의 프로젝트도 삭제될 수 있으므로 파일을 내보내 보관하세요.</p>
     <p class="privacy-note">${button('개인정보처리방침', 'privacy', 'ghost')}</p>
     <div class="delete-project">${button('이 프로젝트 삭제', 'delete-project', 'danger ghost')}</div>`;
 }
 function render() {
   const p = record?.project;
-  document.title =
-    p && view !== 'projects' ? p.name + ' · ' + titles[view] + ' — PM Canvas' : 'PM Canvas';
-  document.body.classList.toggle('in-project', Boolean(p && view !== 'projects'));
-  $('#navigation').hidden = !p || view === 'projects';
-  $('#navigation').innerHTML = p
+  const active = Boolean(p && view !== 'projects');
+  document.title = active ? p.name + ' · ' + titles[view] + ' — PM Canvas' : 'PM Canvas';
+  document.body.classList.toggle('in-project', active);
+  $('#activeProjectName').textContent = active ? p.name : '프로젝트 관리';
+  $('#openWorkspaceMenu').hidden = !active;
+  $('#workspaceFiles').hidden = !active;
+  $('#navigation').hidden = !active;
+  $('#drawerProjectName').textContent = p?.name || '';
+  $('#workspaceNavigation').innerHTML = active
+    ? projectNavigation('mobile')
+        .map(
+          (group) =>
+            `<section class="navigation-group"><h2>${esc(group.title)}</h2>${group.views
+              .map(
+                (id) =>
+                  `<a href="#${id}/${esc(p.id)}" data-view="${id}" ${id === view ? 'aria-current="page"' : ''}>${icon(PROJECT_SCREENS[id].icon)}<span>${esc(PROJECT_SCREENS[id].title)}</span></a>`,
+              )
+              .join('')}</section>`,
+        )
+        .join('')
+    : '';
+  $('#navigation').innerHTML = active
     ? tabs
         .map(
           ([key, label, glyph]) =>
             `<a href="#${key}/${esc(p.id)}" ${key === view ? 'aria-current="page"' : ''}>${icon(glyph)}<span>${label}</span></a>`,
         )
-        .join('')
+        .join('') +
+      `<button type="button" data-workspace-menu ${!tabs.some(([key]) => key === view) ? 'class="is-active"' : ''} aria-label="전체 프로젝트 메뉴">${icon('more')}<span>전체</span></button>`
     : '';
-  $('#content').classList.toggle('with-navigation', Boolean(p && view !== 'projects'));
-  if (!p || view === 'projects') {
+  $('#workspaceFiles .menu-popover').innerHTML = active
+    ? `${button('프로젝트 설정', 'settings')}${button('프로젝트 내보내기', 'export')}${button('프로젝트 가져오기', 'import')}<hr>${button('↶ 실행 취소', 'undo', '', undo.length ? '' : 'disabled')}${button('↷ 다시 실행', 'redo', '', redo.length ? '' : 'disabled')}`
+    : '';
+  if (!active) {
     $('#content').innerHTML = projectList();
     return;
   }
-  $('#content').innerHTML =
-    `<section class="project-heading"><a class="back-link" href="#projects">← 프로젝트</a><div class="project-heading-line"><div><span class="eyebrow">${esc(p.name)}</span><h1>${titles[view]}</h1></div><span class="saved-label" role="status">저장됨</span></div><p class="date-caption">${projectTools.at} · ${esc(getBusinessTimeZone())}</p></section>${projectTools.controls(view)}${view === 'overview' ? overview(p) : view === 'tasks' ? tasks(p, false) : view === 'daily' ? tasks(p, true) : view === 'people' ? people(p) : view === 'reports' ? reports(p) : view === 'more' ? more(p) : projectTools.render(view)}`;
+  let content =
+    view === 'overview'
+      ? overview(p)
+      : view === 'tasks'
+        ? tasks(p, false)
+        : view === 'daily'
+          ? tasks(p, true)
+          : view === 'people'
+            ? people(p)
+            : view === 'reports'
+              ? reports(p)
+              : view === 'more'
+                ? more(p)
+                : projectTools.render(view);
+  $('#content').innerHTML = content;
+  if (!$('#content .page-head'))
+    $('#content').insertAdjacentHTML(
+      'afterbegin',
+      pageHead('PROJECT WORKSPACE', titles[view], '', ''),
+    );
+  const heading = $('#content .page-head');
+  heading.classList.add('project-heading');
+  heading.querySelector('h1').textContent = titles[view];
+  if (!['overview', 'tasks', 'daily', 'people'].includes(view))
+    heading.after(document.createRange().createContextualFragment(projectTools.controls(view)));
   projectTools.attach(view);
 }
 async function route() {
@@ -359,10 +363,21 @@ function openEditor(type, id = '') {
   }
   editing = { type, id };
   returnFocus = document.activeElement;
-  const form = editorForm(type, record?.project || { members: [], tasks: [] }, id, { uid });
+  const form = editorForm(type, record?.project || { members: [], tasks: [] }, id, {
+    uid,
+    extraFields: type === 'task' ? parentField(record.project, id) : '',
+    expandDetails: Boolean(record?.project.tasks.find((task) => task.id === id)?.parentId),
+  });
   $('#editorTitle').textContent = form.title;
   $('#editorBody').innerHTML = form.body;
-  simplifyEditor(type, id);
+  // Use the same complete form as desktop; only its scrolling layout changes.
+  if (type === 'task' && !id) $('#editorBody [name="itemTitle"]')?.removeAttribute('required');
+  if (type === 'project' || type === 'settings') {
+    $('#editorBody [name="koreanHolidays"]')?.closest('label')?.remove();
+    mountHolidayPicker($('#editorBody'), {
+      enabled: type === 'project' || record.project.koreanHolidays === true,
+    });
+  }
   $('#formError').textContent = '';
   $('#deleteItem').hidden = !id || !['task', 'member'].includes(type);
   $('#editor').showModal();
@@ -382,45 +397,6 @@ function editorFields() {
       row.dataset.doneDate,
     ]),
   ]);
-}
-function groupEditorFields(label, nodes, open = false) {
-  const details = document.createElement('details');
-  details.className = 'task-details';
-  details.open = open;
-  const summary = document.createElement('summary');
-  summary.textContent = label;
-  details.append(summary);
-  nodes[0].before(details);
-  details.append(...nodes);
-  return details;
-}
-function simplifyEditor(type, id) {
-  const body = $('#editorBody');
-  if (type === 'project' || type === 'settings') {
-    groupEditorFields(
-      '휴무일 설정 (선택)',
-      [body.querySelector('[name="holidays"]').closest('label')],
-      type === 'settings',
-    );
-  } else if (type === 'member') {
-    groupEditorFields('역할 · 근무 설정', [...body.children].slice(1), Boolean(id));
-  } else if (type === 'task') {
-    const ownerField = body.querySelector('[name="owner"]').closest('label');
-    const dates = body.querySelector('[name="start"]').closest('.form-grid');
-    const schedule = groupEditorFields('담당자 · 일정', [ownerField, dates], Boolean(id));
-    const scheduleHint = document.createElement('small');
-    const ownerSelect = ownerField.querySelector('select');
-    scheduleHint.textContent = `${ownerSelect.selectedOptions[0].textContent} · ${dates.querySelector('[name="start"]').value.slice(5)} – ${dates.querySelector('[name="end"]').value.slice(5)}`;
-    schedule.querySelector('summary').append(scheduleHint);
-    const firstTitle = body.querySelector('[name="itemTitle"]');
-    if (!id) {
-      firstTitle.required = false;
-      firstTitle.placeholder = '비우면 업무명을 사용합니다';
-      body.querySelector('.items-title strong').textContent = '세부 작업 (선택)';
-      body.querySelector('.form-hint').textContent =
-        '세부 작업은 선택입니다. 비우면 업무명으로 체크 항목을 만듭니다. 예상 시간은 진척률 계산에 사용됩니다.';
-    }
-  }
 }
 async function requestCloseEditor() {
   if (busy || !editing || $('#confirmation').open) return;
@@ -545,6 +521,12 @@ $('#editorForm').addEventListener('submit', (event) => {
         items,
         { uid },
       );
+      if (editing.type === 'task') {
+        const task = editing.id
+          ? result.project.tasks.find((task) => task.id === editing.id)
+          : result.project.tasks.at(-1);
+        task.parentId = String(new FormData(event.target).get('parentId') || '');
+      }
       await save(result.project);
       closeEditor();
       if (result.created) navigate('overview', result.project.id);
@@ -583,14 +565,41 @@ $('#deleteItem').onclick = async () => {
   run(async () => {
     await save(deleteEntity(record.project, editing.type, editing.id));
     closeEditor();
-    toast('삭제했습니다. 더보기에서 실행 취소할 수 있습니다.');
+    toast('삭제했습니다. 상단 파일 메뉴에서 실행 취소할 수 있습니다.');
   });
 };
+function showWorkspaceMenu() {
+  if (busy || editing || !record || $('#workspaceDrawer').open) return;
+  $('#workspaceDrawer').showModal();
+  $('#openWorkspaceMenu').setAttribute('aria-expanded', 'true');
+}
+$('#openWorkspaceMenu').onclick = showWorkspaceMenu;
+$('#closeWorkspaceMenu').onclick = () => $('#workspaceDrawer').close();
+$('#workspaceDrawer').addEventListener('close', () =>
+  $('#openWorkspaceMenu').setAttribute('aria-expanded', 'false'),
+);
+$('#workspaceDrawer').addEventListener('click', (event) => {
+  if (event.target === $('#workspaceDrawer') || event.target.closest('a'))
+    $('#workspaceDrawer').close();
+});
 document.addEventListener('click', (event) => {
+  if (event.target.closest('[data-workspace-menu]')) showWorkspaceMenu();
+});
+document.addEventListener('click', (event) => {
+  if (event.target.closest('[data-reset-filters]') && !busy && !editing) {
+    query = '';
+    owner = '';
+    render();
+    return;
+  }
   if (busy && event.target.closest('a[href^="#"]')) {
     event.preventDefault();
     return;
   }
+  const go = event.target.closest('[data-go]');
+  if (go && !busy && !editing) return navigate(go.dataset.go);
+  const member = event.target.closest('[data-edit-member]');
+  if (member && !busy && !editing) return openEditor('member', member.dataset.editMember);
   const chartTask = event.target.closest('[data-edit-task]');
   if (chartTask && !busy && !editing) {
     openEditor('task', chartTask.dataset.editTask);
@@ -599,6 +608,7 @@ document.addEventListener('click', (event) => {
   const target = event.target.closest('[data-action]');
   if (!target || busy || editing) return;
   const action = target.dataset.action;
+  $('#workspaceFiles').open = false;
   if (action === 'privacy') {
     $('#privacyBody').innerHTML = privacyContent;
     $('#privacyDialog').showModal();
@@ -617,7 +627,7 @@ document.addEventListener('click', (event) => {
   }
   if (action === 'task' || action === 'add-task' || action === 'edit-task')
     return openEditor('task', target.dataset.id);
-  if (action === 'add-member' || action === 'edit-member')
+  if (action === 'member' || action === 'add-member' || action === 'edit-member')
     return openEditor('member', target.dataset.id);
   if (action === 'settings') return openEditor('settings');
   if (action === 'clear-filters') {
@@ -671,24 +681,27 @@ document.addEventListener('click', (event) => {
     } else if (action === 'retry') await route();
   });
 });
+function refreshFilteredScreen() {
+  const fragment = document
+    .createRange()
+    .createContextualFragment(tasks(record.project, view === 'daily'));
+  $('#workspaceResults').replaceWith(fragment.querySelector('#workspaceResults'));
+  $('.filter-status').replaceWith(fragment.querySelector('.filter-status'));
+}
 document.addEventListener('input', (event) => {
   if (event.target.id !== 'search') return;
   query = event.target.value;
-  $('#taskList').innerHTML = taskList(record.project, view === 'daily');
-  $('#filterStatus').hidden = !query && !owner;
-  $('#filterStatus span').textContent = `${filtered(record.project).length}개 업무`;
+  refreshFilteredScreen();
 });
 document.addEventListener('change', (event) => {
   const element = event.target;
   if (element.id === 'owner') {
     owner = element.value;
-    $('#taskList').innerHTML = taskList(record.project, view === 'daily');
-    $('#filterStatus').hidden = !query && !owner;
-    $('#filterStatus span').textContent = `${filtered(record.project).length}개 업무`;
+    refreshFilteredScreen();
   }
   if (element.id === 'onlyOpen') {
     onlyOpen = element.checked;
-    $('#taskList').innerHTML = taskList(record.project, true);
+    refreshFilteredScreen();
   }
   if (element.id === 'completionDate') {
     if (!validDate(element.value) || element.value > today()) {
@@ -707,7 +720,12 @@ document.addEventListener('change', (event) => {
     run(async () => {
       try {
         await save(
-          toggleItem(record.project, element.dataset.task, element.dataset.item, completionDate),
+          toggleItem(
+            record.project,
+            element.dataset.task || element.dataset.check,
+            element.dataset.item,
+            completionDate,
+          ),
         );
         toast(element.checked ? '완료를 기록했습니다.' : '완료를 취소했습니다.', true);
       } catch (error) {
@@ -766,6 +784,7 @@ if (Capacitor.isNativePlatform()) {
     if (busy) return;
     if ($('#privacyDialog').open) return $('#privacyDialog').close();
     if ($('#confirmation').open) return $('#confirmation').close('cancel');
+    if ($('#workspaceDrawer').open) return $('#workspaceDrawer').close();
     if ($('#editor').open) return requestCloseEditor();
     if (view !== 'projects') navigate('projects', '');
     else App.minimizeApp();
