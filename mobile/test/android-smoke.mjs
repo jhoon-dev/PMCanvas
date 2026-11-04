@@ -267,11 +267,11 @@ try {
     await screenshot('02-checklist');
     await page.getByRole('link', { name: '업무', exact: true }).click();
     await fillField(page.getByRole('searchbox', { name: '업무 검색' }), '없는 업무');
-    await expect(page.getByRole('heading', { name: '검색 결과가 없습니다' })).toBeVisible();
+    await expect(page.locator('#workspaceResults')).toContainText('표시할 업무가 없습니다.');
     await fillField(page.getByRole('searchbox', { name: '업무 검색' }), '');
     const ownerId = await page.locator('#owner option').nth(1).getAttribute('value');
     await page.getByLabel('담당자 필터').selectOption(ownerId);
-    await expect(page.locator('.check-panel')).toHaveCount(1);
+    await expect(page.locator('.desktop-table tbody tr')).toHaveCount(1);
     await page.getByLabel('담당자 필터').selectOption('');
     await page.getByRole('link', { name: '현황', exact: true }).click();
     await expect(page.locator('.desktop-metric:first-child > strong')).toHaveText('25%');
@@ -373,6 +373,7 @@ try {
       await readFile(path.join(output, 'project.pmcanvas')),
       '/sdcard/Download/PMCanvas-Native-Smoke.pmcanvas',
     );
+    await openView(page, 'more');
     await page.getByRole('button', { name: '프로젝트 가져오기', exact: true }).click();
     await waitForNative('06-picker-initial', /documentsui/i);
     await screenshot('06-picker-initial', { webView: false });
@@ -384,7 +385,7 @@ try {
     const importedId = page.url().split('/').at(-1);
     assert.notEqual(importedId, projectId, 'Import must create a copy.');
     await screenshot('07-imported');
-    await page.getByRole('link', { name: '프로젝트 목록', exact: true }).click();
+    await page.locator('#projectListLink').click();
     await expect(page.locator('.project-card').filter({ hasText: name })).toHaveCount(2);
   });
   await step('delete task, member and imported project without changing the original', async () => {
@@ -396,12 +397,13 @@ try {
     await expect(page.locator('#editor')).toBeVisible();
     await page.locator('#deleteItem').click();
     await page.locator('#confirmation').getByRole('button', { name: '삭제', exact: true }).click();
-    await expect(page.locator('.check-panel')).toHaveCount(0);
-    await openView(page, 'more');
+    await expect(page.locator('.desktop-table tbody tr')).toHaveCount(0);
+    await openView(page, 'people');
     await page.locator('[data-edit-member]').click();
     await page.locator('#deleteItem').click();
     await page.locator('#confirmation').getByRole('button', { name: '삭제', exact: true }).click();
     await expect(page.locator('.member-card')).toHaveCount(0);
+    await openView(page, 'more');
     await page.getByRole('button', { name: '이 프로젝트 삭제', exact: true }).click();
     await page.locator('#confirmation').getByRole('button', { name: '삭제', exact: true }).click();
     await expect(page.locator('.project-card').filter({ hasText: name })).toHaveCount(1);
