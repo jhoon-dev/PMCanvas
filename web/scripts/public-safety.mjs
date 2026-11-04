@@ -40,6 +40,7 @@ const documentationHosts = new Set([
   'policies.google.com',
   'calendar.google.com',
   'support.google.com',
+  'firebase.google.com',
   'www.mpm.go.kr',
   'www.kasa.go.kr',
   'astro.kasi.re.kr',
