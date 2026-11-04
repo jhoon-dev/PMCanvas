@@ -1,0 +1,33 @@
+PM Canvas | macOS 0.8.3 (60)
+Bundle ID: app.toolmoa.pmcanvas | Apple ID: 6829387538
+
+1. Physical-Mac demonstration and quality assurance
+PREPARATION STATUS: Physical-Mac QA/recording are pending; complete this draft before App Review submission. This proactively covers the previous iOS information request; it does not assert a separate Mac video request from Apple.
+Mac model / chip / exact macOS / test date: [PENDING]
+Tested app version/build: 0.8.3 (60) [VERIFY ON DEVICE]
+Recording URL: [PENDING]
+Actual QA results, including any failures: [PENDING]
+The recording will show launch, tasks/progress, folder authorization, saving/reopening and file/report operations. CI signing/upload is not physical-Mac sandbox QA.
+
+2. Purpose and intended audience
+PM Canvas is an offline project planner for individuals, students, freelancers and small-project users. It organizes participants, tasks, dates, estimated hours and completion, with hours-weighted progress, WBS/baseline comparison and reports. It is for general users, not one organization's staff/customers. No account/enrollment is required.
+
+3. Setup and main-feature instructions
+No login, credentials, subscription, server installation or external sample file is required. Korean and English UI are supported.
+a) Launch; choose New Project (새 프로젝트), create "Review Project" and add "Alex" in Participants (참여인력).
+b) In Tasks/Schedule (업무 · 일정), add "Prepare outline" and "Review outline", each with one 1-hour checklist item and dates covering the test day.
+c) In Completion Check (완료 체크), complete the first item today. Overview (현황) shows 50%. Edit a task; try project Undo/Redo.
+d) Save Review Project.pmcanvas in a test folder. At the sandbox PARENT FOLDER prompt, select that same folder. Cancel/wrong folder must not save. This enables atomic safe saves and persistent security-scoped bookmarks.
+e) Quit/relaunch, reopen the saved file and check tasks/progress. Save As makes a separate copy.
+f) File Options (파일 옵션) offers open/save, web JSON I/O, Excel template/export and Excel import. Reports (보고서) exports XLSX/CSV. Use the app-generated template to test Excel import; no separate dataset or Excel installation is required.
+File Options/native File menu offer the privacy policy. Project UI offers WBS/baseline and schedule tools. Files transfer manually to/from mobile; no automatic sync or real-time collaboration.
+
+4. External services, tools and user content
+The Mac app uses bundled Electron/HTML/JavaScript, local project files, local recovery/preferences and an isolated local helper for Excel processing. No developer backend, remote data provider, authentication, payment processor, AI, ads or analytics is required for core functions. The Mac App Store build opens Apple's update UI and does not download GitHub installers. Optional support/privacy links open GitHub in a browser. User-chosen cloud/network storage is optional.
+User project/task content stays in local files; there is no public feed, messaging or hosted content distribution. Other-user reporting/blocking is not applicable. There are no accounts, paid features or in-app purchases; registration/login/account deletion are not applicable.
+
+5. Regional differences
+Core features/content are consistent across offered regions. Korean/English UI is available; the configurable business time zone defaults to Asia/Seoul.
+
+6. Regulated services and protected material
+This general productivity app does not provide regulated financial, medical or gambling services or distribute protected third-party media. No industry license is required for its described functions.

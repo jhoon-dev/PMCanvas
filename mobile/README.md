@@ -23,6 +23,10 @@ iPhone과 Android에서 사용하는 오프라인 프로젝트 관리 앱입니�
 
 프로젝트 관리 기능·파일 형식·계산은 웹·데스크톱과 공통입니다. 로그인·팀 공유·서버 동기화·관리자 기능은 웹에서 제공합니다. 모바일 화면은 한국어이며 알림과 위젯은 포함하지 않습니다.
 
+모바일 입력은 업무명만으로 시작할 수 있습니다. 새 업무의 세부 작업을 하나만 둔 채 비우면 업무명을 체크 항목으로 사용하며, 기본 예상 시간은 4시간입니다. 담당자·일정과 추가 설정은 펼쳐서 변경합니다. 프로젝트 휴무일과 새 참여인력의 근무 설정도 필요할 때 펼칩니다. 저장·취소 버튼은 폼과 별도로 표시하고, 미저장 입력을 닫거나 Android 뒤로 가기를 누르면 버릴지 확인합니다.
+
+완료 체크는 완료한 항목도 기본으로 유지해 바로 취소할 수 있고, 전체 완료 수·진척률과 8초간 되돌리기를 제공합니다. 검색·담당자 필터를 한 번에 초기화할 수 있으며 탭을 오가면 이전 스크롤 위치를 복원합니다. 이 동작과 레이아웃은 iPhone·iPad·Android에서 같은 코드를 사용합니다.
+
 ## 개발
 
 Node.js 22.18 이상을 사용합니다. 제품 폴더에서 의존성을 설치합니다.
@@ -94,13 +98,31 @@ npm run test:ios
 
 CI는 브라우저 검증과 개발용 Android APK 빌드, Mac에서 iPhone 시뮬레이터의 XCTest 실행 및 서명 전 기기용 아카이브를 수행합니다. iPhone 테스트는 앱 실행, 개인정보처리방침, 프로젝트 생성, 앱 종료·재실행 후 저장 복원을 확인하며 자신이 만든 시뮬레이터만 정리합니다. `PMCanvas-iPhone-verification-NOT-for-submission` 아티팩트에 시뮬레이터 앱·서명 전 기기 아카이브·XCTest 결과를 ZIP으로 보존합니다. 이 파일은 서명된 IPA나 Store 제출본이 아닙니다. Store 배포 전 실제 iPhone과 Android에서 파일 선택·공유·키보드·백그라운드 복귀·업그레이드 후 데이터 보존을 추가로 확인하세요.
 
-아이콘 원본은 데스크톱과 동일한 `../desktop/build/icon.ico`입니다. Chromium 설치 후 `npm run prepare:icons`를 실행하면 iPhone·Android의 실행 아이콘과 시작 화면, 앱 내부 로고, 웹 파비콘을 같은 원본으로 갱신합니다. 생성된 PNG는 소스 관리하며 일반 앱 빌드에는 브라우저 도구가 필요하지 않습니다.
+아이콘 원본은 `../desktop/build/icon-source.png`이며 공통 배경은 `icon-settings.json`의 `#2c2e3a`입니다. Chromium 설치 후 `npm run prepare:icons`를 실행하면 Windows ICO·Mac·iPhone·Android 실행 아이콘과 시작 화면, 앱 내부 로고, 웹 파비콘을 같은 불투명 원본으로 갱신합니다. Mac·iPhone의 1024px 파일은 바이트까지 같으며 Android 적응형 배경과 Windows Store 타일도 같은 색을 사용합니다. `npm run verify:icons`는 실제 이미지의 투명도·배경색·크기와 플랫폼 설정을 검사합니다. 생성된 PNG는 소스 관리하며 일반 앱 빌드에는 브라우저 도구가 필요하지 않습니다.
 
-2026-10-30 Windows에서 모델·저장소 테스트 8개, Android Chromium·iPhone WebKit 시나리오 8개, 포맷·공개 파일·의존성 검사와 개발용 Android APK 빌드를 통과했습니다. 생성한 APK의 앱 ID·서명과 최신 화면 번들 일치도 확인했습니다. 2026-10-31 [Mac CI의 iPhone 네이티브 검증](https://github.com/jhoon-dev/PMCanvas/actions/runs/41157141725)에서 실제 시뮬레이터의 개인정보처리방침·프로젝트 생성·종료 후 복원 테스트와 기기용 아카이브 빌드를 통과했습니다. 양쪽 플랫폼의 실제 기기 동작과 Store 서명·업로드는 아직 검증하지 않았습니다.
+2026-10-30 Windows에서 모델·저장소 테스트 8개, Android Chromium·iPhone WebKit 시나리오 8개, 포맷·공개 파일·의존성 검사와 개발용 Android APK 빌드를 통과했습니다. 생성한 APK의 앱 ID·서명과 최신 화면 번들 일치도 확인했습니다. 2026-10-31 [Mac CI의 iPhone 네이티브 검증](https://github.com/jhoon-dev/PMCanvas/actions/runs/41157141725)에서 실제 시뮬레이터의 개인정보처리방침·프로젝트 생성·종료 후 복원 테스트와 기기용 아카이브 빌드를 통과했습니다. 당시 검증에는 실제 기기와 Store 서명·업로드가 포함되지 않았습니다.
 
-출시 식별자는 macOS·iOS·Android 모두 `app.toolmoa.pmcanvas`입니다. 2026-11-01 [새 PM Canvas 앱 레코드](https://appstoreconnect.apple.com/apps/6829387538/distribution/info)(Apple ID `6829387538`, SKU `PMCanvas-ToolMoa`)를 iOS·macOS 공통으로 등록했습니다. 이전 앱의 iOS·macOS 심사 제출을 취소하고 앱 레코드를 삭제했으며 새 레코드만 출시 대상으로 사용합니다. 새 식별자의 빌드 업로드·심사 제출·게시는 아직 진행하지 않았습니다. 업로드 전 새 App ID에 맞는 서명·프로비저닝 프로파일을 준비합니다.
+출시 식별자는 macOS·iOS·Android 모두 `app.toolmoa.pmcanvas`입니다. 2026-11-01 [새 PM Canvas 앱 레코드](https://appstoreconnect.apple.com/apps/6829387538/distribution/info)(Apple ID `6829387538`, SKU `PMCanvas-ToolMoa`)를 iOS·macOS 공통으로 등록했습니다. 이전 앱의 iOS·macOS 심사 제출을 취소하고 앱 레코드를 삭제했으며 새 레코드만 출시 대상으로 사용합니다. 새 App ID용 iOS 배포 프로파일을 기존 배포 환경에 등록했습니다. [iPhone·iPad 네이티브 스크린샷 검증](https://github.com/jhoon-dev/PMCanvas/actions/runs/41293586331)과 [모바일 네이티브 검증](https://github.com/jhoon-dev/PMCanvas/actions/runs/41293586282)이 통과했으며, 필수 검사를 통과한 PR #32를 병합한 뒤 [main의 iOS 서명·업로드 워크플로](https://github.com/jhoon-dev/PMCanvas/actions/runs/41296552107)에서 iPhone·iPad 검증과 **0.1.0 (20.1)** 서명·Apple 검증·업로드가 모두 성공했습니다. 소스 커밋은 `fb3e1a8f132bb0048b66b64e0fa90521e34b818c`, IPA SHA-256은 `7821ddfca54edc45a5152804eebe96ae2ccb7889b8fca677e6b29d951bfca120`입니다. Apple 처리도 완료했습니다. App Review 제출·공개 출시는 아직 완료하지 않았습니다.
 
 10월 30~31일의 네이티브 검증은 변경 전 식별자로 실행한 기록입니다. 과거 결과 JSON과 APK 해시는 그대로 보존하며 새 식별자의 네이티브 검증 결과로 간주하지 않습니다.
+
+## iOS App Store 제출용 빌드
+
+`iOS App Store` 워크플로우는 Dynamic Island 지원 iPhone 중형 디스플레이와 iPad 13인치 시뮬레이터에서 실제 UI로 프로젝트·참여인력·업무를 만들고, 완료 체크와 재실행 복원을 확인한 뒤 스크린샷 4장씩을 생성합니다. [Apple의 현재 필수 스크린샷 규격](https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications/)에 맞춰 원본 화면을 리사이즈하거나 합성하지 않고 투명도 없는 JPEG로 인코딩합니다.
+
+검증한 변경을 main에 반영한 후 `gh workflow run ios-app-store.yml --ref main -f upload=true`로 제출용 빌드를 실행합니다. main 전용 `desktop-mac-store` 환경의 기존 Apple Distribution 인증서·업로드 키와 `IOS_PROVISION_PROFILE_BASE64`를 사용합니다. 별도 인증서나 더 높은 API 권한을 만들지 않습니다. API 키의 Developer 권한으로 프로파일 생성이 허용되지 않으면 Account Holder/Admin이 개발자 사이트에서 생성하고 기존 배포 환경에 등록합니다.
+
+서명은 임시 키체인을 사용하며 앱 Release 타깃에만 적용하고 프로젝트 파일을 복원합니다. IPA의 앱 ID·버전·빌드 번호·프로파일·인타이틀먼트·서명 인증서·개인정보 매니페스트·서명 무결성을 확인한 뒤 Apple 검증·업로드를 수행합니다. `PMCanvas-iOS-App-Store-submission` 아티팩트에는 IPA, SHA-256과 소스 커밋을 포함한 매니페스트, 업로드 결과를 보존합니다. 빌드 번호는 실행 번호와 재실행 차수를 결합해 중복을 방지합니다.
+
+업로드는 App Review 제출이나 출시를 수행하지 않습니다. Apple의 빌드 처리가 끝난 뒤 App Store Connect에서 iOS 빌드, 스크린샷, 심사 정보를 연결하고 심사에 제출합니다. `PMCanvas-iPhone-verification-NOT-for-submission` 아티팩트는 계속 서명 전 검증용으로만 사용합니다.
+
+2026-11-01 새 iOS 버전에 한국어 소개, 실제 iPhone·iPad 스크린샷 각 4장과 기존 PM Canvas 앱의 심사 연락처를 저장했습니다. 새 앱 레코드에는 이전 심사 연락처가 자동 복사되지 않으므로 플랫폼별 저장을 확인했습니다. 연락처 원문은 저장소에 기록하지 않습니다. 공통 가격은 무료, 배포 지역은 175개, 연령 등급은 4+, 개인정보 표시는 데이터 수집 없음입니다.
+
+내부 TestFlight 그룹 **PM Canvas Release QA**에 iOS **0.1.0 (20.1)**과 Mac **0.8.3 (60)**을 연결하고 두 빌드가 **테스트 중**인 것을 확인했습니다. 계정 소유자 본인이 내부 테스터로 초대되어 있습니다. 초대를 받은 Apple 계정으로 각 기기의 TestFlight에서 초대를 수락하고 PM Canvas를 설치합니다. iOS 빌드는 iPhone·iPad 공통입니다. 이전 번들 ID 앱과 별도 앱이므로 기존 프로젝트를 먼저 내보내고 새 앱에서 가져옵니다. 기존 앱을 제거하거나 데이터를 지울 필요가 없습니다.
+
+2026-11-02 두 빌드가 내부 그룹에서 **테스트 중**이며 본인 테스터는 **초대됨**인 것을 다시 확인했습니다. 플랫폼별 TestFlight 테스트 안내와 이전 Guideline 2.1 여섯 항목을 반영한 iOS·Mac 심사 메모 초안을 저장하고, iOS 버전에 빌드 **20.1**을 연결했습니다. 실제 기기·OS·QA 결과·영상 링크는 대기 중이며 App Review에 제출하지 않았습니다. [새 ID 심사 준비 자료](../docs/app-store-review/README.md)와 [촬영 순서](../docs/app-store-review/recording-guide.ko.md)를 사용합니다.
+
+이전 iOS 제출의 [Apple 심사 메시지](https://appstoreconnect.apple.com/apps/6829098378/distribution/reviewsubmissions/details/ddf53bd8-9324-4ea0-b156-30d073010817)는 Guideline 2.1에 따라 **최신 OS를 실행하는 실제 기기에서 앱 실행부터 일반 사용 흐름까지 보여주는 화면 녹화**와 지원 플랫폼의 실기기 QA를 요청했습니다. 새 앱 레코드에서도 이 요청을 해결한 뒤 재제출합니다. 시뮬레이터 스크린샷·네이티브 테스트 성공을 실기기 녹화나 QA로 표시하지 않습니다. 기기·OS·빌드 정보, 실제 녹화 링크, 생성·편집·완료 체크·재실행 복원·파일 내보내기와 가져오기 결과를 확인해 심사 메모에 추가합니다. 앱 목적·대상 사용자·기능 접근 방법·외부 서비스·지역별 동일 동작 설명은 새 심사 메모에 작성했습니다.
 
 2026-10-31에는 부팅 설정을 조정한 Android 15 에뮬레이터에서 실제 APK의 전체 12단계 검증을 통과했습니다. 저장 직후와 완료 기록 변경 후의 강제 종료·복원, 편집·진척률·오프라인 실행 취소·뒤로 가기, 네이티브 공유·파일 선택·가져오기·삭제를 확인했습니다. [결과와 환경 설정](docs/validation/android-emulator-2026-10-31.md)을 참고하세요.
 

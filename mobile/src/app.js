@@ -46,13 +46,15 @@ let records = [],
   busy = false;
 let query = '',
   owner = '',
-  onlyOpen = true,
+  onlyOpen = false,
   completionDate = today(),
   lastDay = today();
 let undo = [],
   redo = [],
   toastTimer,
-  returnFocus = null;
+  returnFocus = null,
+  initialEditorFields = '';
+const scrollPositions = new Map();
 const mobileViews = projectNavigation('mobile').flatMap((group) => group.views);
 const titles = Object.fromEntries(mobileViews.map((id) => [id, PROJECT_SCREENS[id].title]));
 const tabs = ['overview', 'tasks', 'daily', 'people', 'reports', 'more'].map((id) => [
@@ -78,13 +80,17 @@ const projectTools = new ProjectTools({
   },
 });
 
-function toast(message) {
-  $('#toast').textContent = message;
+function toast(message, canUndo = false) {
+  $('#toastText').textContent = message;
+  $('#toastUndo').hidden = !canUndo;
   $('#toast').hidden = false;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => {
-    $('#toast').hidden = true;
-  }, 5000);
+  toastTimer = setTimeout(
+    () => {
+      $('#toast').hidden = true;
+    },
+    canUndo ? 8000 : 5000,
+  );
 }
 function errorText(error) {
   return error?.message || '작업하지 못했습니다. 다시 시도해 주세요.';
@@ -178,7 +184,11 @@ function projectList() {
 }
 function overview(p) {
   const s = summary(p, projectTools.at);
+  if (!p.tasks.length) {
+    return `<section class="setup-card"><span class="eyebrow">프로젝트 시작하기</span><h2>첫 업무만 적으면 시작할 수 있어요</h2><p>담당자와 세부 일정은 나중에 정해도 됩니다.</p>${button('＋ 업무 추가', 'add-task', 'primary')}<div class="setup-step"><span>1</span><div><strong>해야 할 업무를 적으세요</strong><p>업무명만 입력해도 저장할 수 있습니다.</p></div></div><div class="setup-step"><span>2</span><div><strong>완료한 작업을 체크하세요</strong><p>완료 체크에서 진척률을 기록합니다.</p></div></div><div class="setup-step"><span>3</span><div><strong>필요할 때 담당자를 추가하세요</strong><p>혼자 사용한다면 미지정으로 두어도 됩니다.</p></div></div>${button('참여인력 추가', 'add-member', 'ghost')}</section>`;
+  }
   return `<section class="hero"><span class="eyebrow">PROJECT PULSE</span><div class="hero-progress"><strong>${pct(s.progress)}</strong><span>전체 진척률</span></div>${meter(s.progress)}<div class="hero-foot"><span>계획 ${pct(s.planned)}</span><span>${num(s.done)} / ${num(s.total)}h 완료</span></div></section>
+    <div class="quick-actions">${button('＋ 업무 추가', 'add-task', 'primary')}<a class="button" href="#daily/${esc(p.id)}">${icon('check')}완료 기록</a></div>
     <div class="metric-grid"><article><span>완료 업무</span><strong>${s.completed}<small> / ${taskLeaves(p).length}</small></strong></article><article><span>지연 업무</span><strong class="${s.overdue ? 'late-text' : ''}">${s.overdue}<small>건</small></strong></article></div>
     <section class="forecast-card">${icon('calendar')}<div><span>예상 완료일</span><strong>${s.forecast.end || '업무를 등록해 주세요'}</strong><small>보고 기준일 업무 종료 기준 · ${s.forecast.observed ? '최근 완료 속도를 반영했습니다.' : '현재 계획과 공수를 기준으로 계산합니다.'}</small></div></section>
     ${projectTools.visuals(p)}<div class="section-heading"><h2>다가오는 업무</h2><a href="#tasks/${esc(p.id)}">모두 보기 →</a></div>
@@ -200,10 +210,11 @@ function overview(p) {
     }`;
 }
 function filters(p) {
-  return `<div class="filters"><label class="search-box">${icon('layers')}<input id="search" type="search" placeholder="업무 검색" aria-label="업무 검색" value="${esc(query)}"></label><select id="owner" aria-label="담당자 필터"><option value="">전체 담당자</option>${p.members.map((m) => `<option value="${esc(m.id)}" ${owner === m.id ? 'selected' : ''}>${esc(m.name)}</option>`).join('')}</select></div>`;
+  return `<div class="filters"><label class="search-box">${icon('layers')}<input id="search" type="search" placeholder="업무 검색" aria-label="업무 검색" value="${esc(query)}"></label><select id="owner" aria-label="담당자 필터"><option value="">전체 담당자</option>${p.members.map((m) => `<option value="${esc(m.id)}" ${owner === m.id ? 'selected' : ''}>${esc(m.name)}</option>`).join('')}</select></div><div id="filterStatus" class="filter-status" ${query || owner ? '' : 'hidden'}><span>${filtered(p).length}개 업무</span>${button('필터 초기화', 'clear-filters', 'ghost')}</div>`;
 }
 function tasks(p, daily) {
-  return `${daily ? `<div class="notice">완료한 세부 작업을 체크하면 진척률이 바뀝니다.</div><div class="daily-options"><label>완료일<input type="date" id="completionDate" aria-label="완료일" value="${esc(completionDate)}" max="${today()}" required></label><label class="switch-label"><input id="onlyOpen" type="checkbox" ${onlyOpen ? 'checked' : ''}>할 일만</label></div>` : `<div class="section-heading"><p>전체 업무 ${p.tasks.length}개</p>${button('＋ 업무 추가', 'add-task', 'primary')}</div>`}${filters(p)}<div id="taskList" class="task-list">${taskList(p, daily)}</div>`;
+  const items = p.tasks.flatMap((task) => task.items);
+  return `${daily ? `<div class="completion-summary"><div><strong>${items.filter((item) => item.doneDate).length}<span> / ${items.length}개 완료</span></strong><p>체크를 다시 누르면 완료를 취소합니다.</p></div><strong>${pct(summary(p, today()).progress)}</strong></div><div class="daily-options"><label>완료일<input type="date" id="completionDate" aria-label="완료일" value="${esc(completionDate)}" max="${today()}" required></label><label class="switch-label"><input id="onlyOpen" type="checkbox" ${onlyOpen ? 'checked' : ''}>할 일만</label></div>` : `<div class="section-heading"><p>전체 업무 ${p.tasks.length}개</p>${button('＋ 업무 추가', 'add-task', 'primary')}</div>`}${filters(p)}<div id="taskList" class="task-list">${taskList(p, daily)}</div>`;
 }
 function taskList(p, daily) {
   const tasks = filtered(p).filter(
@@ -251,6 +262,7 @@ function render() {
   const p = record?.project;
   document.title =
     p && view !== 'projects' ? p.name + ' · ' + titles[view] + ' — PM Canvas' : 'PM Canvas';
+  document.body.classList.toggle('in-project', Boolean(p && view !== 'projects'));
   $('#navigation').hidden = !p || view === 'projects';
   $('#navigation').innerHTML = p
     ? tabs
@@ -289,12 +301,14 @@ async function route() {
     if (picker) picker.value = view;
     return;
   }
+  scrollPositions.set(`${view}/${record?.id || ''}`, window.scrollY);
   records = await store.list();
   const next = records.find((entry) => entry.id === id);
   if (next && Object.hasOwn(titles, requested)) {
     const changed = record?.id !== next.id || record?.revision !== next.revision;
     record = { ...next, project: normalizeProject(next.project) };
     if (changed) {
+      $('#toast').hidden = true;
       undo = [];
       redo = [];
       query = '';
@@ -304,6 +318,7 @@ async function route() {
     completionDate = projectTools.at;
     view = requested;
   } else {
+    $('#toast').hidden = true;
     view = 'projects';
     record = null;
     undo = [];
@@ -311,7 +326,7 @@ async function route() {
   }
   render();
   $('#content').focus({ preventScroll: true });
-  window.scrollTo(0, 0);
+  window.scrollTo(0, scrollPositions.get(`${view}/${record?.id || ''}`) || 0);
 }
 function navigate(next, id = record?.id) {
   location.hash = next + (id ? '/' + id : '');
@@ -347,11 +362,75 @@ function openEditor(type, id = '') {
   const form = editorForm(type, record?.project || { members: [], tasks: [] }, id, { uid });
   $('#editorTitle').textContent = form.title;
   $('#editorBody').innerHTML = form.body;
+  simplifyEditor(type, id);
   $('#formError').textContent = '';
   $('#deleteItem').hidden = !id || !['task', 'member'].includes(type);
   $('#editor').showModal();
+  $('#editorBody').scrollTop = 0;
+  initialEditorFields = editorFields();
   // Native WebViews respect the user's keyboard gesture on the triggering click.
   $('#editorBody').querySelector('input,textarea,select')?.focus();
+}
+function editorFields() {
+  return JSON.stringify([
+    [...new FormData($('#editorForm')).entries()],
+    [...$('#editorBody').querySelectorAll('.item-editor')].map((row) => [
+      row.dataset.itemId,
+      row.dataset.doneDate,
+    ]),
+  ]);
+}
+function groupEditorFields(label, nodes, open = false) {
+  const details = document.createElement('details');
+  details.className = 'task-details';
+  details.open = open;
+  const summary = document.createElement('summary');
+  summary.textContent = label;
+  details.append(summary);
+  nodes[0].before(details);
+  details.append(...nodes);
+  return details;
+}
+function simplifyEditor(type, id) {
+  const body = $('#editorBody');
+  if (type === 'project' || type === 'settings') {
+    groupEditorFields(
+      '휴무일 설정 (선택)',
+      [body.querySelector('[name="holidays"]').closest('label')],
+      type === 'settings',
+    );
+  } else if (type === 'member') {
+    groupEditorFields('역할 · 근무 설정', [...body.children].slice(1), Boolean(id));
+  } else if (type === 'task') {
+    const ownerField = body.querySelector('[name="owner"]').closest('label');
+    const dates = body.querySelector('[name="start"]').closest('.form-grid');
+    const schedule = groupEditorFields('담당자 · 일정', [ownerField, dates], Boolean(id));
+    const scheduleHint = document.createElement('small');
+    const ownerSelect = ownerField.querySelector('select');
+    scheduleHint.textContent = `${ownerSelect.selectedOptions[0].textContent} · ${dates.querySelector('[name="start"]').value.slice(5)} – ${dates.querySelector('[name="end"]').value.slice(5)}`;
+    schedule.querySelector('summary').append(scheduleHint);
+    const firstTitle = body.querySelector('[name="itemTitle"]');
+    if (!id) {
+      firstTitle.required = false;
+      firstTitle.placeholder = '비우면 업무명을 사용합니다';
+      body.querySelector('.items-title strong').textContent = '세부 작업 (선택)';
+      body.querySelector('.form-hint').textContent =
+        '세부 작업은 선택입니다. 비우면 업무명으로 체크 항목을 만듭니다. 예상 시간은 진척률 계산에 사용됩니다.';
+    }
+  }
+}
+async function requestCloseEditor() {
+  if (busy || !editing || $('#confirmation').open) return;
+  if (
+    editorFields() !== initialEditorFields &&
+    !(await confirmAction(
+      '저장하지 않은 입력이 있습니다. 계속 작성하거나 변경사항을 버릴 수 있습니다.',
+      '변경사항을 버릴까요?',
+      '버리기',
+    ))
+  )
+    return;
+  closeEditor();
 }
 function closeEditor() {
   editing = null;
@@ -362,11 +441,36 @@ $('#editor').addEventListener('close', () => {
   if (returnFocus?.isConnected) returnFocus.focus();
 });
 $('#editor').addEventListener('cancel', (event) => {
-  if (busy) event.preventDefault();
+  event.preventDefault();
+  requestCloseEditor();
 });
 $('#closeEditor').onclick = $('#cancelEditor').onclick = () => {
-  if (!busy) closeEditor();
+  requestCloseEditor();
 };
+$('#editorForm').addEventListener(
+  'invalid',
+  (event) => {
+    for (
+      let parent = event.target.parentElement;
+      parent && parent !== $('#editorBody');
+      parent = parent.parentElement
+    ) {
+      if (parent.tagName === 'DETAILS') parent.open = true;
+    }
+  },
+  true,
+);
+function updateEditorViewport() {
+  const viewport = window.visualViewport;
+  if (!viewport) return;
+  document.documentElement.style.setProperty('--editor-viewport-height', `${viewport.height}px`);
+  document.documentElement.style.setProperty(
+    '--editor-bottom',
+    `${Math.max(0, innerHeight - viewport.height - viewport.offsetTop)}px`,
+  );
+}
+window.visualViewport?.addEventListener('resize', updateEditorViewport);
+updateEditorViewport();
 if (Capacitor.getPlatform() === 'android') {
   // Keep the IME open until the button action. Blurring on pointer-down can
   // resize the dialog before pointer-up and swallow Save, Delete or Cancel.
@@ -389,6 +493,10 @@ $('#editorBody').addEventListener('click', (event) => {
     $('#itemEditors').lastElementChild.querySelector('input').focus();
   }
   event.target.closest('.remove-item')?.closest('.item-editor').remove();
+  const itemTitles = [...$('#editorBody').querySelectorAll('[name="itemTitle"]')];
+  itemTitles.forEach((input) => {
+    input.required = Boolean(editing?.id || itemTitles.length > 1);
+  });
 });
 $('#editorForm').addEventListener('submit', (event) => {
   event.preventDefault();
@@ -424,6 +532,9 @@ $('#editorForm').addEventListener('submit', (event) => {
         hours: Number(row.querySelector('[name="itemHours"]').value),
         doneDate: row.dataset.doneDate || null,
       }));
+      if (editing.type === 'task' && !editing.id && items.length === 1 && !items[0].title) {
+        items[0].title = new FormData(event.target).get('name').trim();
+      }
       const result = applyEditor(
         record?.project || {},
         editing,
@@ -440,10 +551,10 @@ $('#editorForm').addEventListener('submit', (event) => {
     }
   });
 });
-async function confirmDelete(message, { title = '삭제할까요?', action = '삭제' } = {}) {
-  $('#confirmTitle').textContent = title;
-  $('#confirmation button[value="delete"]').textContent = action;
+async function confirmAction(message, title = '삭제할까요?', label = '삭제') {
   $('#confirmText').textContent = message;
+  $('#confirmTitle').textContent = title;
+  $('#confirmAccept').textContent = label;
   $('#confirmation').returnValue = 'cancel';
   $('#confirmation').showModal();
   return new Promise((resolve) =>
@@ -454,6 +565,8 @@ async function confirmDelete(message, { title = '삭제할까요?', action = '�
     ),
   );
 }
+const confirmDelete = (message, { title = '삭제할까요?', action = '삭제' } = {}) =>
+  confirmAction(message, title, action);
 $('#deleteItem').onclick = async () => {
   if (!editing || busy) return;
   if (
@@ -504,6 +617,12 @@ document.addEventListener('click', (event) => {
   if (action === 'add-member' || action === 'edit-member')
     return openEditor('member', target.dataset.id);
   if (action === 'settings') return openEditor('settings');
+  if (action === 'clear-filters') {
+    query = '';
+    owner = '';
+    render();
+    return;
+  }
   if (action === 'timezone') {
     returnFocus = target;
     editing = { type: 'timezone' };
@@ -513,6 +632,7 @@ document.addEventListener('click', (event) => {
     $('#formError').textContent = '';
     $('#deleteItem').hidden = true;
     $('#editor').showModal();
+    initialEditorFields = editorFields();
     return;
   }
   if (action === 'delete-project') {
@@ -538,6 +658,7 @@ document.addEventListener('click', (event) => {
       destination.push(previous);
       trimHistory(destination);
       render();
+      toast(action === 'undo' ? '변경사항을 되돌렸습니다.' : '변경사항을 다시 적용했습니다.');
     } else if (action === 'export') {
       await shareFile(record.project.name + '.pmcanvas', serializeProject(record.project));
     } else if (action === 'csv') {
@@ -551,12 +672,16 @@ document.addEventListener('input', (event) => {
   if (event.target.id !== 'search') return;
   query = event.target.value;
   $('#taskList').innerHTML = taskList(record.project, view === 'daily');
+  $('#filterStatus').hidden = !query && !owner;
+  $('#filterStatus span').textContent = `${filtered(record.project).length}개 업무`;
 });
 document.addEventListener('change', (event) => {
   const element = event.target;
   if (element.id === 'owner') {
     owner = element.value;
     $('#taskList').innerHTML = taskList(record.project, view === 'daily');
+    $('#filterStatus').hidden = !query && !owner;
+    $('#filterStatus span').textContent = `${filtered(record.project).length}개 업무`;
   }
   if (element.id === 'onlyOpen') {
     onlyOpen = element.checked;
@@ -581,6 +706,7 @@ document.addEventListener('change', (event) => {
         await save(
           toggleItem(record.project, element.dataset.task, element.dataset.item, completionDate),
         );
+        toast(element.checked ? '완료를 기록했습니다.' : '완료를 취소했습니다.', true);
       } catch (error) {
         element.checked = !element.checked;
         throw error;
@@ -637,7 +763,7 @@ if (Capacitor.isNativePlatform()) {
     if (busy) return;
     if ($('#privacyDialog').open) return $('#privacyDialog').close();
     if ($('#confirmation').open) return $('#confirmation').close('cancel');
-    if ($('#editor').open) return closeEditor();
+    if ($('#editor').open) return requestCloseEditor();
     if (view !== 'projects') navigate('projects', '');
     else App.minimizeApp();
   }).catch((error) => toast(errorText(error)));

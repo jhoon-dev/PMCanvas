@@ -12,7 +12,7 @@
   },
   "scripts": {
     "prepare:app": "node scripts/prepare.mjs",
-    "prepare:icons": "electron scripts/prepare-icons.cjs",
+    "prepare:icons": "node scripts/prepare-icons.cjs",
     "signing:setup": "node scripts/setup-mac-signing.mjs",
     "start": "npm run prepare:app && electron .",
     "test": "node --test test/*.test.mjs",

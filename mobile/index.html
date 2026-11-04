@@ -63,7 +63,7 @@
         <p id="confirmText"></p>
         <div class="dialog-actions">
           <button class="button" value="cancel" autofocus>취소</button
-          ><button class="button danger" value="delete">삭제</button>
+          ><button id="confirmAccept" class="button danger" value="delete">삭제</button>
         </div>
       </form>
     </dialog>
@@ -73,6 +73,9 @@
       accept=".pmcanvas,.json,application/json,application/octet-stream"
       hidden
     />
-    <div id="toast" role="status" hidden></div>
+    <div id="toast" role="status" hidden>
+      <span id="toastText"></span
+      ><button id="toastUndo" class="toast-undo" data-action="undo" hidden>되돌리기</button>
+    </div>
   </body>
 </html>

@@ -1,0 +1,13 @@
+platform,device_model,chip,exact_os,app_version,build,test_date_kst,test_scope,expected_result,actual_result,status,recording_file_or_url
+iPhone,,,,0.1.0,20.1,,launch-create-edit-complete,Two equal-hours tasks and one completion give 50 percent,,NOT_TESTED,
+iPhone,,,,0.1.0,20.1,,export-import-relaunch,Native export and new imported copy; original progress survives relaunch,,NOT_TESTED,
+iPhone,,,,0.1.0,20.1,,keyboard-offline-background-unsaved,Input accessible; offline changes persist; unsaved input protected,,NOT_TESTED,
+iPad,,,,0.1.0,20.1,,launch-create-edit-complete,Two equal-hours tasks and one completion give 50 percent,,NOT_TESTED,
+iPad,,,,0.1.0,20.1,,export-import-relaunch,Native export and new imported copy; original progress survives relaunch,,NOT_TESTED,
+iPad,,,,0.1.0,20.1,,keyboard-offline-background-unsaved,Input accessible; offline changes persist; unsaved input protected,,NOT_TESTED,
+macOS,,,,0.8.3,60,,launch-create-edit-complete,Two equal-hours tasks and one completion give 50 percent,,NOT_TESTED,
+macOS,,,,0.8.3,60,,save-folder-cancel-wrong-folder,Only selected target parent folder permits save,,NOT_TESTED,
+macOS,,,,0.8.3,60,,save-as-quit-reopen,Saved tasks and completion survive normal quit and relaunch,,NOT_TESTED,
+macOS,,,,0.8.3,60,,excel-csv-json,Local reports and template import work,,NOT_TESTED,
+macOS,,,,0.8.3,60,,recovery-external-change,Unsaved recovery and external overwrite protection work,,NOT_TESTED,
+macOS,,,,0.8.3,60,,wbs-baseline-language-privacy-updates,WBS and baseline work; Korean and English; policy and Store update UI accessible,,NOT_TESTED,

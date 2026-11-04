@@ -1,0 +1,47 @@
+{
+  "checkedDateKst": "2026-11-02",
+  "appName": "PM Canvas",
+  "bundleId": "app.toolmoa.pmcanvas",
+  "appleId": "6829387538",
+  "internalGroup": "PM Canvas Release QA",
+  "internalGroupId": "5f4e0774-5b45-458f-b238-8bdda76ddea7",
+  "testerCount": 1,
+  "testerState": "INVITED",
+  "installationAndSessionMetrics": "NOT_DISPLAYED",
+  "ios": {
+    "version": "0.1.0",
+    "build": "20.1",
+    "buildId": "72be8b73-72d6-4c9e-a54d-14abd7758cc0",
+    "internalGroupBuildState": "TESTING",
+    "whatToTestSaved": true,
+    "reviewNotesDraftSaved": true,
+    "buildAttachedToStoreVersion": true,
+    "reviewState": "PREPARE_FOR_SUBMISSION",
+    "physicalQa": "PENDING",
+    "physicalRecordings": "PENDING",
+    "signedUploadWorkflowRun": "41296552107"
+  },
+  "macos": {
+    "version": "0.8.3",
+    "build": "60",
+    "buildId": "dddca368-38d9-4fd6-ae74-b7d2a9783704",
+    "internalGroupBuildState": "TESTING",
+    "whatToTestSaved": true,
+    "reviewNotesDraftSaved": true,
+    "buildAttachedToStoreVersion": true,
+    "reviewState": "PREPARE_FOR_SUBMISSION",
+    "physicalQa": "PENDING",
+    "physicalRecordings": "PENDING",
+    "signedUploadWorkflowRun": "41293690010"
+  },
+  "newBuildDispatchedInThisTask": false,
+  "appReviewSubmittedInThisTask": false,
+  "previousRequest": {
+    "guideline": "2.1 - Information Needed - New App Submission",
+    "platform": "iOS",
+    "source": "User-provided Apple review message in earlier chat",
+    "sourceDateKst": "2026-11-01",
+    "previousAppleId": "6829098378",
+    "macRecording": "PROACTIVE_EVIDENCE_NOT_A_CONFIRMED_MAC_REQUEST"
+  }
+}

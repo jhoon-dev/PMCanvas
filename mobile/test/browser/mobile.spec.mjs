@@ -78,14 +78,15 @@ test('create, edit, check, reopen offline, undo and export a project on a phone'
   ).toBeVisible();
   await page.getByRole('link', { name: '완료 체크', exact: true }).click();
   await page.getByRole('checkbox', { name: /현황 화면/ }).click();
-  await expect(page.locator('[data-item]')).toHaveCount(1);
+  await expect(page.locator('[data-item]')).toHaveCount(2);
+  await expect(page.locator('[data-item]:checked')).toHaveCount(1);
   await page.getByRole('link', { name: '현황', exact: true }).click();
   await expect(page.locator('.hero-progress strong')).toHaveText('25%');
   await page.evaluate(() => {
     document.documentElement.style.setProperty('--safe-area-inset-top', '28px');
     document.documentElement.style.setProperty('--safe-area-inset-bottom', '24px');
   });
-  await expect(page.locator('.app-header')).toHaveCSS('padding-top', '48px');
+  await expect(page.locator('.app-header')).toHaveCSS('padding-top', '40px');
   await expect(page.locator('.bottom-nav')).toHaveCSS('padding-bottom', '32px');
   await page.screenshot({ path: testInfo.outputPath('overview.png'), fullPage: true });
   await page.context().setOffline(true);
@@ -183,6 +184,7 @@ test('small screens, malicious text and failed writes keep a usable editor', asy
   await noOverflow(page);
   await page.screenshot({ path: testInfo.outputPath('small-editor.png'), fullPage: true });
   await page.getByRole('button', { name: '입력 취소', exact: true }).click();
+  await page.getByRole('button', { name: '버리기', exact: true }).click();
   await page.reload();
   await expect(page.getByRole('button', { name: '배포 확인', exact: true })).toBeVisible();
 });
@@ -204,6 +206,7 @@ test('changing the business timezone cannot invalidate saved completion records'
   await page.getByRole('button', { name: '저장', exact: true }).click();
   await expect(page.locator('#formError')).toContainText('시간대를 변경하지 못했습니다');
   await page.getByRole('button', { name: '입력 취소', exact: true }).click();
+  await page.getByRole('button', { name: '버리기', exact: true }).click();
   await page.reload();
   await expect(page.locator('.date-caption')).toContainText('Asia/Seoul');
   await page.getByRole('link', { name: '현황', exact: true }).click();
@@ -249,4 +252,64 @@ test('peer screens open directly and personnel and reports stay out of settings'
     expect(box.height).toBeGreaterThanOrEqual(44);
   }
   await page.screenshot({ path: testInfo.outputPath('reports-navigation.png'), fullPage: true });
+});
+
+test('quick task entry, draft protection, completion undo and filter recovery', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: '＋ 새 프로젝트', exact: true }).click();
+  await page.locator('[name="name"]').fill('간단한 프로젝트');
+  await page.getByRole('button', { name: '저장', exact: true }).click();
+  await expect(
+    page.getByRole('heading', { name: '첫 업무만 적으면 시작할 수 있어요' }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: '＋ 업무 추가', exact: true }).click();
+  await page.locator('[name="name"]').fill('회의 준비');
+  await page.getByRole('button', { name: '입력 취소', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '변경사항을 버릴까요?' })).toBeVisible();
+  await page.locator('#confirmation').getByRole('button', { name: '취소', exact: true }).click();
+  await expect(page.locator('[name="name"]')).toHaveValue('회의 준비');
+  // A task name alone creates one checkable item with the default estimate.
+  await page.getByRole('button', { name: '저장', exact: true }).click();
+  await page.getByRole('link', { name: '완료 체크', exact: true }).click();
+  await page.getByRole('checkbox', { name: /회의 준비/ }).check();
+  await expect(page.locator('.completion-summary')).toContainText('100%');
+  await expect(page.getByRole('checkbox', { name: /회의 준비/ })).toBeChecked();
+  await page.getByRole('button', { name: '되돌리기', exact: true }).click();
+  await expect(page.getByRole('checkbox', { name: /회의 준비/ })).not.toBeChecked();
+  await expect(page.locator('.completion-summary')).toContainText('0%');
+  await page.getByRole('searchbox', { name: '업무 검색' }).fill('없는 업무');
+  await expect(page.locator('.task-card')).toHaveCount(0);
+  await page.getByRole('button', { name: '필터 초기화', exact: true }).click();
+  await expect(page.locator('.task-card')).toHaveCount(1);
+  await page.reload();
+  await expect(page.getByRole('checkbox', { name: /회의 준비/ })).not.toBeChecked();
+});
+
+test('long forms keep actions reachable in a short viewport and reveal invalid folded fields', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 480 });
+  await page.goto('/');
+  await importProject(page, backup());
+  await page.getByRole('button', { name: '＋ 업무 추가', exact: true }).click();
+  await page.locator('[name="name"]').fill('짧은 화면에서도 저장');
+  for (let index = 0; index < 5; index++) {
+    await page.getByRole('button', { name: '＋ 세부 작업 추가', exact: true }).click();
+  }
+  const actions = await page.locator('#editor .dialog-actions').boundingBox();
+  expect(actions.y).toBeGreaterThanOrEqual(0);
+  expect(actions.y + actions.height).toBeLessThanOrEqual(480);
+  await noOverflow(page);
+  await page.getByRole('button', { name: '입력 취소', exact: true }).click();
+  await page.getByRole('button', { name: '버리기', exact: true }).click();
+  await page.getByRole('button', { name: '＋ 업무 추가', exact: true }).click();
+  await page.locator('[name="name"]').fill('일정 확인');
+  await page.locator('summary').filter({ hasText: '담당자 · 일정' }).click();
+  await page.locator('[name="start"]').fill('');
+  await page.locator('summary').filter({ hasText: '담당자 · 일정' }).click();
+  await page.getByRole('button', { name: '저장', exact: true }).click();
+  await expect(page.locator('[name="start"]')).toBeVisible();
+  await expect(page.locator('#editor')).toBeVisible();
 });
