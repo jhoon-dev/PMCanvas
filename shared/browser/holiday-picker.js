@@ -143,7 +143,7 @@ export function mountHolidayPicker(root, { at = today(), enabled = true } = {}) 
           (holiday ? ' is-public-holiday' : '') +
           (date === at ? ' is-today' : '') +
           '" data-holiday-date="' +
-          date +
+          esc(date) +
           '" aria-pressed="' +
           (chosen || Boolean(enabled && holiday)) +
           '" aria-disabled="' +
@@ -173,11 +173,11 @@ export function mountHolidayPicker(root, { at = today(), enabled = true } = {}) 
             .map(
               (date) =>
                 '<button type="button" class="button small" data-holiday-remove="' +
-                date +
+                esc(date) +
                 '" aria-label="' +
                 esc(fullDate(date) + ' · ' + ui('추가 휴무일 해제')) +
                 '">' +
-                date +
+                esc(date) +
                 ' <span aria-hidden="true">×</span></button>',
             )
             .join('')

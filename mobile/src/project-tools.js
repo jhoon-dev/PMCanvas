@@ -112,7 +112,7 @@ export class ProjectTools {
       this.range.owner = '';
   }
   dateControl() {
-    return `<label class="report-date"><span>보고 기준일</span><input id="projectReportDate" aria-label="보고 기준일" type="date" max="${today()}" value="${this.at}"></label>`;
+    return `<label class="report-date"><span>보고 기준일</span><input id="projectReportDate" aria-label="보고 기준일" type="date" max="${esc(today())}" value="${esc(this.at)}"></label>`;
   }
   controls(view) {
     return `<div class="desktop-controls date-only">${this.dateControl()}<span class="date-caption">${esc(view && this.at === today() ? '오늘' : '과거 조회')} · ${esc(getBusinessTimeZone())} · 저장됨</span></div>`;
