@@ -60,6 +60,8 @@ npm run android:apk
 
 결과는 `android/app/build/outputs/apk/debug/app-debug.apk`입니다. 개발용 서명 APK이므로 Play Store 제출용으로 사용하지 않습니다. 배포는 Android Studio에서 고유한 application ID·버전 코드·릴리스 서명을 확인한 뒤 AAB로 생성합니다. 키 파일은 소스에 넣지 않습니다.
 
+테스터 배포에는 [Google Play 내부 테스트](https://support.google.com/googleplay/android-developer/answer/9845334?hl=ko)(Play 스토어를 통한 설치·업데이트, 최대 100명)와 [Firebase App Distribution](https://firebase.google.com/docs/app-distribution/android/distribute-console)(APK 업로드와 테스터 배포)을 사용할 수 있습니다. APK 직접 배포와 Play 배포의 서명 키는 서로 다를 수 있으므로 같은 앱 위의 업데이트에는 동일한 서명이 필요합니다.
+
 ## iPhone
 
 Mac과 Xcode 26 이상이 필요하며 최소 지원 OS는 iOS 15.4입니다. Swift Package Manager를 사용하므로 CocoaPods 설치는 필요하지 않습니다.
@@ -116,6 +118,8 @@ CI는 브라우저 검증과 개발용 Android APK 빌드, Mac에서 iPhone 시�
 서명은 임시 키체인을 사용하며 앱 Release 타깃에만 적용하고 프로젝트 파일을 복원합니다. IPA의 앱 ID·버전·빌드 번호·프로파일·인타이틀먼트·서명 인증서·개인정보 매니페스트·서명 무결성을 확인한 뒤 Apple 검증·업로드를 수행합니다. `PMCanvas-iOS-App-Store-submission` 아티팩트에는 IPA, SHA-256과 소스 커밋을 포함한 매니페스트, 업로드 결과를 보존합니다. 빌드 번호는 실행 번호와 재실행 차수를 결합해 중복을 방지합니다.
 
 업로드는 App Review 제출이나 출시를 수행하지 않습니다. Apple의 빌드 처리가 끝난 뒤 App Store Connect에서 iOS 빌드, 스크린샷, 심사 정보를 연결하고 심사에 제출합니다. `PMCanvas-iPhone-verification-NOT-for-submission` 아티팩트는 계속 서명 전 검증용으로만 사용합니다.
+
+TestFlight 배포는 업로드가 끝난 빌드 번호로 `gh workflow run ios-testflight.yml --ref main -f build_number=41.1`처럼 실행합니다. 현재 모바일 버전·정확한 빌드 번호·iOS 플랫폼을 확인하고 Apple 처리가 완료될 때까지 기다린 뒤, 기존 내부 그룹 **PM Canvas Release QA**에 연결합니다. 새 테스터·외부 그룹·권한을 만들지 않으며 재실행해도 기존 연결을 유지합니다. 결과는 `PMCanvas-TestFlight-result` 아티팩트에서 확인합니다. 사용 키는 기존 업로드 키이며 main 전용 배포 환경에서만 사용합니다.
 
 2026-11-01 새 iOS 버전에 한국어 소개, 실제 iPhone·iPad 스크린샷 각 4장과 기존 PM Canvas 앱의 심사 연락처를 저장했습니다. 새 앱 레코드에는 이전 심사 연락처가 자동 복사되지 않으므로 플랫폼별 저장을 확인했습니다. 연락처 원문은 저장소에 기록하지 않습니다. 공통 가격은 무료, 배포 지역은 175개, 연령 등급은 4+, 개인정보 표시는 데이터 수집 없음입니다.
 

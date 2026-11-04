@@ -1,0 +1,41 @@
+name: iOS TestFlight distribution
+on:
+  workflow_dispatch:
+    inputs:
+      build_number:
+        description: Existing uploaded iOS build number (run.attempt)
+        type: string
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: ios-testflight-${{ github.ref_name }}
+  cancel-in-progress: false
+jobs:
+  distribute:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment: desktop-mac-store
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - name: Verify Apple processing and distribute to the existing internal group
+        run: node scripts/testflight.mjs
+        env:
+          PM_IOS_TEAM_ID: ${{ vars.PM_MAS_TEAM_ID }}
+          PM_IOS_BUILD_NUMBER: ${{ inputs.build_number }}
+          ASC_KEY_BASE64: ${{ secrets.ASC_KEY_BASE64 }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: PMCanvas-TestFlight-result
+          path: mobile/build/app-store/testflight-result.json
+          if-no-files-found: error
+          retention-days: 14
