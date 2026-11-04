@@ -4,27 +4,11 @@ Windows의 유일한 공개 배포 경로는 **MSIX → Partner Center → Micro
 
 ## 1.9.0 제출 대상 — 2026-11-04
 
-앱 표시 버전 **1.9.0**과 Store 버전의 앞 세 숫자를 통일합니다. Windows의 네 번째 예약 필드만 붙여 MSIX **1.9.0.0**으로 제출합니다. 2026-11-04 Partner Center에서 확인한 기존 패키지 MSIX **1.8.128.0**보다 높습니다. 앱 버전 외의 빌드 번호로 Store 버전을 변경하지 않으며, 다른 패키지를 다시 제출할 때는 앱 버전도 함께 올립니다. 제출 파일의 소스·해시·네이티브 실행·MakeAppx 검증 결과는 빌드가 생성한 `store-manifest.json`에 기록합니다.
+앱 표시 버전 **1.9.0**과 Store 버전의 앞 세 숫자를 통일합니다. Windows의 네 번째 예약 필드만 붙여 MSIX **1.9.0.0**으로 제출합니다. 앱 버전 외의 빌드 번호로 Store 버전을 변경하지 않으며, 다른 패키지를 다시 제출할 때는 앱 버전도 함께 올립니다. 제출 파일의 소스·해시·네이티브 실행·MakeAppx 검증 결과는 빌드가 생성한 `store-manifest.json`에 기록합니다.
 
 검증한 제출 파일은 소스 `25aae7f326f69b2c9a877c72fe4cf7818c32ccc2`, SHA-256 `36e288e03e88331e7bc40bb7db44a8bcd2df4bf297ca361dcfaf6e3b532cf69f`입니다. 실제 실행·저장·재시작·Excel, MakeAppx 생성·추출, 전체 payload 비교와 ASAR 소스 검증을 통과했습니다. 필수 GitHub 검증을 통과한 [PR #36](https://github.com/jhoon-dev/PMCanvas/pull/36)으로 앱·버전별 매뉴얼·현재 예제 화면을 main에 병합했습니다.
 
 [버전별 매뉴얼](../docs/manuals/README.md)과 [데스크톱 1.9.0 사용 매뉴얼](../docs/manuals/desktop/1.9.0/README.ko.md)을 추가했습니다. 현재 대규모 가상 예제의 한국어·영어 화면을 각각 6장씩 1920×1080으로 촬영했으며, 해상도·파일 해시는 [캡처 목록](../docs/manuals/screenshots.json)에 보존합니다. 설치·업데이트·제거·재설치 검증에서는 새 `workspace.json`과 기존 `recovery.json`·프로젝트·설정 원본을 모두 확인합니다. 최종 심사·게시 상태는 [Partner Center](https://partner.microsoft.com/ko-kr/dashboard/products/9NV119XJGQ7J/overview)에서 확인합니다.
-
-## 이전 제출 기록 — 2026-11-01
-
-새 [PM Canvas 제품](https://partner.microsoft.com/ko-kr/dashboard/products/9NV119XJGQ7J/overview)(Store ID **`9NV119XJGQ7J`**)을 출시 대상으로 사용합니다. 기존 PM Canvas Desktop의 인증을 취소하고 제출 초안을 삭제했습니다. 로컬 `.env.msix`와 GitHub `desktop-store` 환경 변수도 새 제품으로 갱신했습니다.
-
-Apple·Capacitor·데스크톱 앱의 번들 ID는 `app.toolmoa.pmcanvas`이며, Windows MSIX의 `Package/Identity/Name`은 새 제품의 Product identity에서 발급한 별도 값을 사용합니다. 번들 ID를 MSIX Identity에 임의로 넣지 않습니다.
-
-개발자 **jhoon-dev**, 브랜드 **Toolmoa**, 제품 표시 이름 **PM Canvas**를 사용합니다. [공통 표기 규칙](../README.md#제품-식별표기-규칙)을 따르며, Store 목록의 개발자 필드와 패키지 author는 `jhoon-dev`로 맞춥니다. `PublisherDisplayName`은 Product identity의 법적 발행자 값입니다. 앱·실행 파일은 `PM Canvas`, `PM Canvas.exe`를 사용하고, 기존 `pmcanvas-desktop` 프로필 폴더와 NSIS 업그레이드 GUID는 데이터·설치 호환성을 위해 보존합니다.
-
-2026-11-01 새 제품의 **Submission 1**(제출 ID `1152921505702288369`)을 인증 심사에 제출했고, Partner Center에서 **인증 중 / 사전 처리 중**으로 접수된 것을 확인했습니다. 개발자 `jhoon-dev`·브랜드 `Toolmoa`·제품명 `PM Canvas`를 반영한 한국어·영어 목록과 각 4장의 새 화면, 무료·전 세계 배포, 기존 IARC 등급, 제한 기능 사용 사유와 새 패키지 검증을 완료했습니다. 최초 제출을 취소한 뒤 아래 새 패키지로 교체해 다시 제출했습니다. 승인·게시 완료를 뜻하지 않습니다. 이후 제출의 버전 규칙은 위 1.9.0 안내를 따릅니다.
-
-새 제품용 앱 **0.8.3**, MSIX **1.8.5.0**은 네이티브 실행·저장·재시작·Excel 기능, MakeAppx 생성·추출, 전체 payload 비교를 통과했습니다. 제출 파일의 소스 커밋은 `9f2782f70cfa13ab3658f5f2817ee26e049105eb`, SHA-256은 `29160b1c31c798f905ab67c421ea6afb48b0f5657b2aa41d48eaadb7eaf40638`입니다. SDK 도구는 서명된 원본과 인접한 매니페스트를 짧은 작업 경로로 복사한 뒤 실행합니다.
-
-## 무서명 배포 종료 — 2026-11-01
-
-공개된 무서명 데스크톱 릴리스 5개(0.7.1·0.7.2·0.8.0·0.8.1·0.8.2)를 비공개 초안으로 전환했습니다. 기존 EXE 다운로드 URL은 인증 없는 요청에 404를 반환합니다. EXE 배포 명령과 무서명 설치 파일의 공개 CI 작업을 제거했으며, 공개 스크립트는 Windows EXE·무서명 파일·이전 무서명 실행의 재공개를 거부합니다. 이전 파일은 공개 해제한 초안으로 보존합니다. CI는 고정된 0.7.1 소스 커밋에서 일회용 검증 설치본을 재현하므로 초안 다운로드 권한이나 추가 쓰기 권한이 필요하지 않습니다. Store 제출용 unsigned MSIX는 Partner Center 전용이며, 사용자에게는 Microsoft Store가 서명한 패키지만 배포합니다.
 
 ## 1. 앱 예약 후 설정할 값
 
@@ -48,7 +32,7 @@ Apple·Capacitor·데스크톱 앱의 번들 ID는 `app.toolmoa.pmcanvas`이며,
 
 **Actions → Windows Store MSIX**는 푸시·PR에서 Windows에 실제 MSIX 테스트 패키지를 만들어 설치합니다. 이 패키지는 실행 ID로 만든 별도 테스트 ID와 일회용 자체 서명 인증서를 사용하며 CI에만 등록합니다. 테스트 인증서·개인 키는 공개 artifact에 넣지 않습니다. 사용자 PC나 실제 Store 앱 ID에는 설치하지 않습니다.
 
-검증 흐름은 기존 0.7.1 EXE 설치 → 한글 프로젝트·완료 기록·WBS 계층·기준 계획·언어·시간대 저장 → 등록된 MSIX로 전환 → MSIX 버전 업데이트 → 제거 → 재설치입니다. 실제 패키지 ID로 실행되는지, 복구·설정·프로젝트가 유지되는지, Store 업데이트 안내와 Excel 보조 프로세스가 동작하는지 확인합니다.
+검증 흐름은 마이그레이션 검증용 EXE 설치 → 한글 프로젝트·완료 기록·WBS 계층·기준 계획·언어·시간대 저장 → 등록된 MSIX로 전환 → MSIX 버전 업데이트 → 제거 → 재설치입니다. 실제 패키지 ID로 실행되는지, 복구·설정·프로젝트가 유지되는지, Store 업데이트 안내와 Excel 보조 프로세스가 동작하는지 확인합니다.
 
 앱 데이터 보존을 위해 `runFullTrust` 및 `unvirtualizedResources` 제한 기능을 선언합니다. Windows 11에서는 기존 앱의 두 Roaming AppData 폴더만 가상화에서 제외하고, 이전 Windows에서는 파일 쓰기 가상화를 비활성화합니다. 레지스트리 가상화는 비활성화하지 않습니다. **Partner Center 제출 시 제한 기능 사용 이유를 설명하고 승인을 받아야 합니다.** 사용자 작업·복구·기존 EXE 데이터 보존이 이유이며, 승인 여부를 CI 테스트가 대신하지 않습니다. [Microsoft 가상화 설명](https://learn.microsoft.com/en-us/windows/msix/desktop/flexible-virtualization)
 

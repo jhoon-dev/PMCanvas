@@ -1,10 +1,10 @@
 # PM Canvas 버전별 사용 매뉴얼
 
-| 제품                   | 최신 매뉴얼                         | 이전 버전                                                                 |
-| ---------------------- | ----------------------------------- | ------------------------------------------------------------------------- |
-| Windows·macOS 데스크톱 | [1.9.0](desktop/1.9.0/README.ko.md) | [0.8.3](desktop/0.8.3/README.ko.md), [전체 버전 안내](desktop/HISTORY.md) |
-| 웹                     | [0.21.9](web/0.21.9/README.ko.md)   | [0.21.8](web/0.21.8/README.ko.md)                                         |
-| iPhone·Android 모바일  | [0.2.0](mobile/0.2.0/README.ko.md)  | [0.1.0](mobile/0.1.0/README.ko.md)                                        |
+| 제품                   | 최신 매뉴얼                         | 이전 버전                          |
+| ---------------------- | ----------------------------------- | ---------------------------------- |
+| Windows·macOS 데스크톱 | [1.9.0](desktop/1.9.0/README.ko.md) | —                                  |
+| 웹                     | [0.21.9](web/0.21.9/README.ko.md)   | [0.21.8](web/0.21.8/README.ko.md)  |
+| iPhone·Android 모바일  | [0.2.0](mobile/0.2.0/README.ko.md)  | [0.1.0](mobile/0.1.0/README.ko.md) |
 
 버전 번호는 각 제품의 앱 버전입니다. Windows 앱 표시 버전과 Store 패키지의 앞 세 숫자는 같습니다. 예를 들어 앱 1.9.0은 Windows 패키지 MSIX **1.9.0.0**으로 제출합니다. 마지막 0은 Store가 요구하는 예약 필드입니다. Windows 1.9.0는 이번 Store 제출 대상이며, 심사·게시 상태는 [Windows 배포 기록](../../desktop/WINDOWS-STORE.md)에서 확인합니다. 모바일 0.2.0의 안내는 현재 소스·개발 빌드를 기준으로 하며 iOS·Android Store 게시 완료를 뜻하지 않습니다.
 
