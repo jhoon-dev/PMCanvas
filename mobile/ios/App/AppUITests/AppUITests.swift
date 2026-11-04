@@ -54,9 +54,15 @@ final class AppUITests: XCTestCase {
         let visible = CGRect(x: app.frame.minX, y: app.frame.minY + 160,
                              width: app.frame.width, height: app.frame.height - 290)
         for _ in 0..<8 {
-            if element.isHittable && visible.contains(element.frame) { return }
-            if element.frame.minY < visible.minY { web.swipeDown() }
-            else { web.swipeUp() }
+            let frame = element.frame
+            if element.isHittable && visible.contains(frame) { return }
+            // A full swipe can move the row past the header and oscillate back
+            // below the footer. Use a bounded drag and stop before lifting.
+            let distance = max(-180, min(180, frame.midY - visible.midY))
+            let start = web.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.55))
+            let end = start.withOffset(CGVector(dx: 0, dy: -distance))
+            start.press(forDuration: 0.1, thenDragTo: end,
+                        withVelocity: .slow, thenHoldForDuration: 0.2)
         }
         XCTAssertTrue(element.isHittable && visible.contains(element.frame),
                       "Control did not enter the visible workspace: \(element.debugDescription)")
