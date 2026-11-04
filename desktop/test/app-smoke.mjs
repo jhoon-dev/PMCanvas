@@ -482,7 +482,13 @@ try {
   assert.deepEqual(finalProject, copied.project);
   await page.evaluate(() => window.desktop.save());
   checkpoint('manual-update-notice');
-  await application.evaluate(({ shell }) => {
+  const futureVersion =
+    Number(JSON.parse(readFileSync(path.join(root, 'package.json'))).version.split('.')[0]) +
+    1 +
+    '.0.0';
+  const futureRelease =
+    'https://github.com/jhoon-dev/PMCanvas/releases/tag/desktop-v' + futureVersion;
+  await application.evaluate(({ shell }, futureVersion) => {
     const https = process.getBuiltinModule('https'),
       { EventEmitter } = process.getBuiltinModule('events');
     globalThis.__updateRequest = https.get;
@@ -498,7 +504,7 @@ try {
         const res = new EventEmitter();
         res.statusCode = 200;
         callback(res);
-        const tag = 'desktop-v0.99.0';
+        const tag = 'desktop-v' + futureVersion;
         res.emit(
           'data',
           Buffer.from(
@@ -521,10 +527,10 @@ try {
     shell.openExternal = async (url) => {
       globalThis.__releasePages.push(url);
     };
-  });
+  }, futureVersion);
   await nativeCommand(application, 'updates');
   await page.locator('#checkUpdates').click();
-  await page.getByText('새 버전: 0.99.0', { exact: false }).waitFor();
+  await page.getByText('새 버전: ' + futureVersion, { exact: false }).waitFor();
   assert.equal(await application.evaluate(() => globalThis.__releasePages.length), 0);
   await page.locator('#openRelease').click();
   await page.locator('#settingsBack').click();
@@ -549,18 +555,13 @@ try {
   );
   await page.evaluate(async () => window.desktop.undo((await window.desktop.snapshot()).revision));
   assert.deepEqual((await page.evaluate(() => window.desktop.snapshot())).project, finalProject);
-  assert.deepEqual(await application.evaluate(() => globalThis.__releasePages), [
-    'https://github.com/jhoon-dev/PMCanvas/releases/tag/desktop-v0.99.0',
-  ]);
+  assert.deepEqual(await application.evaluate(() => globalThis.__releasePages), [futureRelease]);
   checkpoint('privacy-policy');
   const beforePrivacy = await page.evaluate(() => window.desktop.snapshot());
   await nativeCommand(application, 'privacy');
   await expect
     .poll(() => application.evaluate(() => globalThis.__releasePages))
-    .toEqual([
-      'https://github.com/jhoon-dev/PMCanvas/releases/tag/desktop-v0.99.0',
-      'https://github.com/jhoon-dev/PMCanvas/blob/main/desktop/PRIVACY.md',
-    ]);
+    .toEqual([futureRelease, 'https://github.com/jhoon-dev/PMCanvas/blob/main/desktop/PRIVACY.md']);
   assert.deepEqual(await page.evaluate(() => window.desktop.snapshot()), beforePrivacy);
   assert.deepEqual((await page.evaluate(() => window.desktop.snapshot())).project, finalProject);
   await application.evaluate(({ shell }) => {
