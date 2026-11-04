@@ -132,10 +132,10 @@ test('imports make independent copies and malformed input preserves existing pro
   await page.goto('/');
   await importProject(page, backup());
   await expect(page.locator('#activeProjectName')).toHaveText('가져온 프로젝트');
-  await page.getByRole('link', { name: '프로젝트 목록', exact: true }).click();
+  await page.locator('#projectListLink').click();
   await importProject(page, backup());
   await expect(page.locator('#activeProjectName')).toHaveText('가져온 프로젝트');
-  await page.getByRole('link', { name: '프로젝트 목록', exact: true }).click();
+  await page.locator('#projectListLink').click();
   await expect(page.locator('.project-card')).toHaveCount(2);
   await importProject(page, '{broken');
   await expect(page.getByRole('status')).toContainText('JSON');

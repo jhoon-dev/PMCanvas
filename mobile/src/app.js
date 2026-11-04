@@ -225,6 +225,10 @@ function render() {
   document.title = active ? p.name + ' · ' + titles[view] + ' — PM Canvas' : 'PM Canvas';
   document.body.classList.toggle('in-project', active);
   $('#activeProjectName').textContent = active ? p.name : '프로젝트 관리';
+  $('#projectListLink').setAttribute(
+    'aria-label',
+    active ? '프로젝트 목록 · ' + p.name : '프로젝트 목록',
+  );
   $('#openWorkspaceMenu').hidden = !active;
   $('#workspaceFiles').hidden = !active;
   $('#navigation').hidden = !active;

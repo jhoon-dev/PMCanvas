@@ -75,7 +75,7 @@ final class AppUITests: XCTestCase {
         XCTAssertTrue(name.waitForExistence(timeout: 10))
         enter(projectName, in: name, app: app)
         web.buttons["저장"].tap()
-        XCTAssertTrue(web.staticTexts[projectName].waitForExistence(timeout: 10))
+        XCTAssertTrue(web.links.matching(NSPredicate(format: "label CONTAINS %@", projectName)).firstMatch.waitForExistence(timeout: 10))
 
         web.links["인력"].tap()
         web.buttons.matching(identifier: "＋ 참여인력 추가").firstMatch.tap()
@@ -136,7 +136,7 @@ final class AppUITests: XCTestCase {
         let name = web.textFields["프로젝트명"]
         enter("iPhone persistence check", in: name, app: app)
         web.buttons["저장"].tap()
-        XCTAssertTrue(web.staticTexts["iPhone persistence check"].waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(web.links.matching(NSPredicate(format: "label CONTAINS %@", "iPhone persistence check")).firstMatch.waitForExistence(timeout: 10), app.debugDescription)
 
         let overview = XCTAttachment(screenshot: app.screenshot())
         overview.name = "iPhone project overview"
@@ -152,7 +152,7 @@ final class AppUITests: XCTestCase {
         let savedProject = relaunchedWeb.buttons.matching(NSPredicate(format: "label CONTAINS %@", "iPhone persistence check")).firstMatch
         XCTAssertTrue(savedProject.waitForExistence(timeout: 20), "Committed project disappeared after relaunch: \(app.debugDescription)")
         savedProject.tap()
-        XCTAssertTrue(app.webViews.staticTexts["iPhone persistence check"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.webViews.links.matching(NSPredicate(format: "label CONTAINS %@", "iPhone persistence check")).firstMatch.waitForExistence(timeout: 10))
         let restored = XCTAttachment(screenshot: app.screenshot())
         restored.name = "iPhone project restored after relaunch"
         restored.lifetime = .keepAlways
