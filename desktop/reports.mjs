@@ -1,3 +1,4 @@
+import { weeklyHtml } from './app/shared/management-ui.js';
 import { summary, today, validDate } from './app/shared/engine.js';
 import { csvText, wbsRows, completionRecords, completionRows } from './app/shared/reports.js';
 import { getLanguage, setLanguage, ui, supportedLanguages } from './app/shared/i18n.js';
@@ -17,6 +18,11 @@ export function buildReport(project, options) {
 function report(project, options) {
   if (!project) throw Error('프로젝트를 먼저 열어 주세요.');
   if (!options || typeof options !== 'object') throw Error('보고서 종류를 확인해 주세요.');
+  if (options.kind === 'weekly') {
+    const snapshot = project.weeklyReports?.find((r) => r.id === options.id);
+    if (!snapshot || options.format !== 'html') throw Error('발행한 주간보고를 확인해 주세요.');
+    return { filename: 'PM-Weekly-' + snapshot.to + '.html', html: weeklyHtml(snapshot) };
+  }
   let rows, label;
   if (options.kind === 'wbs') {
     if (!validDate(options.at) || options.at > today())

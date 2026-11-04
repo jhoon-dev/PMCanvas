@@ -1,6 +1,137 @@
 import desktop from './desktop-en.js';
 // UI literals only. User-entered content never passes through this catalog.
 export default {
+  '집계 기준': 'Calculation basis',
+  '기간별 계획': 'Staffing periods',
+  '기본 투입률로 추정': 'Estimated from default allocation',
+  '추정값 포함': 'Includes estimates',
+  '합계에 기본 투입률로 추정한 값이 포함됩니다.':
+    'The total includes estimates based on default allocations.',
+  '투입 기간이 없는 인력은 업무 기간 밖에서도 기본 투입률로 계산합니다. 실제 투입 실적이나 등록한 기간별 계획을 뜻하지 않습니다.':
+    'Members without staffing periods use their default allocation, including months outside the task schedule. These estimates are neither actual time spent nor registered staffing periods.',
+  '기준일 투입률': 'Allocation on report date',
+  '기간별 투입 계획': 'Staffing periods',
+  '담당자·투입 계획·선행 확인 필요': 'Check assignees, staffing plans and dependencies',
+  '</span></div><div class="member-stats"><div><small>기준일 투입률</small><strong>':
+    '</span></div><div class="member-stats"><div><small>Allocation on report date</small><strong>',
+  '기간별 계획이 있으면 계획 투입률을 사용하고 기간 밖은 0%입니다. 계획이 없거나 마지막 기간을 삭제하면 인력의 기본 투입률을 사용합니다. 예측·과부하·계획 M/M에 함께 적용됩니다. 160h는 편집 가능한 환산 기준이며 실제 투입 실적은 수집하지 않습니다.':
+    'Period allocations replace the member’s default allocation; dates outside the periods have zero capacity. Without periods, or after removing the last period, the default applies. Forecasts, overload warnings and planned person-months share this capacity. 160h is an editable conversion basis. Actual time spent is not collected.',
+  '변경사항을 적용했습니다. 프로젝트 파일도 저장해 주세요.':
+    'Changes applied. Save the project file as well.',
+  '주간보고를 발행했습니다. 프로젝트 파일도 저장해 주세요.':
+    'Weekly report published. Save the project file as well.',
+  '이슈 · 보고': 'Issues & reports',
+  마일스톤: 'Milestone',
+  '새 마일스톤': 'New milestone',
+  '마일스톤 추가': 'Add milestone',
+  마일스톤명: 'Milestone name',
+  목표일: 'Target date',
+  '실제 완료일': 'Actual completion date',
+  '마일스톤 완료': 'Milestone complete',
+  미완료: 'Incomplete',
+  '마일스톤·이슈·주간보고·월별 투입 계획':
+    'Milestones, issues, weekly reports and monthly staffing plans',
+  '공수와 자원을 사용하지 않는 완료 시점입니다. 목표일은 휴일도 지정할 수 있습니다.':
+    'A zero-effort completion event that consumes no capacity. Target dates may fall on holidays.',
+  이슈: 'Issue',
+  리스크: 'Risk',
+  '이슈·리스크': 'Issues and risks',
+  '이슈·리스크 추가': 'Add issue or risk',
+  낮음: 'Low',
+  보통: 'Medium',
+  높음: 'High',
+  미해결: 'Open',
+  '조치 중': 'In progress',
+  종료: 'Closed',
+  영향도: 'Impact',
+  '발생 가능성 (리스크)': 'Probability (risks)',
+  기한: 'Due date',
+  '관련 업무': 'Related task',
+  '조치 내용·해결 결과': 'Actions and resolution',
+  제목: 'Title',
+  유형: 'Type',
+  주간보고: 'Weekly report',
+  발행: 'Published',
+  '금주 설명': 'This week: notes',
+  '차주 설명': 'Next week: notes',
+  '현재 계획': 'Current plan',
+  '실제 진척': 'Actual progress',
+  '누적 계획·실제 진척 추이': 'Cumulative planned and actual progress',
+  '금주 완료 기록이 있는 업무': 'Tasks with completion records this week',
+  '진행·미완료 업무': 'Ongoing and incomplete tasks',
+  '차주 계획': 'Next week plan',
+  '차주 예정 업무': 'Tasks scheduled for next week',
+  '발행 시점의 주요 이슈·리스크': 'Open issues and risks at publication',
+  '회색: 현재 계획 · 파랑: 실제 진척 · 보라: 기준 계획':
+    'Gray: current plan · Blue: actual progress · Purple: baseline',
+  '현재 계획과 실제 진척은 현재 범위의 예상 공수 기준입니다. 기준 계획은 저장 당시 범위의 별도 비율입니다. 실제 투입시간이 아닙니다.':
+    'Current-plan and actual-progress percentages use estimated effort in the current scope. The baseline percentage uses its original scope. These are not time-spent measurements.',
+  '미리보기로 검토한 뒤 발행하세요. 발행한 보고서는 작업·계획·이슈를 바꿔도 유지되며 수정·삭제할 수 없습니다. 정정 시 새 보고서를 발행하세요.':
+    'Review the preview before publishing. Published snapshots remain unchanged when tasks, plans or issues change, and cannot be edited or deleted. Publish a new report for corrections.',
+  '금주 시작일': 'Period start',
+  '금주 종료일': 'Period end',
+  '주간보고 미리보기': 'Preview weekly report',
+  '이 내용으로 발행': 'Publish this snapshot',
+  '보고서 HTML 내려받기': 'Download report HTML',
+  '주간보고를 발행했습니다.': 'Weekly report published.',
+  '월별 계획 M/M': 'Monthly planned person-months',
+  '기간별 투입 계획 × 일 근무시간 × 근무일로 계산합니다. 실제 투입 실적은 수집하지 않습니다. 160h는 초기값이며 조직의 환산 기준으로 변경하세요.':
+    'Calculated from period allocations, daily working hours and working days. Actual time spent is not collected. 160h is an editable default; use your organization’s conversion basis.',
+  '1 M/M 기준 시간': 'Hours per person-month',
+  '환산 기준 저장': 'Save conversion basis',
+  '투입 기간 추가': 'Add staffing period',
+  인력: 'Member',
+  '투입 시작일': 'Allocation start',
+  '투입 종료일': 'Allocation end',
+  '조회 월': 'Month',
+  '투입 계획(h)': 'Planned allocation (h)',
+  '계획 M/M': 'Planned person-months',
+  '업무 계획 공수(h)': 'Planned task effort (h)',
+  '선행 업무 ID (쉼표 구분)': 'Predecessor IDs (comma-separated)',
+  '오늘 완료 기록': 'Record today’s completions',
+  '오늘 실제로 완료한 항목만 선택하세요.': 'Select only items actually completed today.',
+  '오늘 완료': 'Completed today',
+  '오늘 완료로 기록했습니다.': 'Recorded as completed today.',
+  '담당 업무가 변경되었습니다. 다시 확인해 주세요.':
+    'The assigned task changed. Refresh and review it.',
+  '관리 입력을 먼저 저장하거나 취소해 주세요.': 'Save or discard the management form first.',
+  '저장하지 않은 관리 입력을 버리고 이동할까요?': 'Discard unsaved management input and leave?',
+  '내용이 변경되었습니다. 주간보고를 다시 미리보기 해 주세요.':
+    'The content changed. Preview the weekly report again.',
+  '발행한 주간보고는 수정·삭제할 수 없습니다. 정정 보고서를 새로 발행해 주세요.':
+    'Published weekly reports cannot be edited or removed. Publish a new report for corrections.',
+  '마일스톤 아래에는 하위 업무를 둘 수 없습니다.': 'Milestones cannot contain subtasks.',
+  '주간보고는 오늘까지의 1~7일 기간으로 발행해 주세요.':
+    'Publish a period of one to seven days ending no later than today.',
+  '같은 인력의 겹치는 투입률 합계는 100%를 넘을 수 없습니다.':
+    'Overlapping allocations for the same member cannot exceed 100%.',
+  '요약 업무 추가': 'Add summary task',
+  '새 요약 업무': 'New summary task',
+  '상위 업무는 요약 전용입니다. 일정·공수·진척률은 하위 업무에서 계산합니다.':
+    'Parent tasks are summaries. Dates, effort and progress are calculated from subtasks.',
+  '상위 업무는 요약 전용입니다. 공수·진척률·기간·예상 완료일은 하위 실제 업무에서 계산합니다.':
+    'Parent tasks are summaries. Effort, progress, dates and forecasts are calculated from executable subtasks.',
+  '요약 업무의 일정·공수·진척률은 하위 업무에서 계산합니다. 하위 업무를 수정해 주세요.':
+    'Summary dates, effort and progress come from subtasks. Edit the subtasks instead.',
+  '요약 업무의 일정·공수는 하위 업무에서 계산합니다. 하위 업무를 수정해 주세요.':
+    'Summary dates and effort come from subtasks. Edit the subtasks instead.',
+  '인력 200명, 실제 업무 500개와 요약 업무 500개까지 지원합니다.':
+    'Projects support 200 members, 500 executable tasks and 500 summary tasks.',
+  '보고 기준일 업무 종료 기준으로 남은 작업을 다음 근무일부터 배정합니다. 예상 완료일은 계획 일정·담당자 가용시간·완료 기록을 바탕으로 계산합니다. 등급은 분류에만 사용합니다.':
+    'Forecasts use the end of the report date and schedule remaining work from the next working day. Dates use the plan, available capacity and completion records. Grades are for classification only.',
+
+  '요약 업무': 'Summary task',
+  '하위 업무 집계': 'Subtask rollup',
+  '하위 업무에서 계산': 'Calculated from subtasks',
+  '업무 유형': 'Task type',
+  '업무 번호 또는 ID, 쉼표로 구분': 'Task numbers or IDs, separated by commas',
+  '보고 기준일 업무 종료 기준 · 남은 작업은 다음 근무일부터 배정':
+    'As of the end of the report date; remaining work starts on the next working day',
+  '요약 업무의 일정·공수·진척률은 하위 업무에서 계산합니다.':
+    'Summary dates, effort and progress are calculated from subtasks.',
+  '선택한 모든 선행 업무가 끝난 다음 근무일에 시작합니다. 여러 개를 선택할 수 있습니다.':
+    'Starts on the next working day after all selected predecessors finish. Multiple selections are supported.',
+
   '저장하지 않은 입력이 있습니다. 입력을 버리고 이동할까요?':
     'You have unsaved input. Discard it and leave?',
   ...desktop,
@@ -768,8 +899,8 @@ export default {
     "Record your team's work today and see what comes next.",
   '팀의 프로젝트를 시작하세요': "Start your team's project",
   파일: 'File',
-  '파일은 4MB 이하 · 머리글 1행 · 업무 500행까지. 미리보기 적용 후 WBS 저장으로 반영합니다. 갱신은 업무 ID가 일치하는 행만 수정하고, 생략한 업무는 유지합니다.':
-    'XLSX files up to 4 MB, one header row and 500 task rows. Preview, apply to the draft, then save WBS. Updates match task IDs and preserve omitted tasks.',
+  '파일은 4MB 이하 · 머리글 1행 · 실제 업무·요약 업무 합계 1,000행까지. 미리보기 적용 후 WBS 저장으로 반영합니다. 갱신은 업무 ID가 일치하는 행만 수정하고, 생략한 업무는 유지합니다.':
+    'XLSX files up to 4 MB, one header row and 1,000 executable/summary task rows. Preview, apply to the draft, then save WBS. Updates match task IDs and preserve omitted tasks.',
   '파일을 내려받았습니다.': 'file downloaded.',
   '파일을 읽는 중…': 'Reading file…',
   편집자: 'Editor',

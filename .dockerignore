@@ -18,6 +18,7 @@
 **/playwright-report
 **/test-results
 **/*.png
+!web/public/icon.png
 desktop
 mobile
 # Private signing and TLS material must never enter the build context.

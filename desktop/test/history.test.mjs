@@ -51,7 +51,7 @@ test('undo/redo restores completion, hierarchy and baseline without changing sav
   assert.equal(doc.snapshot().canRedo, true);
   doc.redo(doc.revision);
   assert.equal(doc.project.tasks[1].parentId, 'task');
-  assert.equal(doc.project.tasks[0].items[0].doneDate, null);
+  assert.equal(doc.project.tasks.find((t) => t.id === 'task-work').items[0].doneDate, null);
   assert.equal(doc.dirty, true);
   assert.deepEqual(parseDocument(readFileSync(file)), before);
 });

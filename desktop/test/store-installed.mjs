@@ -4,8 +4,7 @@ import path from 'node:path';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { createHash } from 'node:crypto';
-import { screenProject } from '../../web/test/support/screen-fixtures.mjs';
-import { captureBaseline } from '../app/shared/planning.js';
+import { legacyProject, assertUpgradedProject, assertMigratedRecovery } from './legacy-project.mjs';
 const { _electron: electron } = createRequire(new URL('../../web/package.json', import.meta.url))(
   '@playwright/test',
 );
@@ -40,13 +39,7 @@ try {
   page.setDefaultTimeout(20000);
   await page.locator('#content').waitFor();
   if (request.mode === 'seed') {
-    const project = screenProject();
-    delete project._role;
-    delete project._revision;
-    project.name = 'Store 전환 데이터 보존';
-    project.tasks[1].predecessor = '';
-    project.tasks[1].parentId = project.tasks[0].id;
-    project.baseline = captureBaseline(project, 'Store 설치 전');
+    const project = legacyProject('Store 전환 데이터 보존', 'Store 설치 전');
     const file = path.join(request.work, 'Documents', 'Preserved.pmcanvas');
     fs.mkdirSync(path.dirname(file), { recursive: true });
     await app.evaluate(({ dialog }, file) => {
@@ -85,9 +78,11 @@ try {
       'MSIX must reuse the legacy application profile.',
     );
     await page.waitForFunction(
-      () => document.querySelector('#projectName')?.textContent === 'Store 전환 데이터 보존',
+      () =>
+        document.querySelector('[data-project-tab][aria-selected="true"] .project-tab-name')
+          ?.textContent === 'Store 전환 데이터 보존',
     );
-    assert.deepEqual(
+    assertUpgradedProject(
       (await page.evaluate(() => window.desktop.snapshot())).project,
       expected.project,
     );
@@ -128,6 +123,29 @@ try {
     assert.ok(fs.statSync(file).size > 1000, 'Packaged Store Excel export must complete.');
     await app.close();
     app = null;
+    // Tab migration retains the original single-document recovery and writes a
+    // separate workspace. Verify both, then preserve both through servicing.
+    const recoveryFile = path.join(runtime.profile, 'workspace.json'),
+      hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+    for (const entry of expected.hashes)
+      assert.equal(
+        hash(entry.file),
+        entry.sha256,
+        'Opening/exporting must preserve original files and the migrated workspace.',
+      );
+    const recovery = JSON.parse(fs.readFileSync(recoveryFile));
+    assert.equal(recovery.version, 1);
+    assert.equal(recovery.tabs.length, 1);
+    assert.equal(recovery.activeId, recovery.tabs[0].id);
+    assertMigratedRecovery(
+      recovery.tabs[0].document,
+      expected.project,
+      expected.file,
+      expected.hashes.find((entry) => entry.file === expected.file).sha256,
+    );
+    if (!expected.hashes.some((entry) => entry.file === recoveryFile))
+      expected.hashes.push({ file: recoveryFile, sha256: hash(recoveryFile) });
+    fs.writeFileSync(request.expected, JSON.stringify(expected));
   }
   fs.writeFileSync(
     resultFile,

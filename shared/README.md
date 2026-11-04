@@ -2,15 +2,16 @@
 
 `web/`, `desktop/`, `mobile/`이 함께 사용하는 원본 코드입니다. 공통 코드는 어느 제품 폴더에도 의존하지 않습니다.
 
-| 경로                                                                        | 내용                                  |
-| --------------------------------------------------------------------------- | ------------------------------------- |
-| `browser/engine.js`                                                         | 근무일·공수 가중 진척률·예상 완료일   |
-| `browser/planning.js`                                                       | WBS 계층·기준 계획·선행 관계          |
-| `browser/html.js`, `browser/i18n.js`, `browser/locales/`                    | 안전한 HTML 출력·언어                 |
-| `browser/people-view.js`, `browser/project-editor.js`, `browser/view-ui.js` | 인력 화면·편집 모델·표현 도구         |
-| `browser/reports.js`, `browser/styles.css`                                  | CSV 모델·공통 스타일                  |
-| `model/project.mjs`, `model/errors.mjs`                                     | 프로젝트 검증·입력 정규화·공통 오류   |
-| `assets.mjs`                                                                | 웹에 공개할 공통 브라우저 리소스 목록 |
+| 경로                                                                        | 내용                                           |
+| --------------------------------------------------------------------------- | ---------------------------------------------- |
+| `browser/engine.js`                                                         | 근무일·공수 가중 진척률·예상 완료일            |
+| `browser/task-model.js`                                                     | 요약 업무·실제 업무·복수 선행·기존 데이터 전환 |
+| `browser/planning.js`                                                       | WBS 계층·기준 계획·선행 관계                   |
+| `browser/html.js`, `browser/i18n.js`, `browser/locales/`                    | 안전한 HTML 출력·언어                          |
+| `browser/people-view.js`, `browser/project-editor.js`, `browser/view-ui.js` | 인력 화면·편집 모델·표현 도구                  |
+| `browser/reports.js`, `browser/styles.css`                                  | CSV 모델·공통 스타일                           |
+| `model/project.mjs`, `model/errors.mjs`                                     | 프로젝트 검증·입력 정규화·공통 오류            |
+| `assets.mjs`                                                                | 웹에 공개할 공통 브라우저 리소스 목록          |
 
 웹은 기존 브라우저 URL을 유지하면서 허용된 공통 리소스를 직접 제공합니다. `web/public/`의 작은 재노출 모듈과 `web/server/`의 모델 재노출 모듈은 기존 내부 import 경로의 호환 계층입니다. 원본을 복제하지 않습니다.
 

@@ -1,6 +1,6 @@
 {
   "name": "pmcanvas-desktop",
-  "version": "0.8.3",
+  "version": "1.9.0",
   "private": true,
   "description": "Offline project planning for Windows and macOS",
   "author": "jhoon-dev",
@@ -16,7 +16,7 @@
     "signing:setup": "node scripts/setup-mac-signing.mjs",
     "start": "npm run prepare:app && electron .",
     "test": "node --test test/*.test.mjs",
-    "test:app": "node test/app-smoke.mjs",
+    "test:app": "node test/app-smoke.mjs && node test/tabs-smoke.mjs && node test/holiday-sync-smoke.mjs",
     "pack": "npm run prepare:app && electron-builder --dir",
     "dist:win": "node --env-file-if-exists=.env.msix scripts/store.mjs",
     "dist:win:dev": "npm run prepare:app && electron-builder --win nsis --x64 --config.win.signAndEditExecutable=false",
@@ -27,7 +27,7 @@
     "pretest": "npm run prepare:app",
     "pretest:app": "npm run prepare:app",
     "pretest:renderer": "npm run prepare:app",
-    "test:renderer": "node test/renderer-smoke.mjs && node test/update-renderer-smoke.mjs",
+    "test:renderer": "node test/renderer-smoke.mjs && node test/update-renderer-smoke.mjs && node test/ui-layout.mjs && node test/ux-flows.mjs && node test/holiday-picker-flow.mjs",
     "release:check:win": "node --env-file-if-exists=.env.msix scripts/store.mjs --check",
     "release:check:mac": "node --env-file-if-exists=.env.signing scripts/release.mjs mac --check",
     "test:dates-language": "node --test test/date-language-smoke.mjs",
@@ -35,7 +35,8 @@
   },
   "devDependencies": {
     "electron": "45.1.0",
-    "electron-builder": "26.18.0"
+    "electron-builder": "26.18.0",
+    "korean-lunar-calendar": "0.4.0"
   },
   "build": {
     "appId": "app.toolmoa.pmcanvas",
@@ -45,6 +46,7 @@
     },
     "files": [
       "main.mjs",
+      "dialogs.mjs",
       "updates.mjs",
       "store-updates.mjs",
       "preferences.mjs",
@@ -64,6 +66,8 @@
       "excel-session.mjs",
       "app/index.html",
       "app/renderer.js",
+      "app/dialog-ui.js",
+      "app/holiday-picker.js",
       "app/update-ui.js",
       "app/excel-ui.js",
       "app/planning-ui.js",
@@ -71,9 +75,14 @@
       "app/desktop.css",
       "app/icon.png",
       "app/shared/engine.js",
+      "app/shared/task-model.js",
+      "app/shared/management.js",
+      "app/shared/management-ui.js",
+      "app/shared/project-navigation.js",
       "app/shared/business-clock.js",
       "app/shared/planning.js",
       "app/shared/html.js",
+      "app/shared/id.js",
       "app/shared/i18n.js",
       "app/shared/locales/en.js",
       "app/shared/view-ui.js",
@@ -82,6 +91,8 @@
       "app/shared/reports.js",
       "app/shared/wbs-model.js",
       "app/shared/excel-import-model.js",
+      "app/shared/dashboard-view.js",
+      "app/shared/project-visuals.css",
       "app/shared/styles.css",
       "app/model/project.mjs",
       "app/model/errors.mjs",
@@ -90,7 +101,13 @@
       "package.json",
       "app/shared/report-clock.js",
       "app/shared/locales/desktop-en.js",
-      "app/build-info.json"
+      "app/build-info.json",
+      "workspace.mjs",
+      "app/shared/korean-holidays.js",
+      "app/shared/korean-holidays-data.js",
+      "holiday-sync.mjs",
+      "app/holiday-ui.js",
+      "app/navigation.js"
     ],
     "asar": true,
     "win": {

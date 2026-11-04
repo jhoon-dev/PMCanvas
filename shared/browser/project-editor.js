@@ -1,3 +1,7 @@
+import { uid as projectUid } from './id.js';
+import { projectHolidays } from './korean-holidays.js';
+import { detachManagementLinks } from './management.js';
+import { summaryIds, normalizeTaskModel, predecessorIds, setPredecessors } from './task-model.js';
 import { ui } from './i18n.js';
 import { escapeHtml as esc } from './html.js';
 import { field } from './view-ui.js';
@@ -25,18 +29,24 @@ export function editorForm(
   type,
   p,
   id = '',
-  {
-    currentDate = today(),
-    uid = () => crypto.randomUUID(),
-    extraFields = '',
-    expandDetails = false,
-  } = {},
+  { currentDate = today(), uid = projectUid, extraFields = '', expandDetails = false } = {},
 ) {
   let body = '',
     title = '';
   if (type === 'project' || type === 'settings') {
     title = type === 'project' ? ui('새 프로젝트') : ui('프로젝트 설정');
     body =
+      '<label class="field">' +
+      ui('한국 공휴일 자동 반영') +
+      '<select name="koreanHolidays"><option value="true" ' +
+      (type === 'project' || p.koreanHolidays === true ? 'selected' : '') +
+      '>' +
+      ui('사용') +
+      '</option><option value="false" ' +
+      (type !== 'project' && p.koreanHolidays !== true ? 'selected' : '') +
+      '>' +
+      ui('사용 안 함') +
+      '</option></select></label>' +
       field(
         ui('프로젝트명'),
         'name',
@@ -63,13 +73,15 @@ export function editorForm(
     const t = p.tasks.find((x) => x.id === id) || {
       name: '',
       owner: p.members[0]?.id || '',
-      start: nextWorkday(currentDate, p.holidays),
-      end: shiftWorkday(nextWorkday(currentDate, p.holidays), 4, p.holidays),
+      start: nextWorkday(currentDate, projectHolidays(p)),
+      end: shiftWorkday(nextWorkday(currentDate, projectHolidays(p)), 4, projectHolidays(p)),
       phase: '개발',
       predecessor: '',
       items: [{ id: uid(), title: '', hours: 4, doneDate: null }],
       memo: '',
     };
+    const isSummary = summaryIds(p).has(id),
+      isMilestone = t.kind === 'milestone';
     title = id ? ui('업무 수정') : ui('새 업무 추가');
     body =
       field(
@@ -79,31 +91,56 @@ export function editorForm(
         'text',
         ui('required maxlength="200" placeholder="예: 회원 관리 기능 개발"'),
       ) +
-      ui('<label class="field">담당자<select name="owner"><option value="">미지정</option>') +
-      p.members
-        .map(
-          (m) =>
-            '<option value="' +
-            esc(m.id) +
-            '" ' +
-            (m.id === t.owner ? 'selected' : '') +
-            '>' +
-            esc(m.name) +
-            ' · ' +
-            esc(m.grade) +
-            '</option>',
-        )
-        .join('') +
-      '</select></label><div class="form-grid">' +
-      field(ui('예상 시작일'), 'start', t.start, 'date', 'required') +
-      field(ui('예상 종료일'), 'end', t.end, 'date', 'required') +
-      ui(
-        '</div><div class="items-title"><strong>세부 작업 체크리스트</strong><span>예상 공수 (h)</span></div><div id="itemEditors">',
-      ) +
-      t.items.map(itemEditor).join('') +
-      ui(
-        '</div><button type="button" id="addItem" class="button ghost add-item">＋ 세부 작업 추가</button><p class="form-hint">작업을 실제로 완료했을 때 체크합니다. 세부 작업의 예상 시간이 진척률의 가중치가 됩니다.</p>',
-      ) +
+      (isSummary
+        ? ui('<p class="form-hint">요약 업무의 일정·공수·진척률은 하위 업무에서 계산합니다.</p>')
+        : isMilestone
+          ? ui('<label class="field">담당자<select name="owner"><option value="">미지정</option>') +
+            p.members
+              .map(
+                (m) =>
+                  '<option value="' +
+                  esc(m.id) +
+                  '" ' +
+                  (m.id === t.owner ? 'selected' : '') +
+                  '>' +
+                  esc(m.name) +
+                  '</option>',
+              )
+              .join('') +
+            '</select></label>' +
+            field(ui('목표일'), 'start', t.start, 'date', 'required') +
+            field(
+              ui('실제 완료일'),
+              'doneDate',
+              t.doneDate || '',
+              'date',
+              'max="' + currentDate + '"',
+            )
+          : ui('<label class="field">담당자<select name="owner"><option value="">미지정</option>') +
+            p.members
+              .map(
+                (m) =>
+                  '<option value="' +
+                  esc(m.id) +
+                  '" ' +
+                  (m.id === t.owner ? 'selected' : '') +
+                  '>' +
+                  esc(m.name) +
+                  ' · ' +
+                  esc(m.grade) +
+                  '</option>',
+              )
+              .join('') +
+            '</select></label><div class="form-grid">' +
+            field(ui('예상 시작일'), 'start', t.start, 'date', 'required') +
+            field(ui('예상 종료일'), 'end', t.end, 'date', 'required') +
+            ui(
+              '</div><div class="items-title"><strong>세부 작업 체크리스트</strong><span>예상 공수 (h)</span></div><div id="itemEditors">',
+            ) +
+            t.items.map(itemEditor).join('') +
+            ui(
+              '</div><button type="button" id="addItem" class="button ghost add-item">＋ 세부 작업 추가</button><p class="form-hint">작업을 실제로 완료했을 때 체크합니다. 세부 작업의 예상 시간이 진척률의 가중치가 됩니다.</p>',
+            )) +
       '<details class="task-details" ' +
       (expandDetails || t.predecessor || t.memo ? 'open' : '') +
       '>' +
@@ -113,7 +150,7 @@ export function editorForm(
       extraFields +
       field(ui('단계 / 분류'), 'phase', t.phase, 'text', 'maxlength="50" list="phases"') +
       ui(
-        '<datalist id="phases"><option value="기획">기획</option><option value="설계">설계</option><option value="디자인">디자인</option><option value="개발">개발</option><option>QA</option><option value="오픈">오픈</option></datalist><label class="field">선행 업무 <span class="optional">선택</span><select name="predecessor"><option value="">없음</option>',
+        '<datalist id="phases"><option value="기획">기획</option><option value="설계">설계</option><option value="디자인">디자인</option><option value="개발">개발</option><option>QA</option><option value="오픈">오픈</option></datalist><label class="field">선행 업무 <span class="optional">선택</span><select name="predecessor" multiple size="5">',
       ) +
       p.tasks
         .filter((x) => x.id !== id)
@@ -122,14 +159,14 @@ export function editorForm(
             '<option value="' +
             esc(x.id) +
             '" ' +
-            (x.id === t.predecessor ? 'selected' : '') +
+            (predecessorIds(t).includes(x.id) ? 'selected' : '') +
             '>' +
             esc(x.name) +
             '</option>',
         )
         .join('') +
       ui(
-        '</select><small>선행 업무가 끝난 다음 근무일에 시작합니다.</small></label><label class="field">메모 <span class="optional">선택</span><textarea name="memo" rows="2" maxlength="2000">',
+        '</select><small>선택한 모든 선행 업무가 끝난 다음 근무일에 시작합니다. 여러 개를 선택할 수 있습니다.</small></label><label class="field">메모 <span class="optional">선택</span><textarea name="memo" rows="2" maxlength="2000">',
       ) +
       esc(t.memo || '') +
       '</textarea></label></div></details>';
@@ -142,7 +179,7 @@ export function applyEditor(
   editor,
   f,
   items = [],
-  { currentDate = today(), uid = () => crypto.randomUUID() } = {},
+  { currentDate = today(), uid = projectUid } = {},
 ) {
   const value = (n) => String(f.get(n) || '').trim();
   let target = structuredClone(p),
@@ -169,6 +206,7 @@ export function applyEditor(
         members: [],
         tasks: [],
       };
+      if (f.has('koreanHolidays')) target.koreanHolidays = value('koreanHolidays') === 'true';
       validateProject(target);
       created = true;
       message = ui('새 프로젝트를 만들었습니다. 참여인력부터 추가해 보세요.');
@@ -176,26 +214,42 @@ export function applyEditor(
       target.name = value('name');
       target.description = value('description');
       target.holidays = holidays;
+      if (f.has('koreanHolidays')) target.koreanHolidays = value('koreanHolidays') === 'true';
       validateProject(target);
     }
   } else if (editor.type === 'member') {
     updateMember(target, editor.id, f, uid);
   } else {
-    if (!items.length) throw Error(ui('체크할 세부 작업을 한 개 이상 추가해 주세요.'));
+    const isSummary = summaryIds(target).has(editor.id),
+      isMilestone = target.tasks.find((t) => t.id === editor.id)?.kind === 'milestone';
+    if (!items.length && !isSummary && !isMilestone)
+      throw Error(ui('체크할 세부 작업을 한 개 이상 추가해 주세요.'));
     const t = {
       ...(editor.id ? target.tasks.find((t) => t.id === editor.id) : {}),
       id: editor.id || uid(),
       name: value('name'),
-      owner: value('owner'),
+      owner: isSummary ? '' : value('owner'),
+      ...(isMilestone ? { doneDate: value('doneDate') || null } : {}),
       phase: value('phase'),
-      start: value('start'),
-      end: value('end'),
+      start: isSummary ? target.tasks.find((t) => t.id === editor.id).start : value('start'),
+      end: isSummary
+        ? target.tasks.find((t) => t.id === editor.id).end
+        : isMilestone
+          ? value('start')
+          : value('end'),
       predecessor: value('predecessor'),
-      items,
+      items: isSummary || isMilestone ? [] : items,
       memo: value('memo'),
     };
+    setPredecessors(
+      t,
+      (typeof f.getAll === 'function' ? f.getAll('predecessor') : [value('predecessor')])
+        .map(String)
+        .filter(Boolean),
+    );
     if (editor.id) target.tasks[target.tasks.findIndex((x) => x.id === editor.id)] = t;
     else target.tasks.push(t);
+    normalizeTaskModel(target);
     validateProject(target);
   }
 
@@ -217,7 +271,7 @@ export function createProjectEditor({
   currentDate = today,
   document = globalThis.document,
   confirm = globalThis.confirm,
-  uid = () => crypto.randomUUID(),
+  uid = projectUid,
 }) {
   const $ = (s) => document.querySelector(s),
     currentDay = () => (typeof currentDate === 'function' ? currentDate() : currentDate);
@@ -230,7 +284,11 @@ export function createProjectEditor({
         .map((el) => [
           el.name,
           el.type,
-          ['checkbox', 'radio'].includes(el.type) ? el.checked : el.value,
+          el.multiple
+            ? Array.from(el.selectedOptions).map((o) => o.value)
+            : ['checkbox', 'radio'].includes(el.type)
+              ? el.checked
+              : el.value,
         ]),
       Array.from($('#editorForm').querySelectorAll?.('.item-editor') || []).map((el) => [
         el.dataset.itemId,
@@ -317,7 +375,7 @@ export function createProjectEditor({
       );
       return;
     }
-    if (editor.type === 'task' && p.tasks.some((t) => t.predecessor === editor.id)) {
+    if (editor.type === 'task' && p.tasks.some((t) => predecessorIds(t).includes(editor.id))) {
       $('#formError').textContent = ui(
         '후속 업무가 연결되어 있습니다. 먼저 선행 업무 연결을 해제해 주세요.',
       );
@@ -339,6 +397,7 @@ export function createProjectEditor({
       return;
     if (editor.type === 'member') p.members = p.members.filter((m) => m.id !== editor.id);
     else p.tasks = p.tasks.filter((t) => t.id !== editor.id);
+    detachManagementLinks(p);
     const saved = await persist();
     $('#editorDialog').close();
     render();

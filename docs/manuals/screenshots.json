@@ -1,0 +1,118 @@
+{
+  "capturedAt": "2026-11-04T01:43:35.827Z",
+  "project": "스마트워크 통합 플랫폼 구축",
+  "synthetic": true,
+  "versions": {
+    "desktop": "1.9.0",
+    "web": "0.21.9",
+    "mobile": "0.2.0"
+  },
+  "viewport": {
+    "desktop": [
+      1920,
+      1080
+    ],
+    "web": [
+      1920,
+      1080
+    ],
+    "mobile": [
+      390,
+      844
+    ]
+  },
+  "images": [
+    {
+      "path": "desktop/1.9.0/images/ko/overview.png",
+      "sha256": "0991d00b71896e02e50bfd1dc096dba10a060552afae307661f02945341d5e7a"
+    },
+    {
+      "path": "desktop/1.9.0/images/ko/planning.png",
+      "sha256": "824d7023dd66f11ad2697dc03c272b0b1fa4d7e3f9eafa035464aa3d7c4a4673"
+    },
+    {
+      "path": "desktop/1.9.0/images/ko/resources.png",
+      "sha256": "095ac46787cdd76f2d9498fa47a45b1a129e49fa7bf53280d8b50ebce76ed998"
+    },
+    {
+      "path": "desktop/1.9.0/images/ko/management.png",
+      "sha256": "b93b2c3f5a3d0f70198b6f0005693b538c581185f541c9fc9707bca65f320d1a"
+    },
+    {
+      "path": "desktop/1.9.0/images/ko/weekly.png",
+      "sha256": "77cf16e97cf9eb68f9cd9bb43451105b107dc5e269cd770bf7343e735a25aa24"
+    },
+    {
+      "path": "desktop/1.9.0/images/ko/reports.png",
+      "sha256": "5372c27c5ed5fe06ec7e37fa5736f45fcfdd6397c774c438b8e09d27b9926a33"
+    },
+    {
+      "path": "desktop/1.9.0/images/en/overview.png",
+      "sha256": "ddd3e13ce98440ac41ed84e91fc4c4ec3029fc8b80ec03dea0ae6433cfee3c7f"
+    },
+    {
+      "path": "desktop/1.9.0/images/en/planning.png",
+      "sha256": "004d4a4f6686f723d393b8b94db559a90c84ff9110af1a0330ee47d25b73b94f"
+    },
+    {
+      "path": "desktop/1.9.0/images/en/resources.png",
+      "sha256": "043ca06334c852434202cd2b427b0446f24244d6f9ada22176cf4bf596ead52c"
+    },
+    {
+      "path": "desktop/1.9.0/images/en/management.png",
+      "sha256": "033e5060aa8645a4c288c53ee6a47bc5405f80277327c5043c6bdff3ae8d6dbb"
+    },
+    {
+      "path": "desktop/1.9.0/images/en/weekly.png",
+      "sha256": "0a159d64b02b492fb3278cf3daa81abf44c445bf95239b1846c366db1aaa200b"
+    },
+    {
+      "path": "desktop/1.9.0/images/en/reports.png",
+      "sha256": "6df784511e67bb9cbf08905de41dc4340c1414b7afc579b0915dae2d7dbc0be9"
+    },
+    {
+      "path": "web/0.21.9/images/overview.png",
+      "sha256": "48de69462eccf5ae475bae2caa844dbfae9ca53efdd95679d6d25c3364cc7d0e"
+    },
+    {
+      "path": "web/0.21.9/images/tasks.png",
+      "sha256": "5eb9784f090cea23bfe66e568bf985520b78d46b234858c86efdfab9b305f719"
+    },
+    {
+      "path": "web/0.21.9/images/resources.png",
+      "sha256": "07008c4e9c40265a504318a55986e587769098592fa81feaaf207f62176ce09d"
+    },
+    {
+      "path": "web/0.21.9/images/management.png",
+      "sha256": "b097552ec66746b93437da772bfee808eafbe9cf30df088c778d7d51b032fe7b"
+    },
+    {
+      "path": "web/0.21.9/images/weekly.png",
+      "sha256": "3d160961419c69a94e1dc169fd3f17ee41f2329ac105445739e34501a4a4bf70"
+    },
+    {
+      "path": "web/0.21.9/images/reports.png",
+      "sha256": "72d9ca54e56d69a25c767ffe5ff4f81185095803494cf3fc1532f066e62b0012"
+    },
+    {
+      "path": "mobile/0.2.0/images/overview.png",
+      "sha256": "adde316a62d2db65ce22a843e0b549f34839c9e820dd9343d1b58f2ab8af42e1"
+    },
+    {
+      "path": "mobile/0.2.0/images/planning.png",
+      "sha256": "46a39a4bd830a1815b99b92b318d509079b697152b77654d51981dd12596ddfb"
+    },
+    {
+      "path": "mobile/0.2.0/images/daily.png",
+      "sha256": "2c9d3b54456b71c832b34a985ab6e007f955a46a22309f5606fccfaac8176899"
+    },
+    {
+      "path": "mobile/0.2.0/images/resources.png",
+      "sha256": "3ae9cb2d04dc5f361918c13479c321a124985f7f5efcf83c98ff4a6d28bdc4f7"
+    },
+    {
+      "path": "mobile/0.2.0/images/reports.png",
+      "sha256": "6323a96cb13d598380f38bd315943b9d5074a943b4aebec8aa9b5730fa7d5b00"
+    }
+  ]
+}

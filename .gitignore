@@ -13,6 +13,7 @@ web/config/*
 !web/config/mail.example.json
 !web/config/secrets.example/
 .playwright-mcp/
+/runtime/vscode/
 releases/
 originals/
 dist/

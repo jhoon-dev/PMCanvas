@@ -7,8 +7,7 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
-import { screenProject } from '../../web/test/support/screen-fixtures.mjs';
-import { captureBaseline } from '../app/shared/planning.js';
+import { legacyProject, assertUpgradedProject } from './legacy-project.mjs';
 import { verifyWindowsSignature, verifyMacApp } from '../scripts/verify-signatures.mjs';
 import { buildLegacyFixture } from './legacy-fixture.mjs';
 const { _electron: electron } = createRequire(new URL('../../web/package.json', import.meta.url))(
@@ -205,13 +204,7 @@ try {
   checks.push('Installed a CI-only 0.7.1 fixture recreated from its pinned source commit.');
   let page = await launch('0.7.1');
   await page.locator('[data-command="new"]').first().waitFor();
-  const project = screenProject();
-  delete project._role;
-  delete project._revision;
-  project.name = '설치·업데이트 데이터 보존';
-  project.tasks[1].predecessor = '';
-  project.tasks[1].parentId = project.tasks[0].id;
-  project.baseline = captureBaseline(project, '설치 전 기준 계획');
+  const project = legacyProject('설치·업데이트 데이터 보존', '설치 전 기준 계획');
   fs.mkdirSync(path.dirname(projectFile), { recursive: true });
   await application.evaluate(({ dialog }, file) => {
     dialog.showSaveDialog = async () => ({ canceled: false, filePath: file });
@@ -234,9 +227,14 @@ try {
   );
   page = await launch(version);
   await page.waitForFunction(
-    () => document.querySelector('#projectName')?.textContent === '설치·업데이트 데이터 보존',
+    () =>
+      document.querySelector('[data-project-tab][aria-selected="true"] .project-tab-name')
+        ?.textContent === '설치·업데이트 데이터 보존',
   );
-  assert.deepEqual((await page.evaluate(() => window.desktop.snapshot())).project, saved.project);
+  assertUpgradedProject(
+    (await page.evaluate(() => window.desktop.snapshot())).project,
+    saved.project,
+  );
   assert.equal((await page.evaluate(() => window.desktop.settings())).timeZone, 'America/New_York');
   assert.equal(await page.evaluate(() => localStorage.getItem('pmcanvas.language')), 'en');
   await close();
@@ -254,9 +252,14 @@ try {
   unchanged(before);
   page = await launch(version);
   await page.waitForFunction(
-    () => document.querySelector('#projectName')?.textContent === '설치·업데이트 데이터 보존',
+    () =>
+      document.querySelector('[data-project-tab][aria-selected="true"] .project-tab-name')
+        ?.textContent === '설치·업데이트 데이터 보존',
   );
-  assert.deepEqual((await page.evaluate(() => window.desktop.snapshot())).project, saved.project);
+  assertUpgradedProject(
+    (await page.evaluate(() => window.desktop.snapshot())).project,
+    saved.project,
+  );
   assert.equal((await page.evaluate(() => window.desktop.settings())).timeZone, 'America/New_York');
   assert.equal(await page.evaluate(() => localStorage.getItem('pmcanvas.language')), 'en');
   await close();

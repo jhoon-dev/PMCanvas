@@ -2,7 +2,7 @@ import { ui } from './i18n.js';
 import { escapeHtml as esc } from './html.js';
 import { taskHours, earned, validateProject } from './engine.js';
 import { pageHead, btn, icon, avatar, num, pct, meter, empty, field } from './view-ui.js';
-export function peopleView(p, s, asOf) {
+export function peopleView(p, s, asOf, { controls = '' } = {}) {
   return (
     pageHead(
       'PROJECT TEAM',
@@ -10,6 +10,7 @@ export function peopleView(p, s, asOf) {
       ui('누가 어떤 일을 맡고 있는지, 투입 현황을 함께 확인하세요.'),
       btn(ui('＋ 참여인력 추가'), 'member', 'primary'),
     ) +
+    controls +
     '<div class="notice">' +
     icon('users') +
     ui(
@@ -38,10 +39,12 @@ export function peopleView(p, s, asOf) {
               esc(m.role) +
               '<span>·</span><span class="grade">' +
               esc(m.grade) +
-              ui('</span></div><div class="member-stats"><div><small>투입률</small><strong>') +
-              m.allocation +
+              ui(
+                '</span></div><div class="member-stats"><div><small>기준일 투입률</small><strong>',
+              ) +
+              num((pc.capacity / m.hours) * 100) +
               ui('<em>%</em></strong></div><div><small>일 가용시간</small><strong>') +
-              num((m.hours * m.allocation) / 100) +
+              num(pc.capacity) +
               ui('<em>h</em></strong></div><div><small>담당 업무</small><strong>') +
               ts.length +
               ui(

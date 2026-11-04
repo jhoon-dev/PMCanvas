@@ -3,8 +3,10 @@ import yauzl from 'yauzl';
 import { DOMParser } from '@xmldom/xmldom';
 import { parseWorkbook } from './app/node/excel-import.mjs';
 import { buildWorkbook, buildTemplate, buildCompletionWorkbook } from './app/node/excel.mjs';
+import { setKoreanHolidayUpdates } from './app/shared/korean-holidays.js';
 
 export async function performExcelJob(kind, input) {
+  setKoreanHolidayUpdates(input.holidayCalendar || []);
   if (kind === 'import')
     return Buffer.from(
       JSON.stringify(

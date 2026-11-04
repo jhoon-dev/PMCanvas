@@ -67,7 +67,7 @@ export function scheduleForm(project, id = '') {
         '<p class="form-hint">완료 기록·공수·기준 계획은 보존합니다. 이동 후 근무일이 없는 일정은 적용할 수 없습니다. 후속 일정은 달력상 기간을 유지하며 뒤로 조정합니다.</p>',
       ) +
       ui(
-        '<button class="button" type="button" id="previewSchedule">일정 변경 미리보기</button><div id="schedulePreview" aria-live="polite"></div>',
+        '<button class="button" type="button" id="previewSchedule">일정 변경 미리보기</button><p id="scheduleApplyHint" class="form-hint" role="status">일정 변경을 미리 본 뒤 적용할 수 있습니다.</p><div id="schedulePreview" aria-live="polite"></div>',
       ),
   };
 }
@@ -249,7 +249,7 @@ function baselineView(project) {
     ) +
     (rows.join('') || ui('<tr><td colspan="5">비교할 업무가 없습니다.</td></tr>')) +
     ui(
-      '</tbody></table></div><p class="desktop-report-summary">전체 업무를 비교합니다. 날짜는 달력 일수이며 +는 늦어짐, −는 앞당김입니다. 공수는 각 업무 자체의 세부 작업 합계입니다.</p></section>',
+      '</tbody></table></div><p class="desktop-report-summary">전체 업무를 비교합니다. 날짜는 달력 일수이며 +는 늦어짐, −는 앞당김입니다. 요약 업무의 공수는 하위 실제 업무의 합계입니다.</p></section>',
     )
   );
 }
@@ -354,7 +354,7 @@ export function planningView(
       'WORK BREAKDOWN & BASELINE',
       ui('WBS · 기준 계획'),
       ui('업무를 계층으로 묶고 기준 계획과의 변화를 확인하세요.'),
-      btn(ui('＋ 업무 추가'), 'task', 'primary'),
+      btn(ui('요약 업무 추가'), 'summary') + btn(ui('＋ 업무 추가'), 'task', 'primary'),
     ) +
     controls +
     ui(
@@ -396,7 +396,7 @@ export function planningView(
     (rows.join('') || ui('<tr><td colspan="7">표시할 업무가 없습니다.</td></tr>')) +
     '</tbody></table></div></section>' +
     ui(
-      '<p class="desktop-note">묶음의 공수·진척률·기간은 해당 업무 자체와 모든 하위 업무를 합산합니다. 전체 프로젝트 총계에 중복 가산하지 않습니다.<br>들여쓰기는 앞의 같은 수준 업무 아래로 이동합니다. 검색 중에는 일치하는 업무와 상위 경로를 펼쳐 표시하며 집계는 전체 하위 업무를 포함합니다.</p>',
+      '<p class="desktop-note">상위 업무는 요약 전용입니다. 공수·진척률·기간·예상 완료일은 하위 실제 업무에서 계산합니다.<br>들여쓰기는 앞의 같은 수준 업무 아래로 이동합니다. 검색 중에는 일치하는 업무와 상위 경로를 펼쳐 표시하며 집계는 전체 하위 업무를 포함합니다.</p>',
     ) +
     scheduleReview(project, cp) +
     baselineView(project)

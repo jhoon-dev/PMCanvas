@@ -29,15 +29,13 @@ export function storeVersion(version, buildNumber = 0) {
   if (!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(version))
     throw Error('A stable three-part application version is required.');
   const parts = version.split('.').map(Number);
-  if (
-    !/^(0|[1-9]\d*)$/.test(String(buildNumber)) ||
-    !Number.isSafeInteger(Number(buildNumber)) ||
-    String(Number(buildNumber)) !== String(buildNumber)
-  )
-    throw Error('Store build number must be a nonnegative safe integer.');
-  // Store reserves the fourth field; use the third field for repeated application builds.
-  parts[0]++;
-  parts[2] += Number(buildNumber);
+  if (buildNumber !== 0 && buildNumber !== '0')
+    throw Error(
+      'Bump the application version for a new Store submission; build offsets are disabled.',
+    );
+  if (parts[0] === 0)
+    throw Error('Microsoft Store requires an application major version above zero.');
+  // Store reserves the fourth field. The first three fields match the app exactly.
   if (parts.some((value) => value > 65535)) throw Error('MSIX version component exceeds 65535.');
   return parts.join('.') + '.0';
 }

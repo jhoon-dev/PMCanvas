@@ -1,3 +1,4 @@
+import { assertReportHistory } from '../../shared/browser/management.js';
 import { normalizeProject } from './model.mjs';
 
 export class ProjectStore {
@@ -69,6 +70,13 @@ export class ProjectStore {
         const previous = request.result;
         if (expectedRevision !== null && (previous?.revision ?? 0) !== expectedRevision) {
           failure = Error('다른 창에서 변경되었습니다. 프로젝트 목록에서 다시 열어 주세요.');
+          tx.abort();
+          return;
+        }
+        try {
+          if (previous) assertReportHistory(previous.project, project);
+        } catch (error) {
+          failure = error;
           tx.abort();
           return;
         }

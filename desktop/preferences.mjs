@@ -30,9 +30,13 @@ export class DesktopPreferences {
     }
     if (stored.checkUpdatesOnStart !== undefined && typeof stored.checkUpdatesOnStart !== 'boolean')
       this.recovery = { backupCreated: false };
+    if (stored.syncPublicHolidays !== undefined && typeof stored.syncPublicHolidays !== 'boolean')
+      this.recovery = { backupCreated: false };
     this.value = {
       ...stored,
       timeZone: zone,
+      syncPublicHolidays:
+        typeof stored.syncPublicHolidays === 'boolean' ? stored.syncPublicHolidays : true,
       checkUpdatesOnStart:
         typeof stored.checkUpdatesOnStart === 'boolean'
           ? stored.checkUpdatesOnStart
@@ -67,11 +71,15 @@ export class DesktopPreferences {
       !patch ||
       typeof patch !== 'object' ||
       Array.isArray(patch) ||
-      Object.keys(patch).some((key) => !['timeZone', 'checkUpdatesOnStart'].includes(key))
+      Object.keys(patch).some(
+        (key) => !['timeZone', 'checkUpdatesOnStart', 'syncPublicHolidays'].includes(key),
+      )
     )
       throw Error('Invalid preferences.');
     if ('checkUpdatesOnStart' in patch && typeof patch.checkUpdatesOnStart !== 'boolean')
       throw Error('Invalid update preference.');
+    if ('syncPublicHolidays' in patch && typeof patch.syncPublicHolidays !== 'boolean')
+      throw Error('Invalid holiday preference.');
     if ('timeZone' in patch) {
       if (typeof patch.timeZone !== 'string' || patch.timeZone.length > 100)
         throw Error('Invalid time zone.');

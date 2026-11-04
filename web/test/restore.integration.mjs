@@ -15,6 +15,8 @@ import { createMailer } from '../server/mailer.mjs';
 import { hashPassword } from '../server/security.mjs';
 import { restoreCleanupSql } from '../server/restore-safety.mjs';
 import { today } from '../public/engine.js';
+import { weeklyDraft } from '../public/management.js';
+import { cleanProject } from '../server/project.mjs';
 import { screenProject } from './support/screen-fixtures.mjs';
 import { smtpFixture } from './support/smtp-fixture.mjs';
 
@@ -135,6 +137,55 @@ test(
       delete p._revision;
       delete p._role;
       p.tasks[0].items[0].doneDate = today();
+      p.tasks.push({
+        id: 'milestone',
+        kind: 'milestone',
+        name: '검수 완료',
+        phase: '',
+        owner: 'm1',
+        start: '2026-10-30',
+        end: '2026-10-30',
+        predecessors: ['t2', 't3'],
+        memo: '',
+        items: [],
+        doneDate: '2026-10-30',
+      });
+      p.issues = [
+        {
+          id: 'restore-risk',
+          title: '검수 일정 확인',
+          type: 'risk',
+          impact: 'high',
+          probability: 'medium',
+          owner: 'm1',
+          taskId: 'milestone',
+          due: '2026-10-30',
+          status: 'doing',
+          action: '고객 확인',
+        },
+      ];
+      p.staffing = {
+        hoursPerMM: 160,
+        assignments: [
+          {
+            id: 'restore-assignment',
+            memberId: 'm1',
+            start: '2026-10-19',
+            end: '2026-10-30',
+            allocation: 100,
+          },
+        ],
+      };
+      p.weeklyReports = [
+        weeklyDraft(p, {
+          id: 'restore-report',
+          from: '2026-10-26',
+          to: '2026-10-30',
+          currentDate: '2026-10-30',
+          publishedAt: '2026-10-30T12:00:00.000Z',
+          notes: '백업·복원 보존 확인',
+        }),
+      ];
       const saved = await call(original, admin, 'projects', 'POST', { project: p });
       assert.equal(saved.status, 201);
       assert.equal(
@@ -231,6 +282,8 @@ test(
       assert.equal(work.status, 200);
       assert.equal(work.data.project.tasks[0].items[0].doneDate, p.tasks[0].items[0].doneDate);
       assert.equal(work.data.project.tasks[0].name, p.tasks[0].name);
+      assert.deepEqual(cleanProject(work.data.project), cleanProject(saved.data.project));
+      assert.deepEqual(work.data.project.weeklyReports, p.weeklyReports);
       const testMail = await call(restored, user, 'admin/mail-settings/test', 'POST', {
         to: 'receiver@example.com',
       });

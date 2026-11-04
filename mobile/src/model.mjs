@@ -1,3 +1,5 @@
+import { detachManagementLinks } from '../../shared/browser/management.js';
+import { predecessorIds, setPredecessors } from '../../shared/browser/task-model.js';
 import { cleanProject } from '../../shared/model/project.mjs';
 import { today, validDate } from '../../shared/browser/engine.js';
 import { uid } from './id.mjs';
@@ -28,7 +30,7 @@ export function parseProject(text) {
   } catch {
     throw Error('JSON 파일을 읽을 수 없습니다. 원본 파일을 확인해 주세요.');
   }
-  if (value?.format === 'pm-canvas-project' && value.version === 1)
+  if (value?.format === 'pm-canvas-project' && [1, 2, 3].includes(value.version))
     return normalizeProject(value.project);
   // Web JSON exports contain a bare project. Reject unknown versioned envelopes.
   if (value?.format !== undefined || value?.version !== undefined)
@@ -40,7 +42,7 @@ export function serializeProject(project) {
   const text = JSON.stringify(
     {
       format: 'pm-canvas-project',
-      version: 1,
+      version: 3,
       exportedAt: new Date().toISOString(),
       project: normalizeProject(project),
     },
@@ -53,7 +55,11 @@ export function serializeProject(project) {
 
 export function toggleItem(project, taskId, itemId, date = today()) {
   const next = structuredClone(project);
-  const item = next.tasks.find((task) => task.id === taskId)?.items.find((i) => i.id === itemId);
+  const task = next.tasks.find((task) => task.id === taskId);
+  const item =
+    task?.kind === 'milestone' && itemId === '__milestone'
+      ? task
+      : task?.items.find((i) => i.id === itemId);
   if (!item) throw Error('세부 작업을 찾을 수 없습니다.');
   if (!validDate(date) || date > today()) throw Error('완료일은 오늘까지 선택할 수 있습니다.');
   item.doneDate = item.doneDate ? null : date;
@@ -70,12 +76,15 @@ export function deleteEntity(project, type, id) {
     if (!removed) throw Error('업무를 찾을 수 없습니다.');
     next.tasks = next.tasks.filter((task) => task.id !== id);
     for (const task of next.tasks) {
-      if (task.predecessor === id) task.predecessor = '';
+      setPredecessors(
+        task,
+        predecessorIds(task).filter((ref) => ref !== id),
+      );
       if (task.parentId === id) {
         if (removed.parentId) task.parentId = removed.parentId;
         else delete task.parentId;
       }
     }
   } else throw Error('삭제할 항목을 확인해 주세요.');
-  return normalizeProject(next);
+  return normalizeProject(detachManagementLinks(next));
 }

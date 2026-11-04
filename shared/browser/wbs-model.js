@@ -1,3 +1,15 @@
+import { uid as projectUid } from './id.js';
+import { projectHolidays } from './korean-holidays.js';
+import { cleanManagement, detachManagementLinks } from './management.js';
+import {
+  normalizeTaskModel,
+  predecessorIds,
+  setPredecessors,
+  summaryIds,
+  descendants,
+  executionTasks,
+  taskView,
+} from './task-model.js';
 import { hierarchy, validatePlanning } from './planning.js';
 import { ui } from './i18n.js';
 import {
@@ -56,24 +68,32 @@ export function tsvText(rows) {
     )
     .join('\r\n');
 }
-const newId = () => crypto.randomUUID();
-export function newTask(project, { date = today(), id = newId } = {}) {
-  const start = nextWorkday(date, project.holidays);
+const newId = projectUid;
+export function newTask(
+  project,
+  { date = today(), id = newId, summary = false, milestone = false } = {},
+) {
+  const start = nextWorkday(date, projectHolidays(project));
   return {
     id: id(),
-    name: ui('새 업무'),
+    name: ui(summary ? '새 요약 업무' : milestone ? '새 마일스톤' : '새 업무'),
+    ...(milestone ? { kind: 'milestone', doneDate: null } : {}),
+    ...(summary ? { kind: 'summary' } : {}),
     phase: '',
     owner: '',
     start,
-    end: shiftWorkday(start, 4, project.holidays),
+    end: milestone ? start : shiftWorkday(start, 4, projectHolidays(project)),
     predecessor: '',
     memo: '',
-    items: [{ id: id(), title: ui('완료 확인'), hours: 8, doneDate: null }],
+    items:
+      summary || milestone ? [] : [{ id: id(), title: ui('완료 확인'), hours: 8, doneDate: null }],
   };
 }
 export function checkDraft(project) {
+  normalizeTaskModel(project);
   validateProject(project);
   validatePlanning(project);
+  Object.assign(project, cleanManagement(project, project));
   for (const t of project.tasks)
     if ((t.phase || '').length > 50 || (t.memo || '').length > 2000)
       throw Error('단계는 50자, 메모는 2,000자까지 입력할 수 있습니다.');
@@ -149,13 +169,42 @@ function reference(rows, value, label) {
 }
 export function setCell(project, task, field, value) {
   value = String(value).trim();
+  if (summaryIds(project).has(task.id) && ['owner', 'hours', 'start', 'end'].includes(field)) {
+    const view = taskView(project, task);
+    if (
+      field === 'hours'
+        ? Number(value) === taskHours(view)
+        : field === 'owner'
+          ? !value
+          : normalizeDate(value) === view[field]
+    )
+      return;
+    throw Error(
+      '요약 업무의 일정·공수·진척률은 하위 업무에서 계산합니다. 하위 업무를 수정해 주세요.',
+    );
+  }
   if (field === 'owner') task.owner = reference(project.members, value, '담당자');
-  else if (field === 'predecessor')
-    task.predecessor = /^[1-9]\d*$/.test(value)
-      ? (project.tasks[Number(value) - 1]?.id ?? reference(project.tasks, value, '선행 업무'))
-      : reference(project.tasks, value, '선행 업무');
-  else if (field === 'start' || field === 'end') task[field] = normalizeDate(value);
-  else if (field === 'hours') {
+  else if (field === 'predecessor') {
+    const values = project.tasks.some((t) => t.id === value || t.name === value)
+      ? [value]
+      : value.split(/[,;\n]+/);
+    setPredecessors(
+      task,
+      values
+        .map((v) => v.trim())
+        .filter(Boolean)
+        .map((v) =>
+          /^[1-9]\d*$/.test(v)
+            ? (project.tasks[Number(v) - 1]?.id ?? reference(project.tasks, v, '선행 업무'))
+            : reference(project.tasks, v, '선행 업무'),
+        )
+        .filter(Boolean),
+    );
+  } else if (field === 'start' || field === 'end') {
+    task[field] = normalizeDate(value);
+    if (task.kind === 'milestone') task.start = task.end = task[field];
+  } else if (field === 'hours') {
+    if (task.kind === 'milestone' && Number(value) === 0) return;
     const hours = Number(value);
     if (!Number.isFinite(hours) || hours < 0.1 || hours > 10000)
       throw Error('공수는 0.1~10,000h로 입력해 주세요.');
@@ -167,11 +216,24 @@ export function setCell(project, task, field, value) {
   else throw Error('편집할 수 없는 열입니다.');
 }
 export function alignSuccessors(project, changedIds = null) {
-  const affected = changedIds ? new Set(changedIds) : null;
-  for (const task of orderTasks(project.tasks)) {
-    if (!task.predecessor || (affected && !affected.has(task.predecessor))) continue;
-    const pred = project.tasks.find((t) => t.id === task.predecessor),
-      min = nextWorkday(addDays(pred.end, 1), project.holidays);
+  const affected = changedIds
+    ? new Set(changedIds.flatMap((id) => [id, ...descendants(project, id).map((t) => t.id)]))
+    : null;
+  const byId = new Map(project.tasks.map((t) => [t.id, t]));
+  for (const row of orderTasks(executionTasks(project))) {
+    const predecessors = predecessorIds(row);
+    if (
+      !predecessors.length ||
+      (affected && !affected.has(row.id) && !predecessors.some((id) => affected.has(id)))
+    )
+      continue;
+    const task = byId.get(row.id),
+      end = predecessors
+        .map((id) => byId.get(id).end)
+        .sort()
+        .at(-1),
+      min =
+        task.kind === 'milestone' ? end : nextWorkday(addDays(end, 1), projectHolidays(project));
     if (task.start < min) {
       const delta = daysBetween(task.start, min);
       task.start = min;
@@ -179,6 +241,7 @@ export function alignSuccessors(project, changedIds = null) {
     }
     affected?.add(task.id);
   }
+  normalizeTaskModel(project);
   return project;
 }
 export function editCell(project, id, field, value, { cascade = false } = {}) {
@@ -242,18 +305,19 @@ export function moveSchedule(project, ids, delta, { mode = 'move', cascade = fal
   )
     throw Error('일정 조정 범위를 확인해 주세요.');
   const p = structuredClone(project),
-    selected = new Set(ids);
+    selected = new Set(ids.flatMap((id) => [id, ...descendants(p, id).map((t) => t.id)]));
   for (const t of p.tasks)
-    if (selected.has(t.id)) {
+    if (selected.has(t.id) && !summaryIds(p).has(t.id)) {
       if (mode !== 'end') t.start = addDays(t.start, delta);
       if (mode !== 'start') t.end = addDays(t.end, delta);
+      if (t.kind === 'milestone') t.start = t.end = mode === 'end' ? t.end : t.start;
     }
-  if (cascade) alignSuccessors(p, ids);
+  if (cascade) alignSuccessors(p, [...selected]);
   return checkDraft(p);
 }
 export function duplicateTasks(project, ids, { id = newId } = {}) {
   const p = structuredClone(project),
-    selected = new Set(ids),
+    selected = new Set(ids.flatMap((id) => [id, ...descendants(p, id).map((t) => t.id)])),
     mapping = new Map(p.tasks.filter((t) => selected.has(t.id)).map((t) => [t.id, id()])),
     tasks = [];
   for (const t of p.tasks) {
@@ -263,8 +327,12 @@ export function duplicateTasks(project, ids, { id = newId } = {}) {
         ...structuredClone(t),
         id: mapping.get(t.id),
         name: (t.name + ' (복사)').slice(0, 200),
+        ...(t.kind === 'milestone' ? { doneDate: null } : {}),
         parentId: mapping.get(t.parentId) || t.parentId || '',
         predecessor: mapping.get(t.predecessor) || t.predecessor,
+        ...(t.predecessors
+          ? { predecessors: t.predecessors.map((id) => mapping.get(id) || id) }
+          : {}),
         items: t.items.map((i) => ({ ...i, id: id(), doneDate: null })),
       });
   }
@@ -275,8 +343,12 @@ export function removeTasks(project, ids) {
   const p = structuredClone(project),
     selected = new Set(ids);
   p.tasks = p.tasks.filter((t) => !selected.has(t.id));
+  detachManagementLinks(p);
   for (const t of p.tasks) {
-    if (selected.has(t.predecessor)) t.predecessor = '';
+    setPredecessors(
+      t,
+      predecessorIds(t).filter((id) => !selected.has(id)),
+    );
     if (selected.has(t.parentId)) t.parentId = '';
   }
   return checkDraft(p);

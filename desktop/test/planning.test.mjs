@@ -45,7 +45,10 @@ test('desktop hierarchy and baseline survive save, open and restart with complet
   const reopened = new DesktopDocument(recovery);
   reopened.open(file);
   assert.equal(reopened.project.tasks[1].parentId, 'parent');
-  assert.equal(reopened.project.tasks[1].items[0].doneDate, '2026-10-20');
+  assert.equal(
+    reopened.project.tasks.find((t) => t.id === 'child').items[0].doneDate,
+    '2026-10-20',
+  );
   assert.deepEqual(reopened.project.baseline, project.baseline);
   const total = rollups(reopened.project, '2026-10-21').get('parent');
   assert.equal(total.hours, 16);
@@ -86,8 +89,9 @@ test('desktop stores baseline differences for changed, added and deleted tasks w
     diff.removed.map((row) => row.id),
     ['removed'],
   );
-  assert.deepEqual(doc.project.baseline, baseline);
-  assert.equal(doc.project.tasks[1].items[0].doneDate, '2026-10-20');
+  assert.equal(doc.project.baseline.tasks.find((t) => t.id === 'parent-work').hours, 8);
+  assert.deepEqual(project.baseline, baseline);
+  assert.equal(doc.project.tasks.find((t) => t.id === 'child').items[0].doneDate, '2026-10-20');
 });
 
 test('invalid hierarchy, invalid baseline and stale updates cannot change desktop recovery or document state', (t) => {

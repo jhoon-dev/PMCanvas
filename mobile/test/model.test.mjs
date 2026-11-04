@@ -80,7 +80,9 @@ test('invalid imports reject cyclic dependencies, pending web edits, future comp
   assert.throws(() => parseProject('{'), /JSON/);
   assert.throws(
     () =>
-      parseProject(JSON.stringify({ format: 'pm-canvas-project', version: 2, project: fixture() })),
+      parseProject(
+        JSON.stringify({ format: 'pm-canvas-project', version: 99, project: fixture() }),
+      ),
     /버전/,
   );
   assert.throws(() => parseProject(' '.repeat(MAX_BYTES + 1)), /8MB/);
@@ -90,8 +92,16 @@ test('completion toggles retain immutable input and clear the original completio
   const project = fixture();
   const checked = toggleItem(project, 'task-1', 'item-1');
   assert.equal(project.tasks[0].items[0].doneDate, null);
-  assert.equal(checked.tasks[0].items[0].doneDate, today());
-  assert.equal(toggleItem(checked, 'task-1', 'item-1').tasks[0].items[0].doneDate, null);
+  assert.equal(
+    checked.tasks.flatMap((t) => t.items).find((i) => i.id === 'item-1').doneDate,
+    today(),
+  );
+  assert.equal(
+    toggleItem(checked, 'task-1-work', 'item-1')
+      .tasks.flatMap((t) => t.items)
+      .find((i) => i.id === 'item-1').doneDate,
+    null,
+  );
   assert.throws(() => toggleItem(project, 'missing', 'item-1'));
 });
 test('deleting a parent task preserves children and detaches predecessor references', () => {
@@ -106,7 +116,32 @@ test('deleting a member keeps their work and removes dangling ownership', () => 
   const original = fixture();
   const project = deleteEntity(original, 'member', 'member-1');
   assert.equal(project.members.length, 0);
-  assert.equal(project.tasks.length, 2);
+  assert.equal(project.tasks.length, 3);
   assert.equal(project.tasks[0].owner, '');
   assert.equal(original.tasks[0].owner, 'member-1');
+});
+
+test('v2 files retain summary-only rows and every predecessor while v1 remains readable', () => {
+  const p = normalizeProject(fixture());
+  const own = p.tasks.find((t) => t.id === 'task-1-work');
+  p.tasks.push({
+    ...structuredClone(own),
+    id: 'extra',
+    items: [{ id: 'extra-item', title: 'Extra', hours: 1, doneDate: null }],
+  });
+  const last = p.tasks.find((t) => t.id === 'task-2');
+  last.predecessors = [own.id, 'extra'];
+  const bytes = serializeProject(p);
+  assert.equal(JSON.parse(bytes).version, 3);
+  assert.deepEqual(parseProject(bytes), normalizeProject(p));
+  assert.equal(parseProject(bytes).tasks[0].kind, 'summary');
+  assert.deepEqual(parseProject(bytes).tasks.find((t) => t.id === last.id).predecessors, [
+    own.id,
+    'extra',
+  ]);
+  const old = { format: 'pm-canvas-project', version: 1, project: fixture() };
+  assert.equal(
+    parseProject(JSON.stringify(old)).tasks.find((t) => t.id === own.id).items.length,
+    2,
+  );
 });

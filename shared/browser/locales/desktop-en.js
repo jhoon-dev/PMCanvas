@@ -1,5 +1,236 @@
 // Authored interface text only; project names, notes and imported values are never translated.
 export default {
+  '기준일별 업무 현황과 기간별 완료 기록을 확인하세요.':
+    'Review task status by date and completion records by period.',
+  '보고 기준일까지의 업무와 진척률을 파일로 저장합니다.':
+    'Export task status and progress through the report date.',
+  '← 목록으로': '← Back to list',
+  '설정 · 파일': 'Settings & files',
+  '화면 이동': 'Go to view',
+  '세부 메뉴': 'Page actions',
+  '이슈·리스크 목록': 'Issue and risk list',
+  '이슈·리스크 수정': 'Edit issue or risk',
+  '마일스톤 목록': 'Milestone list',
+  '마일스톤 수정': 'Edit milestone',
+  '발행 목록': 'Published reports',
+  '주간보고 작성': 'Write weekly report',
+  '보고서 보기': 'View report',
+  '투입 목록 · 월별 계획': 'Staffing list and monthly plan',
+  '투입 기간 목록': 'Staffing periods',
+  '환산 기준': 'Conversion basis',
+  '등록된 항목이 없습니다.': 'No items have been added.',
+  목록: 'List',
+  추가: 'Add',
+  작성: 'Write',
+  수정: 'Edit',
+  보기: 'View',
+  작업: 'Actions',
+  '작업 공간': 'Workspace',
+  '설정 닫기': 'Close settings',
+  '프로젝트 화면': 'Project views',
+  프로젝트: 'Projects',
+  '공휴일 갱신': 'Public holidays',
+  '앱 공통 메뉴': 'Application navigation',
+  '현재 프로젝트': 'Current project',
+  '현재 프로젝트 메뉴': 'Current project navigation',
+  '프로젝트 메뉴': 'Project navigation',
+  '설정 항목': 'Settings categories',
+  '앱 설정 항목': 'Application settings categories',
+  '일반 설정': 'General settings',
+  '하위 메뉴': 'Subpages',
+  '앱의 표시 언어와 업무 기준 시간대를 설정합니다.':
+    'Set the application language and business time zone.',
+  '모든 프로젝트에서 사용하는 공휴일 데이터를 관리합니다.':
+    'Manage the public holiday data used by all projects.',
+  '앱의 새 버전 확인과 설치를 관리합니다.': 'Manage application update checks and installation.',
+  '앱 버전과 제작자, 개인정보처리방침을 확인합니다.':
+    'View the application version, developer, and privacy policy.',
+  '프로젝트 화면에서 사용할 수 있습니다.': 'This action is available in the Projects workspace.',
+  '언어와 시간대를 바꾸려면 프로젝트 화면에서 변경사항을 모두 저장해 주세요.':
+    'Save changes in the Projects workspace before changing the language or time zone.',
+  '공휴일 데이터': 'Public holiday data',
+  '버전과 설치': 'Version and installation',
+  '제품 정보': 'Product information',
+  '앱 이름': 'Application name',
+  버전: 'Version',
+  제작자: 'Developer',
+
+  '모든 프로젝트에 공통으로 적용됩니다.': 'Applies to all projects.',
+  '프로젝트로 돌아가기': 'Back to project',
+  '시작 화면으로 돌아가기': 'Back to start',
+  '공휴일 정보가 일정에 반영되어 있습니다.':
+    'Downloaded holiday information is applied to schedules.',
+  '공휴일 정보를 저장하지 못해 기존 달력을 사용하고 있습니다. 자동으로 다시 시도합니다.':
+    'Could not save holiday information. Using the previous calendar; the app will retry automatically.',
+  '공휴일 자동 갱신': 'Public holiday updates',
+  '공휴일 정보 자동 갱신': 'Update public holidays automatically',
+  '지금 갱신': 'Refresh now',
+  'Google의 한국 공휴일 전용 캘린더를 앱 시작 시와 6시간마다 확인합니다. 새 임시공휴일과 선거일이 게시되면 자동으로 반영합니다.':
+    'Checks Google’s South Korean public holiday calendar at startup and every six hours. Newly published temporary holidays and election days are applied automatically.',
+  '연결이 없으면 마지막으로 받은 정보와 내장 공휴일 달력을 사용합니다. 프로젝트별 적용 여부는 프로젝트 설정에서 관리하세요.':
+    'While offline, the app uses the last downloaded information and built-in calendar. Choose whether each project uses public holidays in Project settings.',
+  '공휴일 정보를 확인하고 있습니다.': 'Checking public holidays…',
+  '새 공휴일 정보를 받았습니다. 입력을 마치면 일정에 반영합니다.':
+    'New holiday information is ready. It will be applied after you finish editing.',
+  '연결하지 못해 저장된 공휴일 정보를 사용하고 있습니다. 자동으로 다시 시도합니다.':
+    'Could not connect. Using saved holiday information; the app will retry automatically.',
+  '자동 갱신이 꺼져 있습니다. 마지막으로 받은 공휴일 정보를 사용합니다.':
+    'Automatic updates are off. Using the last downloaded holiday information.',
+  '최신 공휴일 정보를 일정에 반영했습니다.': 'Latest holiday information applied to schedules.',
+  '연결되면 새로 지정된 공휴일 정보를 자동으로 확인합니다.':
+    'New public holidays will be checked automatically when connected.',
+  '아직 갱신하지 않았습니다. 내장 공휴일 달력을 사용합니다.':
+    'Not refreshed yet. Using the built-in holiday calendar.',
+  '최근 갱신': 'Last refreshed',
+  '내장 달력: 2020–2050년 · 새 임시공휴일과 선거일은 온라인 갱신으로 반영합니다. 갱신 상태는 앱 설정에서 확인하세요.':
+    'Built-in calendar: 2020–2050. New temporary holidays and election days are applied through online updates. Check update status in App settings.',
+  '설날 연휴': 'Seollal holiday',
+  '추석 연휴': 'Chuseok holiday',
+  '대통령 선거': 'Presidential election',
+  지방선거일: 'Local elections',
+  '대체 휴일': 'Substitute holiday',
+
+  '언어와 시간대를 바꾸려면 열린 프로젝트의 변경사항을 모두 저장해 주세요.':
+    'Save changes in all open projects before changing the language or time zone.',
+  '선택한 추가 휴무일': 'Selected additional holidays',
+  '추가 휴무일 해제': 'Remove additional holiday',
+  '프로젝트 휴무일': 'Project nonworking days',
+  '한국 공휴일 자동 반영': 'Use Korean public holidays',
+  '공휴일과 대체공휴일은 자동으로 휴무에 반영됩니다. 회사별 추가 휴무일은 날짜를 눌러 지정하세요.':
+    'Public and substitute holidays are excluded automatically. Select dates for additional company holidays.',
+  '자동 반영: 2020–2050년 · 새로 지정되는 임시공휴일과 선거일은 추가 휴무일로 등록해 주세요.':
+    'Automatic calendar: 2020–2050. Add newly announced temporary holidays and election days as additional holidays.',
+  '이 연도는 자동 공휴일 지원 범위 밖입니다. 휴무일을 직접 지정해 주세요.':
+    'This year is outside the automatic calendar range. Add its holidays manually.',
+  '열린 프로젝트': 'Open projects',
+  '저장되지 않은 변경사항': 'Unsaved changes',
+  '다음 프로젝트 탭': 'Next project tab',
+  '이전 프로젝트 탭': 'Previous project tab',
+  신정: "New Year's Day",
+  설날: 'Seollal',
+  삼일절: 'Independence Movement Day',
+  노동절: 'Labour Day',
+  어린이날: "Children's Day",
+  부처님오신날: "Buddha's Birthday",
+  현충일: 'Memorial Day',
+  제헌절: 'Constitution Day',
+  광복절: 'Liberation Day',
+  추석: 'Chuseok',
+  개천절: 'National Foundation Day',
+  한글날: 'Hangeul Day',
+  성탄절: 'Christmas',
+  대체공휴일: 'Substitute holiday',
+  임시공휴일: 'Temporary public holiday',
+  '국회의원 선거일': 'National Assembly election',
+  '대통령 선거일': 'Presidential election',
+  전국동시지방선거일: 'Local elections',
+  '저장하지 않은 프로젝트 탭을 복구했습니다. 계속 작업하거나 파일에 저장해 주세요.':
+    'Recovered unsaved project tabs. Continue working or save them to files.',
+  '일부 원본 파일을 열 수 없어 복구 사본을 불러왔습니다. 해당 탭을 다른 이름으로 저장해 주세요.':
+    'Some original files could not be opened. Recovery copies were loaded; save those tabs with new file names.',
+  '프로젝트는 한 번에 20개까지 열 수 있습니다.': 'You can open up to 20 projects at a time.',
+  '다른 탭에서 열려 있는 파일입니다. 다른 이름으로 저장해 주세요.':
+    'This file is open in another tab. Save with a different name.',
+  '한국 공휴일 설정을 확인해 주세요.': 'Check the Korean public holiday setting.',
+
+  '이전 달': 'Previous month',
+  '다음 달': 'Next month',
+  '이번 달': 'This month',
+  '달력의 날짜를 눌러 선택하거나 해제하세요. 토·일요일은 선택하지 않아도 휴무입니다.':
+    'Select or deselect dates on the calendar. Saturdays and Sundays are already nonworking days.',
+  '휴무일 연도': 'Holiday calendar year',
+  '휴무일 월': 'Holiday calendar month',
+  '휴무일 선택': 'Select holidays',
+  '휴무일 해제': 'Remove holiday',
+  '선택한 휴무일': 'Selected holidays',
+  '선택한 추가 휴무일이 없습니다.': 'No additional holidays selected.',
+  '휴무일을 확인해 주세요.': 'Check the selected holidays.',
+  '시간대 변경을 먼저 적용하거나 취소해 주세요.': 'Apply or cancel the time zone change first.',
+  설정: 'Settings',
+  언어: 'Language',
+  '표시 언어': 'Display language',
+  시간대: 'Time zone',
+  돌아가기: 'Back',
+  '변경 취소': 'Cancel changes',
+  '이 PC에서 사용하는 앱의 언어, 시간대와 업데이트를 관리하세요.':
+    'Manage the app language, time zone and updates on this computer.',
+  '언어와 시간대를 바꾸려면 파일 메뉴에서 프로젝트 변경사항을 먼저 저장해 주세요.':
+    'Save project changes from the File menu before changing the language or time zone.',
+  '변경하면 화면을 새로고침합니다. 프로젝트에 입력한 내용은 번역하지 않습니다.':
+    'Changing the language reloads the screen. Project content is not translated.',
+  알림: 'Notice',
+  확인: 'OK',
+  '변경사항 저장': 'Save changes',
+  '삭제 확인': 'Confirm deletion',
+  '이 참여인력을 삭제할까요?': 'Delete this team member?',
+  '이 업무를 삭제할까요?': 'Delete this task?',
+  '업무의 세부 작업과 완료 기록도 함께 삭제됩니다.':
+    'Its checklist items and completion records will also be deleted.',
+  '버리고 이동': 'Discard and leave',
+  '화면 내 메뉴': 'Section navigation',
+  '업무 목록 · 간트': 'Task list & Gantt',
+  '인력 · 투입': 'Team & staffing',
+  '투입 계획': 'Staffing plan',
+  '이슈 · 리스크': 'Issues & risks',
+  '업무 · 완료 기록': 'Tasks & completions',
+  '업무 목록과 계획 간트를 확인하고, 업무 이름을 눌러 일정을 수정하세요.':
+    'Review tasks and the planned Gantt chart. Select a task name to edit its schedule.',
+  '업무의 주요 목표일과 실제 완료일을 관리하세요.':
+    'Manage key target dates and actual completion dates.',
+  '인력별 투입 기간과 투입률을 설정하고 월별 계획 M/M을 확인하세요.':
+    'Set staffing periods and allocations, and review monthly planned person-months.',
+  '발생한 문제와 예상 위험의 담당자·기한·조치 상태를 관리하세요.':
+    'Track owners, due dates and actions for issues and risks.',
+  '기간별 진행 상황을 검토하고 주간보고를 발행하세요.':
+    'Review progress for a period and publish weekly reports.',
+  '업데이트 설정': 'Update settings',
+  '설정 오류를 복구해 실행했습니다. 환경설정에서 내용을 확인해 주세요.':
+    'Recovered settings to start the app. Review them in Preferences.',
+  도움말: 'Help',
+  편집: 'Edit',
+  가져오기: 'Import',
+  내보내기: 'Export',
+  '업무 현황 Excel 저장…': 'Save task status as Excel…',
+  '텍스트 편집': 'Text editing',
+  '텍스트 실행 취소': 'Undo text edit',
+  '텍스트 다시 실행': 'Redo text edit',
+  잘라내기: 'Cut',
+  복사: 'Copy',
+  붙여넣기: 'Paste',
+  '모두 선택': 'Select all',
+  '실제 크기': 'Actual size',
+  확대: 'Zoom in',
+  축소: 'Zoom out',
+  '전체 화면': 'Full screen',
+  '계획 · 투입': 'Plans & staffing',
+  '이슈·리스크와 주간보고를 관리하세요.': 'Manage issues, risks and weekly reports.',
+  '마일스톤과 인력 투입 기간, 월별 계획 M/M을 관리하세요.':
+    'Manage milestones, staffing periods and monthly planned person-months.',
+  '프로젝트 닫기': 'Close project',
+  '프로젝트를 닫았습니다.': 'Project closed.',
+  '열려 있는 프로젝트가 없습니다.': 'There is no open project.',
+  '프로젝트를 먼저 생성해 주세요.': 'Create a project first.',
+  '입력 취소': 'Cancel input',
+  '입력을 취소했습니다. 다른 입력과 저장된 내용은 유지됩니다.':
+    'Input canceled. Other drafts and saved data are preserved.',
+  '이 기능은 프로젝트가 있어야 사용할 수 있습니다. 새 프로젝트를 만들거나 기존 프로젝트 파일을 열어 주세요.':
+    'This feature needs a project. Create a new project or open an existing project file.',
+  '프로젝트 만들기': 'Create project',
+  '기존 프로젝트 열기': 'Open existing project',
+  '처리 중입니다. 잠시만 기다려 주세요.': 'Working. Please wait.',
+  '먼저 업무를 추가해 주세요.': 'Add a task first.',
+  '일정 조정과 기준 계획은 업무를 등록한 뒤 사용할 수 있습니다.':
+    'Add a task before adjusting schedules or saving a baseline.',
+  '일정 변경 미리보기를 먼저 확인해 주세요.': 'Preview the schedule changes first.',
+  '일정 변경을 미리 본 뒤 적용할 수 있습니다.': 'Preview the schedule changes to enable Apply.',
+  '미리보기 내용을 확인한 뒤 적용하세요.': 'Review the preview, then apply the changes.',
+  '변경할 일정이 없습니다. 조정 방법이나 이동 일수를 바꿔 주세요.':
+    'No schedule changes. Choose another adjustment or number of days.',
+  '세부 작업은 한 개 이상 필요합니다.': 'Keep at least one checklist item.',
+  '투입 기간을 등록하려면 참여인력을 먼저 추가해 주세요.':
+    'Add a team member before creating a staffing period.',
+  '프로젝트를 만들었습니다. 참여인력이나 첫 업무를 추가해 보세요.':
+    'Project created. Add your team or your first task.',
   'Mac App Store에서 업데이트': 'Update in Mac App Store',
   'Mac App Store에서 업데이트합니다. 변경사항을 저장한 뒤 진행하세요.':
     'Updates are installed through Mac App Store. Save your changes before continuing.',
@@ -209,8 +440,8 @@ export default {
   '종료일 차이': 'Finish difference',
   '공수 차이': 'Effort difference',
   '비교할 업무가 없습니다.': 'No tasks to compare.',
-  '전체 업무를 비교합니다. 날짜는 달력 일수이며 +는 늦어짐, −는 앞당김입니다. 공수는 각 업무 자체의 세부 작업 합계입니다.':
-    'Compares all tasks. Date differences use calendar days: + is later, − is earlier. Effort totals each task’s own checklist.',
+  '전체 업무를 비교합니다. 날짜는 달력 일수이며 +는 늦어짐, −는 앞당김입니다. 요약 업무의 공수는 하위 실제 업무의 합계입니다.':
+    'Compares all tasks. Date differences use calendar days: + is later, − is earlier. Summary effort totals executable subtasks.',
   ' 하위 업무': ' children',
   들여쓰기: 'Indent',
   내어쓰기: 'Outdent',
@@ -220,6 +451,13 @@ export default {
   '업무 이름을 눌러 상위 업무를 지정할 수 있습니다.': 'Select a task name to choose its parent.',
   '선택 위로': 'Move selection up',
   '선택 아래로': 'Move selection down',
+  '선택 복제': 'Duplicate selection',
+  '선택 삭제': 'Delete selection',
+  '선택 업무 복제': 'Duplicate selected tasks',
+  '선택 업무 삭제': 'Delete selected tasks',
+  '선택 업무 위로 이동': 'Move selected tasks up',
+  '선택 업무 아래로 이동': 'Move selected tasks down',
+  '변경 내용': 'Change',
   '계층 조정': 'Hierarchy',
   '묶음의 공수·진척률·기간은 해당 업무 자체와 모든 하위 업무를 합산합니다. 전체 프로젝트 총계에 중복 가산하지 않습니다.':
     'Group effort, progress and dates include the task and its descendants. Project totals do not count them twice.',
@@ -227,6 +465,8 @@ export default {
     'Indent moves under the previous sibling. Search expands matching tasks and their ancestors; totals include all descendants.',
   '현재 프로젝트의 업무를 선택해 주세요.': 'Select tasks in the current project.',
   '선택한 ': 'Selected: ',
+  '개 업무를 복제합니다. 복제본은 미완료 업무로 추가하며 선택한 상위·선행 관계는 복제본끼리 연결합니다. 하위 업무도 함께 복제합니다.':
+    ' tasks will be copied as incomplete. Selected parent and predecessor links connect the copies. Child tasks are copied too.',
   '개 업무를 복제합니다. 복제본은 미완료 업무로 추가하며 선택한 상위·선행 관계는 복제본끼리 연결합니다. 함께 복제할 하위 업무도 선택해 주세요.':
     ' tasks will be copied as incomplete. Selected parent and predecessor links connect the copies. Select any children you also want to copy.',
   '개 업무와 완료 기록을 삭제합니다. 미선택 하위 업무 ':
@@ -249,6 +489,11 @@ export default {
   '열기…': 'Open…',
   열기: 'Open',
   '다른 이름으로 저장…': 'Save as…',
+  '다른 이름으로 저장': 'Save as',
+  '웹 JSON 내보내기': 'Export web JSON',
+  '개 · 실제 진척률 ': ' tasks · Actual progress ',
+  '완료한 세부 작업 ': 'Completed checklist items: ',
+  '건 · ': ' records · ',
   '웹 버전용 JSON 내보내기…': 'Export web JSON…',
   'Excel 입력 양식 저장…': 'Save Excel template…',
   보기: 'View',
@@ -271,7 +516,6 @@ export default {
   '원본 파일을 열 수 없어 마지막 복구 사본을 불러왔습니다. 다른 이름으로 저장해 주세요.':
     'The original file could not be opened. The recovery copy was loaded; save it as a new file.',
   '앱 정보': 'About',
-  '오프라인 · 내 PC에 저장': 'Offline · saved on this computer',
   '완료한 작업을 체크하면 진척률과 예상 완료일이 함께 바뀝니다.':
     'Record completed work to update progress and forecasts.',
   '프로젝트 변경 실행 취소': 'Undo project change',

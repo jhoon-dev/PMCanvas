@@ -1,3 +1,4 @@
+import { weeklyDraft } from '../../shared/browser/management.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { IDBFactory } from 'fake-indexeddb';
@@ -41,4 +42,25 @@ test('validation and transaction aborts preserve previously committed data', asy
     /Simulated failure/,
   );
   assert.equal((await store.list())[0].project.name, '첫 프로젝트');
+});
+
+test('offline storage preserves published reports and aborts attempts to mutate a snapshot', async () => {
+  const store = new ProjectStore(new IDBFactory()),
+    p = project();
+  p.weeklyReports = [
+    weeklyDraft(p, {
+      id: 'weekly',
+      from: '2026-10-19',
+      to: '2026-10-23',
+      notes: 'Frozen',
+      nextNotes: '',
+    }),
+  ];
+  const first = await store.save(p, 0),
+    invalid = structuredClone(first.project);
+  invalid.weeklyReports[0].notes = 'Changed';
+  await assert.rejects(store.save(invalid, 1), /발행한/);
+  const reopened = (await new ProjectStore(store.factory).list())[0];
+  assert.equal(reopened.revision, 1);
+  assert.equal(reopened.project.weeklyReports[0].notes, 'Frozen');
 });

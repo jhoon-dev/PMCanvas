@@ -2,7 +2,13 @@
 
 Windows의 유일한 공개 배포 경로는 **MSIX → Partner Center → Microsoft Store**입니다. Mac은 Developer ID 서명·공증 후 GitHub Release를 사용합니다. Store는 제출된 MSIX를 심사한 뒤 서명을 제공하므로 Store 배포를 위해 Windows 코드 서명 인증서를 따로 구매할 필요가 없습니다. CI가 만드는 제출 파일은 아직 Store 서명이 없는 파일이며 사용자에게 직접 설치용으로 배포하지 않습니다. [Microsoft 배포 안내](https://learn.microsoft.com/en-us/windows/apps/publish/get-started)
 
-## 현재 출시 대상 — 2026-11-01
+## 1.9.0 제출 대상 — 2026-11-04
+
+앱 표시 버전 **1.9.0**과 Store 버전의 앞 세 숫자를 통일합니다. Windows의 네 번째 예약 필드만 붙여 MSIX **1.9.0.0**으로 제출합니다. 2026-11-04 Partner Center에서 확인한 기존 패키지 MSIX **1.8.128.0**보다 높습니다. 앱 버전 외의 빌드 번호로 Store 버전을 변경하지 않으며, 다른 패키지를 다시 제출할 때는 앱 버전도 함께 올립니다. 제출 파일의 소스·해시·네이티브 실행·MakeAppx 검증 결과는 빌드가 생성한 `store-manifest.json`에 기록합니다.
+
+[버전별 매뉴얼](../docs/manuals/README.md)과 [데스크톱 1.9.0 사용 매뉴얼](../docs/manuals/desktop/1.9.0/README.ko.md)을 추가했습니다. 현재 대규모 가상 예제의 한국어·영어 화면을 각각 6장씩 1920×1080으로 촬영했으며, 해상도·파일 해시는 [캡처 목록](../docs/manuals/screenshots.json)에 보존합니다. 설치·업데이트·제거·재설치 검증에서는 새 `workspace.json`과 기존 `recovery.json`·프로젝트·설정 원본을 모두 확인합니다. 최종 심사·게시 상태는 [Partner Center](https://partner.microsoft.com/ko-kr/dashboard/products/9NV119XJGQ7J/overview)에서 확인합니다.
+
+## 이전 제출 기록 — 2026-11-01
 
 새 [PM Canvas 제품](https://partner.microsoft.com/ko-kr/dashboard/products/9NV119XJGQ7J/overview)(Store ID **`9NV119XJGQ7J`**)을 출시 대상으로 사용합니다. 기존 PM Canvas Desktop의 인증을 취소하고 제출 초안을 삭제했습니다. 로컬 `.env.msix`와 GitHub `desktop-store` 환경 변수도 새 제품으로 갱신했습니다.
 
@@ -10,7 +16,7 @@ Apple·Capacitor·데스크톱 앱의 번들 ID는 `app.toolmoa.pmcanvas`이며,
 
 개발자 **jhoon-dev**, 브랜드 **Toolmoa**, 제품 표시 이름 **PM Canvas**를 사용합니다. [공통 표기 규칙](../README.md#제품-식별표기-규칙)을 따르며, Store 목록의 개발자 필드와 패키지 author는 `jhoon-dev`로 맞춥니다. `PublisherDisplayName`은 Product identity의 법적 발행자 값입니다. 앱·실행 파일은 `PM Canvas`, `PM Canvas.exe`를 사용하고, 기존 `pmcanvas-desktop` 프로필 폴더와 NSIS 업그레이드 GUID는 데이터·설치 호환성을 위해 보존합니다.
 
-2026-11-01 새 제품의 **Submission 1**(제출 ID `1152921505702288369`)을 인증 심사에 제출했고, Partner Center에서 **인증 중 / 사전 처리 중**으로 접수된 것을 확인했습니다. 개발자 `jhoon-dev`·브랜드 `Toolmoa`·제품명 `PM Canvas`를 반영한 한국어·영어 목록과 각 4장의 새 화면, 무료·전 세계 배포, 기존 IARC 등급, 제한 기능 사용 사유와 새 패키지 검증을 완료했습니다. 최초 제출을 취소한 뒤 아래 새 패키지로 교체해 다시 제출했습니다. 승인·게시 완료를 뜻하지 않습니다. 다음 로컬 패키지는 `PM_STORE_BUILD_NUMBER=3` 이상을 사용합니다.
+2026-11-01 새 제품의 **Submission 1**(제출 ID `1152921505702288369`)을 인증 심사에 제출했고, Partner Center에서 **인증 중 / 사전 처리 중**으로 접수된 것을 확인했습니다. 개발자 `jhoon-dev`·브랜드 `Toolmoa`·제품명 `PM Canvas`를 반영한 한국어·영어 목록과 각 4장의 새 화면, 무료·전 세계 배포, 기존 IARC 등급, 제한 기능 사용 사유와 새 패키지 검증을 완료했습니다. 최초 제출을 취소한 뒤 아래 새 패키지로 교체해 다시 제출했습니다. 승인·게시 완료를 뜻하지 않습니다. 이후 제출의 버전 규칙은 위 1.9.0 안내를 따릅니다.
 
 새 제품용 앱 **0.8.3**, MSIX **1.8.5.0**은 네이티브 실행·저장·재시작·Excel 기능, MakeAppx 생성·추출, 전체 payload 비교를 통과했습니다. 제출 파일의 소스 커밋은 `9f2782f70cfa13ab3658f5f2817ee26e049105eb`, SHA-256은 `29160b1c31c798f905ab67c421ea6afb48b0f5657b2aa41d48eaadb7eaf40638`입니다. SDK 도구는 서명된 원본과 인접한 매니페스트를 짧은 작업 경로로 복사한 뒤 실행합니다.
 
@@ -71,9 +77,9 @@ npm run dist:win
 
 현재 고정된 electron-builder의 안정적인 unpacked 패키징과 체크섬이 고정된 Windows SDK MakeAppx를 사용합니다. MSIX를 단순히 확장자만 바꿔 만들지 않습니다. SDK의 manifest/pack 검증, MSIX 추출 후 전체 payload 비교, ASAR 원본 커밋 검사, 네이티브 앱 실행을 통과해야 제출 목록을 만듭니다. 기존 출력 폴더는 덮어쓰지 않습니다.
 
-Store 패키지 버전은 앱의 세 필드 `[major, minor, patch]`와 `PM_STORE_BUILD_NUMBER`를 네 필드 `[major+1, minor, patch+buildNumber, 0]`으로 변환합니다. 기본 빌드 번호는 0이므로 기존 매핑을 유지합니다. 제출 CI는 워크플로 실행 번호 `github.run_number`를 사용합니다. 예를 들어 앱 `0.8.3`의 빌드 70은 패키지 필드 `[1, 8, 73, 0]`입니다. 앱 표시 버전은 바뀌지 않습니다. Store의 첫 숫자 0 금지·네 번째 숫자 0 예약 규칙을 지키며 각 필드는 65535 이하여야 합니다. [Microsoft 패키지 버전 규칙](https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/msix/app-package-requirements)
+Store 패키지 버전은 앱의 세 필드 `[major, minor, patch]`에 Windows의 예약 필드 `0`만 붙인 `[major, minor, patch, 0]`입니다. 앱 `1.9.0`은 패키지 MSIX **1.9.0.0**이며 앱 정보·파일 버전·Store에서 같은 앞 세 숫자를 사용합니다. Store는 첫 숫자 0을 허용하지 않고 네 번째 숫자를 0으로 예약하므로, 각 필드를 65535 이하로 설정합니다. [Microsoft 패키지 버전 규칙](https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/msix/app-package-requirements)
 
-같은 앱 버전의 패키지를 교체할 때는 이전 실행을 재실행하지 말고 **새 Run workflow**를 시작해 더 큰 빌드 번호를 받으세요. 로컬 제출은 기존 업로드보다 큰 패키지 버전이 되도록 `PM_STORE_BUILD_NUMBER`를 지정합니다. 동일한 전체 패키지 이름에 다른 파일을 올리면 Partner Center가 거부합니다. 실제 패키지 버전과 빌드 번호는 `store-manifest.json`에도 기록합니다.
+다른 파일을 다시 제출하려면 앱 버전도 함께 올리세요. CI 실행 번호로 패키지 버전을 바꾸지 않습니다. 이전 설정의 `PM_STORE_BUILD_NUMBER`가 0이 아니면 빌드를 거부합니다. 동일한 전체 패키지 이름에 다른 파일을 올리면 Partner Center가 거부합니다.
 
 ## 4. Partner Center 제출과 공개
 

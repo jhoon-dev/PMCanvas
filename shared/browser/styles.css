@@ -1,3 +1,5 @@
+@import url('./project-visuals.css');
+
 :root {
   font-family:
     'DM Sans',
@@ -121,7 +123,7 @@ h3 {
   letter-spacing: -0.7px;
 }
 .brand small {
-  font-size: 8px;
+  font-size: 12px;
   display: block;
   color: #8ba0b6;
   letter-spacing: 2px;
@@ -139,7 +141,7 @@ h3 {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 1.7px;
   padding: 0 14px;
@@ -176,7 +178,7 @@ h3 {
 }
 .nav-count {
   margin-left: auto;
-  font-size: 10px;
+  font-size: 12px;
   background: #3c5670;
   padding: 0 6px;
   border-radius: 4px;
@@ -208,14 +210,14 @@ h3 {
   color: #a7b8c8;
   padding: 9px 14px;
   border-radius: 6px;
-  font-size: 11px;
+  font-size: 12px;
   overflow-wrap: anywhere;
 }
 .project-switch.selected {
   color: #e1eaf3;
 }
 .project-switch small {
-  font-size: 9px;
+  font-size: 12px;
   color: #90a7bf;
   margin-left: auto;
   white-space: nowrap;
@@ -238,12 +240,12 @@ h3 {
   display: flex;
   align-items: center;
   gap: 9px;
-  font-size: 10px;
+  font-size: 12px;
   color: #afbecc;
 }
 .side-bottom small {
   display: block;
-  font-size: 9px;
+  font-size: 12px;
   color: #8ba0b5;
   margin-top: 1px;
 }
@@ -269,7 +271,7 @@ h3 {
   padding: 0 40px;
 }
 .breadcrumb {
-  font-size: 11px;
+  font-size: 12px;
   color: #94a1ae;
 }
 .breadcrumb span {
@@ -286,7 +288,7 @@ h3 {
   gap: 13px;
 }
 .save-status {
-  font-size: 10px;
+  font-size: 12px;
   color: #6e8991;
 }
 .save-status:before {
@@ -309,7 +311,7 @@ h3 {
   height: 31px;
   background: #e9eef4;
   color: #576f87;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   margin-left: 4px;
 }
@@ -327,12 +329,12 @@ main {
   padding: 9px 14px;
   border-radius: 7px;
   color: #637eaa;
-  font-size: 10px;
+  font-size: 12px;
   margin-bottom: 24px;
   gap: 12px;
 }
 .demo-pill {
-  font-size: 8px;
+  font-size: 12px;
   letter-spacing: 1px;
   color: #4871b8;
   background: #e0eaff;
@@ -342,7 +344,7 @@ main {
   font-weight: 700;
 }
 .demo-notice .button {
-  font-size: 10px;
+  font-size: 12px;
 }
 .page-head {
   display: flex;
@@ -352,7 +354,7 @@ main {
   margin-bottom: 27px;
 }
 .eyebrow {
-  font-size: 9px;
+  font-size: 12px;
   letter-spacing: 1.7px;
   color: #8a9aaa;
   font-weight: 600;
@@ -412,7 +414,7 @@ main {
   min-height: unset;
   background: none;
   color: #6b87b3;
-  font-size: 10px;
+  font-size: 12px;
 }
 .button.link:hover {
   box-shadow: none;
@@ -465,7 +467,7 @@ main {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 10px;
+  font-size: 12px;
   color: #7d8b9a;
 }
 .date-control .icon {
@@ -477,19 +479,19 @@ main {
   background: transparent;
   border: 0;
   color: #3e5268;
-  font-size: 11px;
+  font-size: 12px;
   padding: 5px 2px;
   max-width: 120px;
 }
 .date-tag {
-  font-size: 9px;
+  font-size: 12px;
   background: #e8edf4;
   color: #70829a;
   padding: 2px 7px;
   border-radius: 4px;
 }
 .period-label {
-  font-size: 10px;
+  font-size: 12px;
   color: #92a0ae;
 }
 .period-label strong {
@@ -515,7 +517,7 @@ main {
   justify-content: space-between;
   align-items: center;
   color: #758698;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
 }
 .metric-icon {
@@ -544,14 +546,14 @@ main {
   letter-spacing: 0;
 }
 .metric-number .metric-context {
-  font-size: 10px;
+  font-size: 12px;
   color: #a0aaba;
   letter-spacing: 0;
   margin-left: auto;
   font-weight: 400;
 }
 .metric-foot {
-  font-size: 10px;
+  font-size: 12px;
   color: #8795a4;
   margin-top: 10px;
 }
@@ -560,7 +562,7 @@ main {
   font-weight: 500;
 }
 .subtle {
-  font-size: 9px;
+  font-size: 12px;
   color: #8d9aa8;
   margin-top: 5px;
 }
@@ -597,7 +599,7 @@ main {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 500;
   padding: 3px 7px;
   border-radius: 4px;
@@ -640,14 +642,14 @@ main {
   border-radius: 50%;
   background: color-mix(in srgb, var(--avatar) 12%, white);
   color: var(--avatar);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
   flex-shrink: 0;
 }
 .avatar.tiny {
   width: 24px;
   height: 24px;
-  font-size: 8px;
+  font-size: 12px;
 }
 .avatar.large {
   height: 46px;
@@ -669,7 +671,7 @@ main {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 10px;
+  font-size: 12px;
   white-space: nowrap;
   color: #718397;
 }
@@ -687,7 +689,7 @@ main {
   padding: 22px 24px 16px;
 }
 .panel-head p {
-  font-size: 10px;
+  font-size: 12px;
   color: #91a0af;
   margin-top: 3px;
 }
@@ -703,7 +705,7 @@ main {
 .legend {
   display: flex;
   gap: 14px;
-  font-size: 9px;
+  font-size: 12px;
   color: #8c9aaa;
 }
 .legend span:before {
@@ -723,17 +725,19 @@ main {
 }
 .chart-wrap {
   padding: 0 18px;
+  overflow-x: auto;
 }
 .chart-wrap svg {
   display: block;
   width: 100%;
+  min-width: 600px;
   height: auto;
   max-height: 235px;
   overflow: visible;
   font-family: inherit;
 }
 .chart-wrap svg text {
-  font-size: 9px;
+  font-size: 15px;
   fill: #a1adbb;
 }
 .chart-grid {
@@ -764,10 +768,11 @@ main {
 }
 .chart-caption {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   padding: 0 24px 17px;
   color: #9da9b5;
-  font-size: 8px;
+  font-size: 12px;
   gap: 12px;
 }
 .chart-empty {
@@ -775,7 +780,7 @@ main {
   place-items: center;
   min-height: 220px;
   color: #a0aebc;
-  font-size: 11px;
+  font-size: 12px;
 }
 .outlook {
   background: linear-gradient(125deg, #eef4ff, #f4f8ff);
@@ -785,7 +790,7 @@ main {
 }
 .outlook .eyebrow {
   color: #84a0c9;
-  font-size: 8px;
+  font-size: 12px;
   letter-spacing: 1.4px;
 }
 .outlook-icon {
@@ -813,7 +818,7 @@ main {
   font-weight: 600;
 }
 .outlook p {
-  font-size: 10px;
+  font-size: 12px;
   color: #7d96b3;
   line-height: 1.9;
 }
@@ -825,7 +830,7 @@ main {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 9px;
+  font-size: 12px;
   color: #88a0bc;
   border-top: 1px solid #dce6f5;
   padding-top: 14px;
@@ -854,7 +859,7 @@ main {
   display: grid;
   grid-template-columns: 240px 1fr;
   height: 36px;
-  font-size: 9px;
+  font-size: 12px;
   color: #92a2b4;
   border-bottom: 1px solid #e8edf4;
 }
@@ -892,7 +897,8 @@ main {
   border: 0;
   background: #fff;
   text-align: left;
-  font-size: 10px;
+  font-size: 12px;
+  line-height: 1.3;
   position: sticky;
   left: 0;
   z-index: 3;
@@ -908,12 +914,12 @@ main {
 }
 .gantt-label small {
   display: block;
-  font-size: 8px;
+  font-size: 12px;
   color: #9aa8b7;
   margin-top: 2px;
 }
 .wbs-no {
-  font-size: 8px;
+  font-size: 12px;
   color: #a2aebc;
 }
 .gantt-track {
@@ -948,10 +954,11 @@ main {
   border-radius: 3px;
 }
 .gantt-progress span {
-  font-size: 7px;
+  font-size: 12px;
+  line-height: 14px;
   position: absolute;
   left: 4px;
-  top: 1px;
+  top: 0;
   color: #3b5676;
   z-index: 1;
 }
@@ -979,7 +986,7 @@ main {
   gap: 17px;
   border-top: 1px solid #f0f3f7;
   padding: 13px 24px;
-  font-size: 8px;
+  font-size: 12px;
   color: #8d9cae;
   flex-wrap: wrap;
 }
@@ -1013,7 +1020,7 @@ main {
   gap: 20px;
 }
 .count {
-  font-size: 10px;
+  font-size: 12px;
   margin-left: 6px;
   color: #8b9fb7;
   font-weight: 400;
@@ -1059,17 +1066,17 @@ main {
 }
 .attention-item strong {
   display: block;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 500;
 }
 .attention-item small {
   display: block;
-  font-size: 8px;
+  font-size: 12px;
   color: #99a6b5;
   margin-top: 2px;
 }
 .mini-progress {
-  font-size: 10px;
+  font-size: 12px;
   color: #6e86a0;
   margin-left: 5px;
   min-width: 30px;
@@ -1091,19 +1098,19 @@ main {
   display: flex;
   justify-content: space-between;
   gap: 8px;
-  font-size: 9px;
+  font-size: 12px;
   margin-bottom: 7px;
 }
 .person-line strong {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 500;
 }
 .person-line span {
   color: #9ba7b4;
-  font-size: 8px;
+  font-size: 12px;
 }
 .person-percent {
-  font-size: 10px;
+  font-size: 12px;
   color: #7890a9;
   font-weight: 500;
   min-width: 32px;
@@ -1112,7 +1119,7 @@ main {
 .calm-state {
   padding: 32px 24px;
   text-align: center;
-  font-size: 11px;
+  font-size: 12px;
   color: #9ba9b8;
 }
 .notice {
@@ -1125,7 +1132,7 @@ main {
   border-radius: 7px;
   padding: 13px 16px;
   margin-bottom: 22px;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.8;
 }
 .notice .icon {
@@ -1148,7 +1155,7 @@ main {
   border-radius: 5px;
   background: #fff;
   padding: 0 9px;
-  font-size: 10px;
+  font-size: 12px;
   color: #738498;
 }
 .filter-controls input {
@@ -1167,7 +1174,7 @@ main {
   min-width: 850px;
 }
 .task-table thead th {
-  font-size: 9px;
+  font-size: 12px;
   color: #93a2b3;
   font-weight: 500;
   background: #fbfcfe;
@@ -1178,7 +1185,7 @@ main {
 .task-table td {
   padding: 14px 16px;
   border-bottom: 1px solid #f0f3f8;
-  font-size: 10px;
+  font-size: 12px;
   color: #7d8fa3;
 }
 .task-table tr:last-child td {
@@ -1196,19 +1203,19 @@ main {
   min-width: 155px;
 }
 .task-name-button small {
-  font-size: 8px;
+  font-size: 12px;
   color: #98a8b9;
   display: block;
 }
 .task-name-button strong {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   display: block;
   color: #425a74;
   margin: 3px 0;
 }
 .task-name-button span {
-  font-size: 8px;
+  font-size: 12px;
   color: #9ba9b8;
 }
 .task-table .table-progress {
@@ -1222,13 +1229,13 @@ main {
   min-width: 50px;
 }
 .table-progress strong {
-  font-size: 10px;
+  font-size: 12px;
   color: #67809b;
   font-weight: 500;
 }
 .cell-sub {
   display: block;
-  font-size: 8px;
+  font-size: 12px;
   color: #9caab9;
   margin-top: 3px;
 }
@@ -1268,7 +1275,7 @@ main {
   color: #5579aa;
 }
 .daily-summary p {
-  font-size: 10px;
+  font-size: 12px;
   color: #8b9fbb;
   margin-top: 3px;
 }
@@ -1279,7 +1286,7 @@ main {
   color: #6189c7;
 }
 .daily-count small {
-  font-size: 10px;
+  font-size: 12px;
   margin-left: 6px;
   font-weight: 400;
 }
@@ -1289,13 +1296,13 @@ main {
   justify-content: space-between;
   margin: 23px 0 12px;
   color: #8b9bad;
-  font-size: 10px;
+  font-size: 12px;
 }
 .toggle-label {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 10px;
+  font-size: 12px;
   cursor: pointer;
 }
 .toggle-label input {
@@ -1315,13 +1322,13 @@ main {
   margin: 4px 0 8px;
 }
 .check-task-head .eyebrow {
-  font-size: 8px;
+  font-size: 12px;
 }
 .task-meta {
   display: flex;
   align-items: center;
   gap: 14px;
-  font-size: 9px;
+  font-size: 12px;
   color: #9aa7b6;
 }
 .check-task-progress {
@@ -1395,13 +1402,13 @@ main {
   opacity: 1;
 }
 .check-item strong {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   color: #64788f;
 }
 .check-item small {
   display: block;
-  font-size: 8px;
+  font-size: 12px;
   color: #a1afbd;
   margin-top: 3px;
 }
@@ -1410,14 +1417,14 @@ main {
   color: #9daaba;
 }
 .effort-chip {
-  font-size: 9px;
+  font-size: 12px;
   color: #9cabbc;
   background: #f4f6f9;
   padding: 3px 8px;
   border-radius: 4px;
 }
 .view-note {
-  font-size: 10px;
+  font-size: 12px;
   color: #9baaba;
   text-align: center;
   margin: 22px 0;
@@ -1444,12 +1451,12 @@ main {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 10px;
+  font-size: 12px;
   color: #8e9fb1;
   margin: 4px 0 23px;
 }
 .grade {
-  font-size: 9px;
+  font-size: 12px;
   color: #6c84a4;
   background: #f0f4fa;
   padding: 2px 6px;
@@ -1464,7 +1471,7 @@ main {
 }
 .member-stats small {
   display: block;
-  font-size: 9px;
+  font-size: 12px;
   color: #9ba9b9;
   margin-bottom: 5px;
 }
@@ -1475,7 +1482,7 @@ main {
   letter-spacing: -0.7px;
 }
 .member-stats em {
-  font-size: 9px;
+  font-size: 12px;
   font-style: normal;
   color: #99aabe;
   margin-left: 3px;
@@ -1483,17 +1490,17 @@ main {
 .member-progress-label {
   display: flex;
   justify-content: space-between;
-  font-size: 9px;
+  font-size: 12px;
   color: #93a2b4;
   margin-bottom: 9px;
 }
 .member-progress-label strong {
-  font-size: 10px;
+  font-size: 12px;
   color: #7494bd;
   font-weight: 500;
 }
 .member-foot {
-  font-size: 8px;
+  font-size: 12px;
   color: #a4b1be;
   text-align: right;
   margin-top: 6px;
@@ -1503,7 +1510,7 @@ main {
   color: #92a6bf;
   padding: 8px 9px;
   border-radius: 5px;
-  font-size: 8px;
+  font-size: 12px;
   margin-top: 16px;
 }
 .empty-state {
@@ -1523,7 +1530,7 @@ main {
   font-weight: 500;
 }
 .empty-state p {
-  font-size: 11px;
+  font-size: 12px;
   margin: 7px 0 18px;
   color: #9caabc;
 }
@@ -1535,12 +1542,12 @@ footer {
   margin: auto;
   padding: 21px 40px 28px;
   color: #a3afbc;
-  font-size: 9px;
+  font-size: 12px;
 }
 footer button {
   background: none;
   border: 0;
-  font-size: 9px;
+  font-size: 12px;
   color: #8f9eb0;
   padding: 0;
 }
@@ -1571,7 +1578,7 @@ dialog::backdrop {
   margin-top: 3px;
 }
 .dialog-head .eyebrow {
-  font-size: 8px;
+  font-size: 12px;
 }
 #dialogBody {
   padding: 24px 28px 2px;
@@ -1635,7 +1642,7 @@ dialog::backdrop {
 .field small {
   display: block;
   color: #64748b;
-  font-size: 11px;
+  font-size: 12px;
   margin-top: 6px;
   font-weight: 400;
 }
@@ -1645,7 +1652,7 @@ dialog::backdrop {
   gap: 16px;
 }
 .optional {
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 400;
   color: #acb8c7;
   margin-left: 5px;
@@ -1665,7 +1672,7 @@ dialog::backdrop {
   color: #c57970;
 }
 .form-error {
-  font-size: 11px;
+  font-size: 12px;
   color: #c3776b;
   padding: 0 28px 15px;
   min-height: 0;
@@ -1691,7 +1698,7 @@ dialog::backdrop {
   font-weight: 500;
 }
 .items-title span {
-  font-size: 11px;
+  font-size: 12px;
   margin-right: 35px;
   color: #64748b;
 }
@@ -1711,7 +1718,7 @@ dialog::backdrop {
 .task-details > summary span {
   margin-left: 10px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 400;
 }
 .task-details-body {
@@ -1725,7 +1732,7 @@ dialog::backdrop {
 .menu-label {
   display: block;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
   padding: 10px 12px 4px;
 }
 .menu-label:not(:first-child) {
@@ -1861,14 +1868,14 @@ dialog::backdrop {
 }
 .item-editor > span {
   color: #99aabd;
-  font-size: 10px;
+  font-size: 12px;
 }
 .item-editor .icon-button {
   flex-shrink: 0;
   width: 24px;
 }
 .add-item {
-  font-size: 10px;
+  font-size: 12px;
   color: #7f9dc5;
   padding: 8px 0;
   margin: 3px 0 19px;
@@ -1890,7 +1897,7 @@ dialog::backdrop {
 }
 .info-body .notice {
   margin: 20px 0 0;
-  font-size: 10px;
+  font-size: 12px;
 }
 .help-step {
   display: flex;
@@ -1906,7 +1913,7 @@ dialog::backdrop {
   margin: 0 !important;
 }
 .help-step p {
-  font-size: 11px;
+  font-size: 12px;
   margin-top: 5px;
 }
 #toast {
@@ -1917,7 +1924,7 @@ dialog::backdrop {
   background: #203b56;
   color: #eaf0f9;
   padding: 12px 20px;
-  font-size: 11px;
+  font-size: 12px;
   border-radius: 7px;
   box-shadow: 0 8px 25px #203b5625;
   opacity: 0;
@@ -1978,7 +1985,7 @@ dialog::backdrop {
     font-size: 28px;
   }
   .metric-number .metric-context {
-    font-size: 8px;
+    font-size: 12px;
   }
   .analysis-grid {
     grid-template-columns: minmax(0, 2fr) 245px;
@@ -1991,7 +1998,7 @@ dialog::backdrop {
     font-size: 18px;
   }
   .chart-caption {
-    font-size: 7px;
+    font-size: 12px;
   }
   .team-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2016,16 +2023,16 @@ dialog::backdrop {
     padding-left: 8px;
   }
   .brand small {
-    font-size: 7px;
+    font-size: 12px;
     letter-spacing: 1.5px;
   }
   .nav-item {
-    font-size: 10px;
+    font-size: 12px;
     padding: 12px 10px;
     gap: 9px;
   }
   .side-bottom small {
-    font-size: 8px;
+    font-size: 12px;
   }
   .metric-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2052,7 +2059,7 @@ dialog::backdrop {
     max-width: 350px;
   }
   .head-actions .button {
-    font-size: 10px;
+    font-size: 12px;
     padding: 8px 10px;
   }
   .gantt-foot .muted {
@@ -2067,14 +2074,14 @@ dialog::backdrop {
     font-size: 16px;
   }
   .legend {
-    font-size: 8px;
+    font-size: 12px;
   }
   .demo-notice {
     align-items: flex-start;
-    font-size: 9px;
+    font-size: 12px;
   }
   .demo-notice .button {
-    font-size: 9px;
+    font-size: 12px;
   }
   .chart-wrap svg {
     max-height: 260px;
@@ -2114,7 +2121,7 @@ dialog::backdrop {
     gap: 3px;
     justify-content: center;
     align-items: center;
-    font-size: 8px;
+    font-size: 12px;
     padding: 6px 2px;
     margin: 0;
     border-radius: 0;
@@ -2146,7 +2153,7 @@ dialog::backdrop {
     padding: 0 18px;
   }
   .breadcrumb {
-    font-size: 9px;
+    font-size: 12px;
     max-width: 60%;
     white-space: nowrap;
     overflow: hidden;
@@ -2164,17 +2171,17 @@ dialog::backdrop {
   .profile-avatar {
     width: 25px;
     height: 25px;
-    font-size: 8px;
+    font-size: 12px;
   }
   .top-actions .button {
-    font-size: 9px;
+    font-size: 12px;
   }
   main {
     padding: 20px 16px 12px;
   }
   .demo-notice {
     padding: 10px;
-    font-size: 9px;
+    font-size: 12px;
     flex-direction: column;
     gap: 7px;
     margin-bottom: 18px;
@@ -2188,10 +2195,10 @@ dialog::backdrop {
     font-size: 25px;
   }
   .page-head p {
-    font-size: 10px;
+    font-size: 12px;
   }
   .eyebrow {
-    font-size: 8px;
+    font-size: 12px;
   }
   .head-actions {
     padding-top: 0;
@@ -2208,7 +2215,7 @@ dialog::backdrop {
     min-height: 160px;
   }
   .metric-label {
-    font-size: 10px;
+    font-size: 12px;
   }
   .metric-number {
     font-size: 30px;
@@ -2217,25 +2224,25 @@ dialog::backdrop {
     font-size: 29px;
   }
   .metric-number small {
-    font-size: 11px;
+    font-size: 12px;
   }
   .metric-number .metric-context {
     display: none;
   }
   .subtle {
-    font-size: 8px;
+    font-size: 12px;
   }
   .metric-foot {
-    font-size: 9px;
+    font-size: 12px;
   }
   .view-toolbar {
     margin-bottom: 13px;
   }
   .date-control {
-    font-size: 9px;
+    font-size: 12px;
   }
   .period-label {
-    font-size: 8px;
+    font-size: 12px;
   }
   .period-label strong {
     margin-left: 5px;
@@ -2247,21 +2254,21 @@ dialog::backdrop {
     font-size: 13px;
   }
   .panel-head p {
-    font-size: 9px;
+    font-size: 12px;
   }
   .panel-head .button.link {
-    font-size: 8px;
+    font-size: 12px;
   }
   .legend {
     gap: 9px;
-    font-size: 8px;
+    font-size: 12px;
   }
   .chart-wrap {
     padding: 0 8px;
   }
   .chart-caption {
     padding: 0 16px 13px;
-    font-size: 7px;
+    font-size: 12px;
   }
   .chart-caption span:last-child {
     display: none;
@@ -2280,15 +2287,15 @@ dialog::backdrop {
     grid-template-columns: 180px 1fr;
   }
   .gantt-label {
-    font-size: 9px;
+    font-size: 12px;
   }
   .gantt-label small {
-    font-size: 7px;
+    font-size: 12px;
   }
   .gantt-foot {
     gap: 12px;
     padding: 12px 16px;
-    font-size: 7px;
+    font-size: 12px;
   }
   .timeline-panel {
     margin-bottom: 17px;
@@ -2297,13 +2304,13 @@ dialog::backdrop {
     padding: 0 16px 7px;
   }
   .attention-item strong {
-    font-size: 10px;
+    font-size: 12px;
   }
   .attention-item .badge {
-    font-size: 8px;
+    font-size: 12px;
   }
   .mini-progress {
-    font-size: 9px;
+    font-size: 12px;
   }
   .people-progress {
     padding: 0 16px 12px;
@@ -2326,20 +2333,20 @@ dialog::backdrop {
     font-size: 17px;
   }
   .member-stats small {
-    font-size: 7px;
+    font-size: 12px;
   }
   .member-role {
-    font-size: 9px;
+    font-size: 12px;
     margin-bottom: 15px;
   }
   .member-progress-label {
-    font-size: 8px;
+    font-size: 12px;
   }
   .pace-note {
-    font-size: 7px;
+    font-size: 12px;
   }
   .notice {
-    font-size: 10px;
+    font-size: 12px;
     padding: 12px;
   }
   .filter-controls {
@@ -2353,7 +2360,7 @@ dialog::backdrop {
   }
   .filter-controls select {
     max-width: 31%;
-    font-size: 9px;
+    font-size: 12px;
     padding: 0 6px;
   }
   .daily-summary {
@@ -2361,10 +2368,10 @@ dialog::backdrop {
     gap: 10px;
   }
   .daily-summary strong {
-    font-size: 11px;
+    font-size: 12px;
   }
   .daily-summary p {
-    font-size: 8px;
+    font-size: 12px;
   }
   .daily-summary-icon {
     width: 34px;
@@ -2376,13 +2383,13 @@ dialog::backdrop {
     white-space: nowrap;
   }
   .daily-count small {
-    font-size: 8px;
+    font-size: 12px;
   }
   .section-toolbar {
-    font-size: 8px;
+    font-size: 12px;
   }
   .toggle-label {
-    font-size: 8px;
+    font-size: 12px;
   }
   .check-task-head {
     padding: 17px 16px;
@@ -2398,26 +2405,26 @@ dialog::backdrop {
   }
   .task-meta {
     gap: 8px;
-    font-size: 8px;
+    font-size: 12px;
   }
   .task-meta .person {
-    font-size: 8px;
+    font-size: 12px;
   }
   .task-meta .badge {
-    font-size: 8px;
+    font-size: 12px;
   }
   .check-item {
     padding: 14px 16px;
     gap: 11px;
   }
   .check-item strong {
-    font-size: 10px;
+    font-size: 12px;
   }
   .check-item small {
-    font-size: 8px;
+    font-size: 12px;
   }
   .view-note {
-    font-size: 8px;
+    font-size: 12px;
   }
   .form-grid {
     gap: 11px;
@@ -2439,7 +2446,7 @@ dialog::backdrop {
     padding: 0 20px 14px;
   }
   .field {
-    font-size: 10px;
+    font-size: 12px;
   }
   .field input,
   .field select,
@@ -2454,21 +2461,21 @@ dialog::backdrop {
   }
   .item-editor input {
     padding: 8px;
-    font-size: 10px;
+    font-size: 12px;
   }
   footer {
     padding: 14px 16px 87px;
-    font-size: 7px;
+    font-size: 12px;
     gap: 15px;
   }
   footer button {
-    font-size: 7px;
+    font-size: 12px;
   }
   #toast {
     left: 50%;
     bottom: 82px;
     width: max-content;
-    font-size: 10px;
+    font-size: 12px;
     max-width: 90vw;
   }
   .task-table th:first-child,
@@ -2506,7 +2513,7 @@ dialog::backdrop {
   .mobile-projects select {
     border: 0;
     background: transparent;
-    font-size: 11px;
+    font-size: 12px;
     color: #526d8c;
     max-width: calc(100% - 28px);
     padding: 6px 0;
@@ -2540,7 +2547,7 @@ dialog::backdrop {
   white-space: normal;
 }
 .report-table strong {
-  font-size: 11px;
+  font-size: 12px;
 }
 @media (max-width: 700px) {
   .report-filters {
@@ -2550,7 +2557,7 @@ dialog::backdrop {
     grid-column: 1/-1;
   }
   .report-summary strong {
-    font-size: 11px;
+    font-size: 12px;
   }
   .head-actions {
     flex-wrap: wrap;
@@ -2586,7 +2593,7 @@ dialog::backdrop {
   color: #718397;
 }
 .auth-card small {
-  font-size: 10px;
+  font-size: 12px;
   color: #8b98a7;
 }
 .auth-card .form-error {
@@ -2612,7 +2619,7 @@ dialog::backdrop {
 .sharing-row small {
   display: block;
   color: #718397;
-  font-size: 10px;
+  font-size: 12px;
 }
 .audit-entry {
   padding: 18px 0;
@@ -2621,12 +2628,12 @@ dialog::backdrop {
 .audit-entry > small {
   display: block;
   color: #8b98a7;
-  font-size: 10px;
+  font-size: 12px;
 }
 .audit-entry ul {
   margin: 10px 0 0;
   padding-left: 18px;
-  font-size: 11px;
+  font-size: 12px;
 }
 button:disabled {
   opacity: 0.6;
@@ -2688,7 +2695,7 @@ button:disabled {
   overflow-wrap: anywhere;
 }
 .connection-card code {
-  font-size: 11px;
+  font-size: 12px;
 }
 .connection-card p {
   margin: 6px 0;
@@ -2712,7 +2719,7 @@ button:disabled {
   outline-offset: 3px;
 }
 .registration-domains {
-  font-size: 11px;
+  font-size: 12px;
   overflow-wrap: anywhere;
 }
 .auth-card h1:focus {
@@ -2965,7 +2972,7 @@ button:disabled {
 }
 .backup-status small {
   display: inline-block;
-  font-size: 11px;
+  font-size: 12px;
   color: #687a90;
 }
 .admin-tabs {
@@ -3079,7 +3086,7 @@ button:disabled {
     white-space: nowrap;
   }
   .nav-item {
-    font-size: 11px;
+    font-size: 12px;
     line-height: 1.25;
     min-height: 54px;
   }
@@ -3134,4 +3141,259 @@ button:disabled {
     min-width: 0;
     overflow-wrap: anywhere;
   }
+}
+
+.pm-management {
+  min-width: 0;
+}
+.pm-management > details {
+  margin: 16px 0;
+  padding: 18px;
+  border: 1px solid #dce4ee;
+  border-radius: 12px;
+  background: white;
+}
+.pm-management summary {
+  cursor: pointer;
+  padding: 12px 0;
+  overflow-wrap: anywhere;
+  font-weight: 600;
+}
+.pm-management fieldset {
+  border: 0;
+  padding: 0;
+  min-width: 0;
+}
+.pm-management form {
+  padding: 16px 0;
+  border-bottom: 1px solid #e4eaf3;
+}
+.pm-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+}
+.pm-management input,
+.pm-management select,
+.pm-management textarea {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.pm-management .button {
+  min-height: 44px;
+}
+.pm-management .pm-error {
+  color: #b92938;
+}
+.pm-table-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+}
+.pm-table-scroll table {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 480px;
+}
+.pm-table-scroll th,
+.pm-table-scroll td {
+  text-align: left;
+  padding: 10px;
+  border-bottom: 1px solid #e4eaf3;
+}
+.pm-narrative {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.pm-curve {
+  width: 100%;
+  max-height: 240px;
+}
+.pm-report {
+  overflow-wrap: anywhere;
+  padding: 16px 0;
+}
+.pm-note {
+  font-size: 13px;
+  color: #58677b;
+}
+.my-work-quick {
+  margin: -8px 0 14px;
+  padding: 10px 14px;
+  background: white;
+  border: 1px solid #e4eaf3;
+  border-radius: 0 0 12px 12px;
+}
+.my-work-quick summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+.my-work-quick button {
+  min-height: 44px;
+  display: block;
+  white-space: normal;
+  text-align: left;
+  width: 100%;
+  margin: 8px 0;
+}
+.wbs-plan.milestone {
+  border-radius: 0;
+  border: 2px solid #8554ad;
+  background: #f4edfb;
+}
+.wbs-plan.milestone .wbs-resize {
+  display: none;
+}
+@media (max-width: 760px) {
+  .sidebar nav {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+  .pm-fields {
+    grid-template-columns: 1fr;
+  }
+  .pm-management > details {
+    padding: 12px;
+  }
+  .pm-management input,
+  .pm-management select,
+  .pm-management textarea {
+    font-size: 16px;
+  }
+}
+
+/* One level of destinations; record creation and editing remain page actions. */
+.management-page-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.management-page {
+  padding: 24px;
+}
+.management-page > h2 {
+  font-size: 18px;
+  margin: 0 0 20px;
+}
+.management-page h3 {
+  margin: 24px 0 16px;
+}
+.management-page > p {
+  margin-bottom: 20px;
+  color: var(--muted);
+}
+.management-page > .field {
+  max-width: 240px;
+  margin-bottom: 20px;
+}
+.management-empty {
+  padding: 20px 0;
+  color: var(--muted);
+}
+.pm-management .desktop-table-wrap {
+  overflow-x: auto;
+}
+.pm-management .desktop-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.pm-management .desktop-table th,
+.pm-management .desktop-table td {
+  padding: 14px 12px;
+  border-bottom: 1px solid #e5eaf2;
+  text-align: left;
+  white-space: nowrap;
+}
+.pm-management .desktop-table th {
+  background: #f7f9fc;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.sidebar {
+  overflow-y: auto;
+}
+.sidebar > .brand {
+  margin-bottom: 24px;
+}
+.sidebar > .side-label {
+  display: none;
+}
+.sidebar > .side-line + .side-label {
+  display: flex;
+}
+.project-nav-group + .project-nav-group {
+  margin-top: 14px;
+}
+.project-nav-group .side-label {
+  margin: 0 0 5px;
+  letter-spacing: 0;
+  font-size: 12px;
+}
+.project-nav-group .nav-item {
+  min-height: 40px;
+  padding-top: 9px;
+  padding-bottom: 9px;
+  margin: 2px 0;
+}
+.compact-navigation {
+  display: none;
+}
+.report-screen-panel {
+  padding: 24px;
+  margin: 0 0 24px;
+}
+.report-screen-panel .panel-head {
+  padding: 0;
+  margin-bottom: 18px;
+}
+.report-screen-panel > p {
+  margin-bottom: 18px;
+  color: #64748b;
+}
+.report-screen-panel .head-actions {
+  padding: 0;
+}
+@media (max-width: 700px) {
+  .sidebar {
+    display: none;
+  }
+  .compact-navigation {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 18px;
+    font-size: 12px;
+    background: #fff;
+    border-bottom: 1px solid #e4eaf3;
+  }
+  .compact-navigation select {
+    flex: 1;
+    min-width: 0;
+    min-height: 44px;
+    font-size: 16px;
+  }
+  .workspace main {
+    padding-bottom: 24px;
+  }
+  .workspace footer {
+    padding-bottom: 24px;
+  }
+  .report-screen-panel {
+    padding: 18px;
+  }
+}
+
+.sidebar > * {
+  flex-shrink: 0;
+}
+.sidebar .project-list {
+  overflow: visible;
+}
+
+/* Keep browser-default small text readable too. */
+small {
+  font-size: max(0.85em, 12px);
 }

@@ -39,13 +39,13 @@ const project = () => ({
 });
 test('WBS 들여쓰기·번호·가중 집계·내어쓰기와 계층 순환 거절', () => {
   let p = setParent(project(), ['b', 'c'], 1);
-  assert.equal(p.tasks[1].parentId, 'a');
-  assert.equal(hierarchy(p).get('c').number, '1.2');
-  p.tasks[1].items[0].doneDate = '2026-10-19';
+  assert.equal(p.tasks.find((t) => t.id === 'b').parentId, 'a');
+  assert.equal(hierarchy(p).get('c').number, '1.3');
+  p.tasks.find((t) => t.id === 'b').items[0].doneDate = '2026-10-19';
   const r = rollup(p, 'a', '2026-10-26');
   assert.equal(r.hours, 32);
   assert.equal(r.progress, 0.5);
-  assert.equal(setParent(p, ['b'], -1).tasks[1].parentId, '');
+  assert.equal(setParent(p, ['b'], -1).tasks.find((t) => t.id === 'b').parentId, '');
   p.tasks[0].parentId = 'c';
   assert.throws(() => hierarchy(p), /순환/);
 });
@@ -169,7 +169,7 @@ test('저장 공간 실패는 메모리 초안을 보존하고 오류를 알림'
 });
 test('XLSX 출력→읽기→ID 갱신은 계층·완료 기록을 유지, 새 행 추가도 지원', async () => {
   const p = setParent(project(), ['b'], 1);
-  p.tasks[0].items[0].doneDate = '2026-10-19';
+  p.tasks.find((t) => t.id === 'a-work').items[0].doneDate = '2026-10-19';
   const buffer = await projectWorkbook(p, '2026-10-26');
   const sheets = await readWorkbook(buffer.toString('base64')),
     sheet = sheets.find((s) => s.name === 'WBS');
@@ -179,7 +179,7 @@ test('XLSX 출력→읽기→ID 갱신은 계층·완료 기록을 유지, 새 �
   const result = previewImport(p, sheet.rows.slice(1), mapping, { mode: 'update' });
   assert.deepEqual(result.errors, []);
   assert.equal(result.project.tasks[1].parentId, 'a');
-  assert.equal(result.project.tasks[0].items[0].doneDate, '2026-10-19');
+  assert.equal(result.project.tasks.find((t) => t.id === 'a-work').items[0].doneDate, '2026-10-19');
   const added = previewImport(p, [['새 업무', '2026-10-26', '2026-10-27', 12]], {
     name: 0,
     start: 1,
@@ -193,7 +193,7 @@ test('XLSX 출력→읽기→ID 갱신은 계층·완료 기록을 유지, 새 �
     memo: -1,
   });
   assert.deepEqual(added.errors, []);
-  assert.equal(added.project.tasks.length, 4);
+  assert.equal(added.project.tasks.length, 5);
 });
 test('Excel 미리보기 오류는 원본을 바꾸지 않고 잘못된 ID·날짜를 표시', () => {
   const p = project(),

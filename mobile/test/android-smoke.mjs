@@ -213,14 +213,14 @@ try {
       await fillField(page.locator('[name="name"]'), name);
       await fillField(page.locator('[name="description"]'), 'Android 에뮬레이터 기능 검증');
       await page.getByRole('button', { name: '저장', exact: true }).click();
-      await expect(page.getByRole('heading', { name, exact: true })).toBeVisible();
+      await expect(page.locator('.project-heading .eyebrow')).toHaveText(name);
       projectId = page.url().split('/').at(-1);
       await stopApp();
       await device.shell(`am start -n ${appId}/.MainActivity`);
       await attach();
       await page.getByRole('button', { name: new RegExp(name) }).click();
-      await expect(page.getByRole('heading', { name, exact: true })).toBeVisible();
-      await page.getByRole('link', { name: '더보기', exact: true }).click();
+      await expect(page.locator('.project-heading .eyebrow')).toHaveText(name);
+      await page.getByRole('link', { name: '인력', exact: true }).click();
       await page.getByRole('button', { name: '＋ 추가', exact: true }).click();
       await fillField(page.locator('[name="name"]'), '모바일 담당자');
       await page.getByRole('button', { name: '저장', exact: true }).click();
@@ -343,6 +343,7 @@ try {
     },
   );
   await step('native CSV sharing writes a report', async () => {
+    await page.getByRole('link', { name: '보고서', exact: true }).click();
     await page.getByRole('button', { name: '업무 보고서 CSV', exact: true }).click();
     const xml = await waitForNative('05-csv-share', /chooser|resolver/i);
     assert.match(xml, /chooser|resolver/i);
@@ -358,6 +359,7 @@ try {
     assert.ok(csv.includes('Android 주요 기능 검증'));
     await writeFile(path.join(output, 'report.csv'), csv);
     await back();
+    await page.getByRole('link', { name: '더보기', exact: true }).click();
     await expect(
       page.getByRole('button', { name: '프로젝트 가져오기', exact: true }),
     ).toBeEnabled();

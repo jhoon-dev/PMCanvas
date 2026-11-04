@@ -1,3 +1,4 @@
+import { SETTINGS_SECTIONS, PROJECT_VIEWS } from './app/navigation.js';
 import {
   app,
   BrowserWindow,
@@ -8,11 +9,15 @@ import {
   session,
   utilityProcess,
   shell,
+  powerMonitor,
 } from 'electron';
 import path from 'node:path';
-import { unlinkSync, readFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, mkdirSync } from 'node:fs';
+import { DesktopWorkspace } from './workspace.mjs';
+import { HolidaySync } from './holiday-sync.mjs';
+import { setKoreanHolidayUpdates } from './app/shared/korean-holidays.js';
 import { fileURLToPath } from 'node:url';
-import { DesktopDocument, MAX_BYTES, atomicWrite, serializeDocument } from './document.mjs';
+import { MAX_BYTES, atomicWrite, serializeDocument, normalizeProject } from './document.mjs';
 import { APP_URL, assetPath } from './assets.mjs';
 import { buildReport } from './reports.mjs';
 import { createExcelJobs } from './excel-jobs.mjs';
@@ -23,6 +28,7 @@ import { validateProject } from './app/shared/engine.js';
 import { UpdateService, StoreUpdateService, MacStoreUpdateService } from './updates.mjs';
 import { MacFileAccess } from './mac-file-access.mjs';
 import { DesktopPreferences } from './preferences.mjs';
+import { AppDialogs } from './dialogs.mjs';
 import { UpdateManager } from './update-manager.mjs';
 import { cleanupUpdateCache } from './update-cache.mjs';
 
@@ -62,33 +68,98 @@ else {
       : new UpdateService();
   let fileAccess;
   let updateManager;
+  let navigation = { scope: 'projects', view: 'overview', section: 'general' };
+  const updateNativeTitle = (snapshot = document?.snapshot()) => {
+    if (!window || window.isDestroyed()) return;
+    window.setTitle(
+      navigation.scope === 'settings'
+        ? ui('앱 설정') +
+            ' · ' +
+            ui(SETTINGS_SECTIONS[navigation.section].title) +
+            ' — ' +
+            metadata.productName
+        : snapshot?.project
+          ? (snapshot.dirty ? '● ' : '') +
+            snapshot.project.name +
+            ' · ' +
+            ui(PROJECT_VIEWS[navigation.view]) +
+            ' — ' +
+            metadata.productName
+          : metadata.productName,
+    );
+  };
+  let holidaySync,
+    appliedHolidays = [],
+    holidayFlushTimer,
+    inputCooldownUntil = 0;
+  const calendarSnapshot = () =>
+    holidaySync
+      ? {
+          ...holidaySync.snapshot(),
+          holidays: appliedHolidays,
+          pending: JSON.stringify(holidaySync.holidays) !== JSON.stringify(appliedHolidays),
+        }
+      : null;
   const updateHistoryMenu = (snapshot = document?.snapshot()) => {
+    for (const id of [
+      'file-save',
+      'file-save-as',
+      'file-close-project',
+      'project-settings',
+      'file-import-excel',
+      'file-export',
+    ]) {
+      const item = Menu.getApplicationMenu()?.getMenuItemById(id);
+      if (item) item.enabled = navigation.scope === 'projects' && !editing;
+    }
+    for (const id of ['tab-next', 'tab-previous']) {
+      const item = Menu.getApplicationMenu()?.getMenuItemById(id);
+      if (item)
+        item.enabled = navigation.scope === 'projects' && !editing && document?.tabs.size > 1;
+    }
     for (const [id, available] of [
       ['project-undo', snapshot?.canUndo],
       ['project-redo', snapshot?.canRedo],
     ]) {
       const item = Menu.getApplicationMenu()?.getMenuItemById(id);
-      if (item) item.enabled = Boolean(available) && !editing;
+      if (item) item.enabled = Boolean(available) && !editing && navigation.scope === 'projects';
     }
   };
   const send = (channel, value) => {
     if (window && !window.isDestroyed()) window.webContents.send(channel, value);
   };
+  const appDialogs = new AppDialogs((request) => send('desktop:dialog', request));
+  const appMessage = (options) => appDialogs.show({ buttons: [ui('확인')], ...options });
   const publish = () => {
-    const snapshot = document.snapshot();
+    const snapshot = { ...document.snapshot(), holidayCalendar: calendarSnapshot() };
     updateHistoryMenu(snapshot);
-    window.setTitle(
-      (snapshot.dirty ? '● ' : '') +
-        (snapshot.project?.name || 'PM Canvas') +
-        ' — ' +
-        metadata.productName,
-    );
+    updateNativeTitle(snapshot);
     window.setDocumentEdited(snapshot.dirty);
     send('desktop:document', snapshot);
     return snapshot;
   };
+  function flushHolidayCalendar() {
+    if (!holidaySync || !document || !window || window.isDestroyed() || closing) return;
+    const pending = JSON.stringify(holidaySync.holidays) !== JSON.stringify(appliedHolidays);
+    if (
+      pending &&
+      !busy &&
+      !editing &&
+      !excelImport?.current &&
+      !appDialogs.pending &&
+      Date.now() >= inputCooldownUntil
+    ) {
+      const changed = setKoreanHolidayUpdates(holidaySync.holidays);
+      appliedHolidays = structuredClone(holidaySync.holidays);
+      if (changed) {
+        document.revision++;
+        publish();
+      }
+    }
+    send('desktop:holidayCalendar', calendarSnapshot());
+  }
   const message = (error) =>
-    dialog.showMessageBox(window, {
+    appMessage({
       type: 'error',
       title: metadata.productName,
       message: ui(error.message || String(error)),
@@ -111,6 +182,7 @@ else {
           return { ok: true, value: await operation(...args) };
         } finally {
           if (exclusive) busy = false;
+          flushHolidayCalendar();
         }
       } catch (error) {
         if (document && window && !window.isDestroyed()) publish();
@@ -120,7 +192,7 @@ else {
   }
   async function save(as = false) {
     if (editing) throw Error(ui('입력창의 변경사항을 먼저 적용하거나 취소해 주세요.'));
-    if (!document.project) return null;
+    requireProject();
     let file = as ? null : document.file;
     if (!file) {
       const result = await dialog.showSaveDialog(window, {
@@ -142,19 +214,23 @@ else {
       true,
     );
   }
+  function requireProject() {
+    if (!document.project) throw Error(ui('프로젝트를 먼저 생성해 주세요.'));
+  }
   async function mayLeave() {
     if (editing) {
-      await dialog.showMessageBox(window, {
+      await appMessage({
         type: 'info',
         message: ui('입력창의 변경사항을 먼저 적용하거나 취소해 주세요.'),
       });
       return { proceed: false };
     }
     if (!document.dirty) return { proceed: true };
-    const result = await dialog.showMessageBox(window, {
+    const result = await appMessage({
       type: 'question',
+      title: ui('변경사항 저장'),
       message: ui('프로젝트 변경사항을 저장할까요?'),
-      detail: ui('저장하지 않으면 이번 변경사항이 사라집니다.'),
+      detail: document.project.name + '\n' + ui('저장하지 않으면 이번 변경사항이 사라집니다.'),
       buttons: [ui('저장'), ui('저장하지 않음'), ui('취소')],
       defaultId: 0,
       cancelId: 2,
@@ -162,6 +238,32 @@ else {
     if (result.response === 2) return { proceed: false };
     if (result.response === 1) return { proceed: true, discard: true };
     return { proceed: Boolean(await save()) };
+  }
+  function requireFinishedInput() {
+    if (editing || excelImport.current)
+      throw Error(ui('입력창의 변경사항을 먼저 적용하거나 취소해 주세요.'));
+  }
+  async function mayQuit() {
+    requireFinishedInput();
+    const original = document.activeId,
+      discarded = [];
+    for (const tab of document.snapshot().tabs.filter((tab) => tab.dirty)) {
+      document.activate(tab.id);
+      publish();
+      const result = await mayLeave();
+      if (!result.proceed) {
+        if (original) {
+          document.activate(original);
+          publish();
+        }
+        return false;
+      }
+      if (result.discard) discarded.push(tab.id);
+    }
+    // Do not discard any tab until all prompts have succeeded.
+    if (discarded.length) document.closeMany(discarded);
+    if (document.tabs.has(original)) document.activate(original);
+    return true;
   }
   app.on('second-instance', () => {
     window?.restore();
@@ -198,7 +300,14 @@ else {
           console.warn('Legacy update cache cleanup deferred.'),
         );
       process.env.PM_TIME_ZONE = getBusinessTimeZone();
-      document = new DesktopDocument(path.join(app.getPath('userData'), 'recovery.json'));
+      document = new DesktopWorkspace(path.join(app.getPath('userData'), 'workspace.json'));
+      holidaySync = new HolidaySync({
+        file: path.join(app.getPath('userData'), 'public-holidays.json'),
+        enabled: preferences.value.syncPublicHolidays,
+        notify: () => flushHolidayCalendar(),
+      });
+      appliedHolidays = structuredClone(holidaySync.holidays);
+      setKoreanHolidayUpdates(appliedHolidays);
       excelImport = new ExcelImportSession(document, excelJob);
       protocol.handle('pmcanvas', async (request) => {
         const asset = assetPath(request.url);
@@ -247,7 +356,18 @@ else {
           spellcheck: false,
         },
       });
+      window.on('page-title-updated', (event) => {
+        event.preventDefault();
+        updateNativeTitle();
+      });
       window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+      window.webContents.on('did-start-navigation', (_event, _url, _inPlace, mainFrame) => {
+        if (mainFrame) appDialogs.reset();
+      });
+      window.webContents.on('render-process-gone', () => appDialogs.reset());
+      window.on('closed', () => appDialogs.reset());
+      handle('dialogsReady', () => appDialogs.connect(), false);
+      handle('dialogResponse', (id, response) => appDialogs.respond(id, response), false);
       window.webContents.on('will-navigate', (event, url) => {
         if (url !== APP_URL) event.preventDefault();
       });
@@ -255,24 +375,18 @@ else {
       window.on('close', (event) => {
         if (closing) return;
         event.preventDefault();
-        if (busy) return;
+        if (busy || appDialogs.pending) return;
         busy = true;
-        mayLeave()
+        mayQuit()
           .then((result) => {
-            if (!result.proceed) return;
-            if (result.discard) {
-              try {
-                unlinkSync(document.recoveryFile);
-              } catch (error) {
-                if (error.code !== 'ENOENT') throw error;
-              }
-            }
+            if (!result) return;
             closing = true;
             window.close();
           })
           .catch(message)
           .finally(() => {
             busy = false;
+            flushHolidayCalendar();
           });
       });
       const command = (name) => send('desktop:command', name);
@@ -285,31 +399,81 @@ else {
               submenu: [
                 {
                   label: ui('새 프로젝트'),
+                  id: 'file-new',
                   accelerator: 'CmdOrCtrl+N',
                   click: () => command('new'),
                 },
-                { label: ui('열기…'), accelerator: 'CmdOrCtrl+O', click: () => command('open') },
+                {
+                  label: ui('열기…'),
+                  id: 'file-open',
+                  accelerator: 'CmdOrCtrl+O',
+                  click: () => command('open'),
+                },
                 { type: 'separator' },
-                { label: ui('저장'), accelerator: 'CmdOrCtrl+S', click: () => command('save') },
+                {
+                  label: ui('저장'),
+                  id: 'file-save',
+                  accelerator: 'CmdOrCtrl+S',
+                  click: () => command('save'),
+                },
                 {
                   label: ui('다른 이름으로 저장…'),
+                  id: 'file-save-as',
                   accelerator: 'CmdOrCtrl+Shift+S',
                   click: () => command('saveAs'),
                 },
-                { label: ui('웹 버전용 JSON 내보내기…'), click: () => command('exportWeb') },
-                { label: ui('Excel 내보내기…'), click: () => command('exportExcel') },
-                { label: ui('Excel 가져오기…'), click: () => command('importExcel') },
-                { label: ui('Excel 입력 양식 저장…'), click: () => command('exportTemplate') },
-                { label: ui('업데이트 확인'), click: () => command('updates') },
-                { label: ui('앱 설정'), click: () => command('appSettings') },
-                { label: ui('개인정보처리방침'), click: () => command('privacy') },
+                {
+                  label: ui('프로젝트 닫기'),
+                  id: 'file-close-project',
+                  accelerator: process.platform === 'win32' ? 'Ctrl+W' : undefined,
+                  click: () => command('closeProject'),
+                },
+                { type: 'separator' },
+                {
+                  label: ui('프로젝트 설정'),
+                  id: 'project-settings',
+                  click: () => command('projectSettings'),
+                },
+                { type: 'separator' },
+                {
+                  label: ui('Excel 가져오기…'),
+                  id: 'file-import-excel',
+                  click: () => command('importExcel'),
+                },
+                {
+                  label: ui('내보내기'),
+                  id: 'file-export',
+                  submenu: [
+                    {
+                      label: ui('웹 버전용 JSON 내보내기…'),
+                      id: 'file-export-json',
+                      click: () => command('exportWeb'),
+                    },
+                    {
+                      label: ui('업무 현황 Excel 저장…'),
+                      id: 'file-export-excel',
+                      click: () => command('exportExcel'),
+                    },
+                    {
+                      label: ui('Excel 입력 양식 저장…'),
+                      id: 'file-export-template',
+                      click: () => command('exportTemplate'),
+                    },
+                  ],
+                },
+                { type: 'separator' },
+                {
+                  label: ui('앱 설정'),
+                  id: 'settings-open',
+                  accelerator: 'CmdOrCtrl+,',
+                  click: () => command('appSettings'),
+                },
                 { type: 'separator' },
                 { role: process.platform === 'darwin' ? 'close' : 'quit' },
               ],
             },
-            { role: 'editMenu' },
             {
-              label: ui('프로젝트'),
+              label: ui('편집'),
               submenu: [
                 {
                   label: ui('프로젝트 변경 실행 취소'),
@@ -323,15 +487,48 @@ else {
                   accelerator: 'CmdOrCtrl+Alt+Y',
                   click: () => command('redo'),
                 },
+                { type: 'separator' },
+                { role: 'undo', label: ui('텍스트 실행 취소') },
+                { role: 'redo', label: ui('텍스트 다시 실행') },
+                { type: 'separator' },
+                { role: 'cut', label: ui('잘라내기') },
+                { role: 'copy', label: ui('복사') },
+                { role: 'paste', label: ui('붙여넣기') },
+                { role: 'selectAll', label: ui('모두 선택') },
               ],
             },
             {
               label: ui('보기'),
               submenu: [
-                { role: 'resetZoom' },
-                { role: 'zoomIn' },
-                { role: 'zoomOut' },
-                { role: 'togglefullscreen' },
+                {
+                  label: ui('다음 프로젝트 탭'),
+                  id: 'tab-next',
+                  accelerator: 'Ctrl+Tab',
+                  click: () => command('nextTab'),
+                },
+                {
+                  label: ui('이전 프로젝트 탭'),
+                  id: 'tab-previous',
+                  accelerator: 'Ctrl+Shift+Tab',
+                  click: () => command('previousTab'),
+                },
+                { type: 'separator' },
+                { role: 'resetZoom', label: ui('실제 크기') },
+                { role: 'zoomIn', label: ui('확대') },
+                { role: 'zoomOut', label: ui('축소') },
+                { role: 'togglefullscreen', label: ui('전체 화면') },
+              ],
+            },
+            {
+              label: ui('도움말'),
+              submenu: [
+                { label: ui('업데이트 확인'), id: 'help-updates', click: () => command('updates') },
+                { label: ui('앱 정보'), id: 'help-about', click: () => command('about') },
+                {
+                  label: ui('개인정보처리방침'),
+                  id: 'help-privacy',
+                  click: () => command('privacy'),
+                },
               ],
             },
           ]),
@@ -368,7 +565,7 @@ else {
       handle('downloadUpdate', () => updateManager.download(), false);
       handle('applyUpdate', async () => {
         const requireSaved = () => {
-          if (editing || document.dirty || excelImport.current)
+          if (editing || document.anyDirty || excelImport.current)
             throw Error(ui('변경사항과 입력창을 먼저 저장하거나 취소한 뒤 업데이트해 주세요.'));
         };
         requireSaved();
@@ -385,12 +582,12 @@ else {
       handle('openRelease', () => shell.openExternal(updates.url), false);
       handle('privacyPolicy', () => shell.openExternal(PRIVACY_POLICY), false);
       handle('timeZone', (value) => {
-        if (editing || document.dirty || excelImport.current)
+        if (editing || document.anyDirty || excelImport.current)
           throw Error(ui('변경사항을 저장하거나 취소한 뒤 시간대를 바꿔 주세요.'));
         const previous = getBusinessTimeZone();
         try {
           setBusinessTimeZone(value);
-          if (document.project) validateProject(document.project);
+          for (const tab of document.tabs.values()) validateProject(tab.project);
           preferences.update({ timeZone: getBusinessTimeZone() });
         } catch (error) {
           setBusinessTimeZone(previous);
@@ -412,6 +609,44 @@ else {
         false,
       );
       handle('snapshot', () => document.snapshot(), false);
+      handle(
+        'navigationContext',
+        (next) => {
+          if (
+            !next ||
+            !['projects', 'settings'].includes(next.scope) ||
+            !Object.hasOwn(PROJECT_VIEWS, next.view) ||
+            !Object.hasOwn(SETTINGS_SECTIONS, next.section)
+          )
+            throw Error('Invalid navigation context');
+          navigation = { scope: next.scope, view: next.view, section: next.section };
+          updateHistoryMenu();
+          updateNativeTitle();
+          return navigation;
+        },
+        false,
+      );
+
+      handle('holidayState', () => calendarSnapshot(), false);
+      handle(
+        'refreshHolidays',
+        (force = true) => {
+          if (typeof force !== 'boolean') throw Error('Invalid holiday refresh');
+          return holidaySync.refresh(force).then(() => calendarSnapshot());
+        },
+        false,
+      );
+      handle(
+        'holidayPreference',
+        (enabled) => {
+          if (typeof enabled !== 'boolean') throw Error('Invalid holiday preference');
+          preferences.update({ syncPublicHolidays: enabled });
+          holidaySync.setEnabled(enabled);
+          if (enabled) void holidaySync.refresh();
+          return calendarSnapshot();
+        },
+        false,
+      );
       for (const direction of ['undo', 'redo'])
         handle(direction, (revision) => {
           if (editing) throw Error(ui('입력창의 변경사항을 먼저 적용하거나 취소해 주세요.'));
@@ -423,6 +658,12 @@ else {
         (value) => {
           if (typeof value !== 'boolean') throw Error(ui('입력 상태가 올바르지 않습니다.'));
           editing = value;
+          if (!value) {
+            inputCooldownUntil = Date.now() + 250;
+            clearTimeout(holidayFlushTimer);
+            holidayFlushTimer = setTimeout(flushHolidayCalendar, 260);
+            holidayFlushTimer.unref();
+          }
           updateHistoryMenu();
         },
         false,
@@ -433,23 +674,24 @@ else {
         document.replace(project, revision);
         return publish();
       });
-      handle('new', async () => {
-        if (!(await mayLeave()).proceed) return null;
-        document.create({
-          name: ui('새 프로젝트'),
-          description: '',
-          holidays: [],
-          members: [],
-          tasks: [],
-        });
+      handle('new', async (proposal) => {
+        requireFinishedInput();
+        if (proposal !== undefined && Buffer.byteLength(JSON.stringify(proposal)) > MAX_BYTES)
+          throw Error(ui('프로젝트 크기를 줄여 주세요.'));
+        const project = normalizeProject(
+          proposal === undefined
+            ? { name: ui('새 프로젝트'), description: '', holidays: [], members: [], tasks: [] }
+            : proposal,
+        );
+        document.create(project);
         return publish();
       });
       handle('open', async () => {
-        if (!(await mayLeave()).proceed) return null;
+        requireFinishedInput();
         const result = await fileAccess.open(
           {
             title: ui('프로젝트 열기 / 웹 JSON 불러오기'),
-            properties: ['openFile'],
+            properties: ['openFile', 'multiSelections'],
             filters: [
               { name: ui('PM Canvas 프로젝트 / JSON 백업'), extensions: ['pmcanvas', 'json'] },
             ],
@@ -457,25 +699,69 @@ else {
           true,
         );
         if (result.canceled || !result.filePaths.length) return null;
-        document.open(result.filePaths[0]);
+        document.openMany(result.filePaths);
         return publish();
       });
       handle('save', (as) => save(as === true));
+      handle('activateTab', (id) => {
+        requireFinishedInput();
+        document.activate(id);
+        try {
+          if (document.file) fileAccess.restore(document.file);
+        } catch {
+          /* Save can request access. */
+        }
+        return publish();
+      });
+      handle('close', async (id = document.activeId) => {
+        requireFinishedInput();
+        if (!document.project) return publish();
+        const original = document.activeId;
+        document.activate(id);
+        publish();
+        if (!(await mayLeave()).proceed) {
+          document.activate(original);
+          publish();
+          return null;
+        }
+        document.close(id);
+        if (id !== original && document.tabs.has(original)) document.activate(original);
+        try {
+          if (document.file) fileAccess.restore(document.file);
+          else fileAccess.dispose();
+        } catch {
+          /* Save can request access. */
+        }
+        return publish();
+      });
       handle('exportReport', async (options, revision) => {
         options = { ...options, language: getLanguage() };
         if (editing) throw Error(ui('입력창의 변경사항을 먼저 적용하거나 취소해 주세요.'));
+        requireProject();
         if (revision !== document.revision)
           throw Error(ui('문서가 변경되었습니다. 보고서를 다시 확인해 주세요.'));
         const report = buildReport(document.project, options);
-        if (options.format !== undefined && !['csv', 'xlsx'].includes(options.format))
+        if (options.format !== undefined && !['csv', 'xlsx', 'html'].includes(options.format))
           throw Error(ui('내보내기 형식을 확인해 주세요.'));
         const format = options.format || 'csv';
+        if ((format === 'html') !== (options.kind === 'weekly'))
+          throw Error(ui('내보내기 형식을 확인해 주세요.'));
         const result = await dialog.showSaveDialog(window, {
-          title: format === 'xlsx' ? ui('Excel 보고서 저장') : ui('CSV 보고서 저장'),
+          title:
+            format === 'html'
+              ? ui('주간보고 저장')
+              : format === 'xlsx'
+                ? ui('Excel 보고서 저장')
+                : ui('CSV 보고서 저장'),
           defaultPath: report.filename.replace(/\.csv$/, '.' + format),
           filters: [
             {
-              name: format === 'xlsx' ? ui('Excel 통합문서') : ui('CSV 보고서 (Excel에서 열기)'),
+              name:
+                format === 'html'
+                  ? 'HTML'
+                  : format === 'xlsx'
+                    ? ui('Excel 통합문서')
+                    : ui('CSV 보고서 (Excel에서 열기)'),
               extensions: [format],
             },
           ],
@@ -490,8 +776,11 @@ else {
                 project: document.project,
                 options,
                 dirty: document.dirty,
+                holidayCalendar: appliedHolidays,
               })
-            : report.csv;
+            : format === 'html'
+              ? report.html
+              : report.csv;
         return fileAccess.write(file, () => {
           atomicWrite(file, bytes);
           return true;
@@ -499,6 +788,7 @@ else {
       });
       handle('openExcel', async (revision) => {
         if (editing) throw Error(ui('입력창의 변경사항을 먼저 적용하거나 취소해 주세요.'));
+        requireProject();
         const result = await dialog.showOpenDialog(window, {
           title: ui('Excel 가져오기'),
           properties: ['openFile'],
@@ -514,6 +804,7 @@ else {
       });
       handle('cancelExcel', (id) => excelImport.cancel(id));
       handle('exportTemplate', async (revision) => {
+        requireProject();
         if (editing || !document.project || revision !== document.revision)
           throw Error(ui('프로젝트를 확인하고 입력을 먼저 적용해 주세요.'));
         const result = await dialog.showSaveDialog(window, {
@@ -538,7 +829,7 @@ else {
       });
       handle('exportWeb', async () => {
         if (editing) throw Error(ui('입력창의 변경사항을 먼저 적용하거나 취소해 주세요.'));
-        if (!document.project) return null;
+        requireProject();
         const result = await dialog.showSaveDialog(window, {
           title: ui('웹 버전용 JSON 내보내기'),
           defaultPath: 'PM-Canvas-project.json',
@@ -556,14 +847,30 @@ else {
       await window.loadURL(APP_URL);
       try {
         const recovery = document.recovery();
-        if (recovery?.dirty) {
+        if (recovery?.workspace) {
+          const restored = document.restore(recovery, (file) => fileAccess.restore(file));
+          if (document.file) {
+            try {
+              fileAccess.restore(document.file);
+            } catch {}
+          }
+          if (restored.missing || recovery.dirty)
+            await appMessage({
+              type: 'info',
+              message: ui(
+                restored.missing
+                  ? '일부 원본 파일을 열 수 없어 복구 사본을 불러왔습니다. 해당 탭을 다른 이름으로 저장해 주세요.'
+                  : '저장하지 않은 프로젝트 탭을 복구했습니다. 계속 작업하거나 파일에 저장해 주세요.',
+              ),
+            });
+        } else if (recovery?.dirty) {
           document.restore(recovery);
           try {
             fileAccess.restore(recovery.file);
           } catch {
             /* Save will request a new folder grant. */
           }
-          await dialog.showMessageBox(window, {
+          await appMessage({
             type: 'info',
             message: ui(
               '저장하지 않은 프로젝트를 복구했습니다. 계속 작업하거나 파일에 저장해 주세요.',
@@ -575,7 +882,7 @@ else {
             document.open(recovery.file);
           } catch {
             document.restore({ ...recovery, file: null, savedHash: null, dirty: true });
-            await dialog.showMessageBox(window, {
+            await appMessage({
               type: 'info',
               message: ui(
                 '원본 파일을 열 수 없어 마지막 복구 사본을 불러왔습니다. 다른 이름으로 저장해 주세요.',
@@ -588,6 +895,18 @@ else {
         await message(error);
       }
       app.on('window-all-closed', () => app.quit());
+      if (!testing && process.env.PMCANVAS_DESKTOP_TEST !== '1') {
+        const stopHolidays = holidaySync.start();
+        const resumeHolidays = () => {
+          if (holidaySync.enabled) void holidaySync.refresh(Boolean(holidaySync.error));
+        };
+        powerMonitor.on('resume', resumeHolidays);
+        window.on('focus', () => void holidaySync.refresh());
+        app.once('will-quit', () => {
+          stopHolidays();
+          powerMonitor.removeListener('resume', resumeHolidays);
+        });
+      }
       // Startup discovery never blocks recovery, opens a modal, downloads, or restarts the app.
       if (app.isPackaged && !testing) {
         const timer = setTimeout(() => {

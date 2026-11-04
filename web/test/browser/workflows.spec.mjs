@@ -133,7 +133,9 @@ async function selectProject(page, p, view = 'tasks') {
   if (await page.locator('#projectSelect').isVisible())
     await page.locator('#projectSelect').selectOption(p.id);
   else await page.locator('#projectList [data-project="' + p.id + '"]').click();
-  await page.locator('[data-view="' + view + '"]').click();
+  if (await page.locator('#viewSelect').isVisible())
+    await page.locator('#viewSelect').selectOption(view);
+  else await page.locator('[data-view="' + view + '"]').click();
 }
 
 test('계층 WBS 위로 이동은 하위 묶음과 함께 표시 순서를 바꾸고 서버에 보존', async ({ page }) => {
@@ -146,7 +148,10 @@ test('계층 WBS 위로 이동은 하위 묶음과 함께 표시 순서를 바�
     name: id,
     parentId: id === 'a1' ? 'a' : id === 'b1' ? 'b' : '',
     predecessor: id === 'b' ? 'a1' : '',
-    items: [{ id: id + '-item', title: id, hours: 8, doneDate: '2026-10-20' }],
+    ...(['a', 'b'].includes(id) ? { kind: 'summary', owner: '' } : {}),
+    items: ['a', 'b'].includes(id)
+      ? []
+      : [{ id: id + '-item', title: id, hours: 8, doneDate: '2026-10-20' }],
   }));
   const p = await createProject(page, session, { name: '계층 순서 검증', tasks });
   await selectProject(page, p);
@@ -162,7 +167,9 @@ test('계층 WBS 위로 이동은 하위 묶음과 함께 표시 순서를 바�
   expect(after.tasks.map((task) => task.id)).toEqual(['b', 'b1', 'a', 'a1']);
   expect(after.tasks[0].predecessor).toBe('a1');
   expect(after.tasks[1].parentId).toBe('b');
-  expect(after.tasks.every((task) => task.items[0].doneDate === '2026-10-20')).toBe(true);
+  expect(
+    after.tasks.every((task) => task.items.every((item) => item.doneDate === '2026-10-20')),
+  ).toBe(true);
   await selectProject(page, p);
   await expect(page.locator('[data-grid-row]').first()).toHaveAttribute('data-grid-row', 'b');
 });
@@ -786,7 +793,7 @@ test('영어 UI·언어 유지·사용자 데이터 보존·미저장 언어 전
     });
   await selectProject(page, p);
   await expect(page.locator('[data-cell=name]')).toHaveValue('완료');
-  await expect(page.locator('#main h1')).toHaveText('Tasks and schedule');
+  await expect(page.locator('#main h1')).toHaveText('Tasks · Schedule');
   await expect(page.getByRole('textbox', { name: 'Row 1 Task name', exact: true })).toBeVisible();
   await page.screenshot({ path: '.playwright-mcp/v0.20.0/english.png' });
   await page.locator('[data-cell=name]').fill('바꾼 이름');
@@ -821,7 +828,7 @@ test('500개 업무 입력·검색·간트 렌더링', async ({ page }) => {
   const session = await login(page),
     p = await createProject(page, session, largeProject());
   await selectProject(page, p);
-  await expect(page.locator('[data-cell=name]')).toHaveCount(500);
+  await expect(page.locator('[data-cell=name]')).toHaveCount(p.tasks.length);
   await page.locator('#wbsQuery').fill('Task 499');
   await expect(page.locator('[data-cell=name]')).toHaveCount(1);
   await page.locator('[data-cell=name]').fill('Edited 499');
@@ -1035,4 +1042,317 @@ test('사용자 추가 입력은 관리자 탭 전환을 취소하면 유지하�
   await expect(form.locator('[name=name]')).toHaveValue('');
   await expect(form.locator('[name=email]')).toHaveValue('');
   expect(await unloadGuard(page)).toBe(false);
+});
+
+test('요약 업무는 자동 집계하고 복수 선행 입력은 상세 편집·저장·재조회에 유지', async ({
+  page,
+}) => {
+  const session = await login(page),
+    source = largeProject(),
+    base = source.tasks[0];
+  const tasks = ['P', 'A', 'B', 'C'].map((id) => ({
+    ...structuredClone(base),
+    id,
+    name: id,
+    predecessor: '',
+    ...(id === 'P' ? { kind: 'summary', owner: '' } : {}),
+    ...(['A', 'B'].includes(id) ? { parentId: 'P' } : {}),
+    items: id === 'P' ? [] : [{ id: id + '-item', title: id, hours: 8, doneDate: null }],
+  }));
+  const p = await createProject(page, session, { name: '요약과 복수 선행', tasks });
+  await selectProject(page, p, 'overview');
+  await expect(page.locator('main')).toContainText('보고 기준일 업무 종료 기준');
+  await page.locator('[data-view=tasks]').click();
+  const parent = page.locator('[data-grid-row=P]');
+  await expect(parent.locator('[data-cell=hours]')).toHaveCount(0);
+  await expect(parent.locator('[data-progress=P]')).toHaveText('0%');
+  await parent.locator('[data-wbs-detail=P]').click();
+  await expect(page.locator('#editorDialog')).toContainText('하위 업무에서 계산');
+  await expect(page.locator('#editorDialog #addItem')).toHaveCount(0);
+  await page.locator('#submitButton').click();
+  await expect(page.locator('#editorDialog')).not.toBeVisible();
+  await page.locator('[data-wbs-detail=C]').click();
+  await page.locator('.task-details summary').click();
+  await page.locator('[name=predecessor]').selectOption(['A', 'B']);
+  await page.locator('#submitButton').click();
+  await expect(page.locator('#editorDialog')).not.toBeVisible();
+  let saved = (await (await page.request.get(api + 'projects/' + p.id)).json()).project;
+  expect(saved.tasks.find((t) => t.id === 'C').predecessors).toEqual(['A', 'B']);
+  await page
+    .locator('#wbsDetailed')
+    .locator('xpath=ancestor::details[1]')
+    .locator('summary')
+    .click();
+  await page.locator('#wbsDetailed').check();
+  const cell = page.locator('[data-grid-row=C] [data-cell=predecessor]');
+  await cell.fill('3, 2');
+  await cell.press('Tab');
+  await page.locator('[data-wbs-action=save]').click();
+  await expect(page.locator('.wbs-state')).toHaveText('저장됨');
+  await page.reload();
+  await expect(page.locator('#authGate')).toBeHidden();
+  saved = (await (await page.request.get(api + 'projects/' + p.id)).json()).project;
+  expect(saved.tasks.find((t) => t.id === 'P').items).toEqual([]);
+  expect(saved.tasks.find((t) => t.id === 'C').predecessors).toEqual(['B', 'A']);
+  await selectProject(page, p);
+  const addSummary = page.locator('[data-wbs-action=add-summary]');
+  await addSummary.locator('xpath=ancestor::details[1]').locator('summary').click();
+  await addSummary.click();
+  await expect(page.locator('[data-grid-row]').last()).toContainText('0%');
+  await page.locator('[data-wbs-action=save]').click();
+  await expect(page.locator('.wbs-state')).toHaveText('저장됨');
+  saved = (await (await page.request.get(api + 'projects/' + p.id)).json()).project;
+  expect(saved.tasks.at(-1).kind).toBe('summary');
+  expect(saved.tasks.at(-1).items).toEqual([]);
+});
+
+test('투입 계획을 저장·재조회하면 대시보드·인력·M/M에 반영하고 마지막 삭제 시 복귀', async ({
+  page,
+}) => {
+  await page.clock.setFixedTime(new Date('2026-11-03T08:00:00Z'));
+  const session = await login(page),
+    source = largeProject(),
+    p = await createProject(page, session, {
+      members: [source.members[0]],
+      tasks: [
+        {
+          ...source.tasks[0],
+          start: '2026-11-02',
+          end: '2026-11-06',
+          items: [{ id: 'staffing-work', title: 'Work', hours: 40, doneDate: null }],
+        },
+      ],
+    });
+  await selectProject(page, p, 'resources');
+  const host = page.locator('#pmManagement'),
+    form = host.locator('[data-pm-form=staffing]');
+  await host.locator('[data-management-pane=add]').click();
+  await form.locator('[name=start]').fill('2026-11-02');
+  await form.locator('[name=end]').fill('2026-11-30');
+  await form.locator('[name=allocation]').fill('25');
+  await form.locator('button[type=submit]').click();
+  await expect(host.locator('#pmPlanResult tbody tr td').nth(1)).toHaveText('42');
+  await expect(host.locator('#pmPlanResult tbody tr td').nth(4)).toHaveText('기간별 계획');
+  await expect(host.locator('.pm-plan-estimate-note')).toHaveCount(0);
+  await selectProject(page, p, 'overview');
+  await page.locator('#reportDate').fill('2026-11-01');
+  await page.locator('#reportDate').dispatchEvent('change');
+  await expect(page.locator('.date-number')).toContainText('11.27');
+  await page.locator('#reportDate').fill('2026-11-02');
+  await page.locator('#reportDate').dispatchEvent('change');
+  await page.locator('[data-view=people]').click();
+  await expect(page.locator('.member-stats')).toContainText('25');
+  await expect(page.locator('.member-stats')).toContainText('2h');
+  await selectProject(page, p, 'resources');
+  await host.locator('[data-pm-remove-assignment]').click();
+  await expect(host.locator('[data-pm-remove-assignment]')).toHaveCount(0);
+  await expect(host.locator('#pmPlanResult tbody tr td').nth(4)).toHaveText('기본 투입률로 추정');
+  await expect(host.locator('#pmPlanResult tfoot')).toContainText('추정값 포함');
+  await host.locator('#pmPlanMonth').fill('2027-06');
+  await host.locator('#pmPlanMonth').dispatchEvent('change');
+  await expect(host.locator('#pmPlanResult tbody tr td').nth(1)).toHaveText('176');
+  await expect(host.locator('#pmPlanResult .pm-plan-estimate-note')).toContainText(
+    '176h · 1.1 M/M',
+  );
+  await selectProject(page, p, 'overview');
+  await page.locator('#reportDate').fill('2026-11-01');
+  await page.locator('#reportDate').dispatchEvent('change');
+  await expect(page.locator('.date-number')).toContainText('11.06');
+});
+
+test('PM 관리: 마일스톤·이슈·투입 계획·주간보고 발행과 불변 사본·모바일 화면', async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2026-11-03T08:00:00Z'));
+  const session = await login(page),
+    p = await createProject(page, session, { name: 'PM 관리 검증' });
+  await selectProject(page, p, 'milestones');
+  const host = page.locator('#pmManagement');
+  const milestone = host.locator('[data-pm-form=milestone]').first();
+  await host.locator('[data-management-pane=add]').click();
+  await milestone.locator('[name=name]').fill('서비스 오픈');
+  await milestone.locator('[name=start]').fill('2026-11-06');
+  await milestone.locator('[name=owner]').selectOption(p.members[0].id);
+  await milestone.locator('button[type=submit]').click();
+  await expect(host).toContainText('서비스 오픈');
+  await page.locator('[data-view=management]').click();
+  await host.locator('[data-management-pane=add]').click();
+  let risk = host.locator('[data-pm-form=issue]').first();
+  await risk.locator('[name=title]').fill('외부 API 검토');
+  await risk.locator('[name=type]').selectOption('risk');
+  await risk.locator('[name=impact]').selectOption('high');
+  await risk.locator('[name=owner]').selectOption(p.members[0].id);
+  await risk.locator('[name=taskId]').selectOption(p.tasks[0].id);
+  await risk.locator('[name=action]').fill('계약 확인');
+  await risk.locator('button[type=submit]').click();
+  await expect(host).toContainText('외부 API 검토');
+  await page.locator('[data-view=resources]').click();
+  await host.locator('[data-management-pane=add]').click();
+  const staffing = host.locator('[data-pm-form=staffing]');
+  await staffing.locator('[name=memberId]').selectOption(p.members[0].id);
+  await staffing.locator('[name=start]').fill('2026-11-02');
+  await staffing.locator('[name=end]').fill('2026-11-06');
+  await staffing.locator('[name=allocation]').fill('50');
+  await staffing.locator('button[type=submit]').click();
+  await expect(host.locator('#pmPlanResult')).toContainText('20');
+  await page.locator('[data-view=weekly]').click();
+  await host.locator('[data-management-pane=add]').click();
+  const weekly = host.locator('[data-pm-form=weekly]');
+  await weekly.locator('[name=notes]').fill('금주 설명');
+  await weekly.locator('[name=from]').fill('2026-10-26');
+  await weekly.locator('[name=to]').fill('2026-10-30');
+  await weekly.locator('[name=nextNotes]').fill('차주 계획');
+  await weekly.locator('button[type=submit]').click();
+  await expect(host.locator('#pmWeeklyPreview')).toContainText('외부 API 검토');
+  await host.locator('[data-pm-publish]').click();
+  await expect(page.locator('#toast')).toContainText('주간보고를 발행');
+  let stored = (await (await page.request.get(api + 'projects/' + p.id)).json()).project;
+  expect(stored.weeklyReports).toHaveLength(1);
+  expect(stored.tasks.find((t) => t.name === '서비스 오픈').kind).toBe('milestone');
+  const snapshot = structuredClone(stored.weeklyReports[0]);
+  await host.locator('[data-management-pane=report]').click();
+  const report = host;
+  await expect(report).toContainText('외부 API 검토');
+  const download = page.waitForEvent('download');
+  await report.locator('[data-pm-export]').click();
+  expect((await download).suggestedFilename()).toMatch(/\.html$/);
+  stored.issues[0].title = '변경한 현재 이슈';
+  const headers = { Origin: origin, 'X-CSRF-Token': session.csrf };
+  expect(
+    (
+      await page.request.put(api + 'projects/' + p.id, {
+        headers,
+        data: { revision: stored._revision, project: stored },
+      })
+    ).ok(),
+  ).toBe(true);
+  stored = (await (await page.request.get(api + 'projects/' + p.id)).json()).project;
+  expect(stored.weeklyReports[0]).toEqual(snapshot);
+  stored.weeklyReports[0].notes = '변조';
+  expect(
+    (
+      await page.request.put(api + 'projects/' + p.id, {
+        headers,
+        data: { revision: stored._revision, project: stored },
+      })
+    ).status(),
+  ).toBe(400);
+  await selectProject(page, p, 'management');
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+  await page.screenshot({
+    path: test.info().outputPath('pm-management-mobile.png'),
+    fullPage: true,
+  });
+});
+
+test('모바일 내 업무에서 오늘 완료를 바로 저장하고 동시 수정은 덮어쓰지 않음', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.clock.setFixedTime(new Date('2026-11-03T08:00:00Z'));
+  const session = await login(page),
+    source = largeProject(),
+    base = source.tasks[0];
+  const p = await createProject(page, session, {
+    name: '빠른 완료',
+    tasks: [
+      {
+        ...base,
+        items: [
+          { id: 'quick-a', title: '첫 항목', hours: 2, doneDate: null },
+          { id: 'quick-b', title: '두 번째 항목', hours: 6, doneDate: null },
+        ],
+      },
+    ],
+  });
+  const headers = { Origin: origin, 'X-CSRF-Token': session.csrf };
+  expect(
+    (
+      await page.request.put(api + 'projects/' + p.id + '/member-accounts', {
+        headers,
+        data: { memberId: p.members[0].id, userId: session.user.id },
+      })
+    ).ok(),
+  ).toBe(true);
+  await selectProject(page, p, 'daily');
+  const quick = page
+    .locator('.my-work-quick')
+    .filter({ has: page.locator('[data-my-complete-project="' + p.id + '"]') });
+  await quick.locator('summary').click();
+  const first = page.locator('[data-my-complete-item=quick-a]');
+  expect((await first.boundingBox()).height).toBeGreaterThanOrEqual(44);
+  await first.click();
+  await expect(page.locator('#toast')).toContainText('오늘 완료');
+  let current = (await (await page.request.get(api + 'projects/' + p.id)).json()).project;
+  expect(current.tasks[0].items[0].doneDate).toBe('2026-11-03');
+  expect(current.tasks[0].items[1].doneDate).toBeNull();
+  await quick.locator('summary').click();
+  await page.route('**/api/projects/' + p.id, async (route) => {
+    if (route.request().method() !== 'PUT') return route.continue();
+    const latest = (await (await page.request.get(api + 'projects/' + p.id)).json()).project;
+    latest.tasks[0].memo = '동시 변경 보존';
+    expect(
+      (
+        await page.request.put(api + 'projects/' + p.id, {
+          headers,
+          data: { revision: latest._revision, project: latest },
+        })
+      ).ok(),
+    ).toBe(true);
+    await route.continue();
+  });
+  await page.locator('[data-my-complete-item=quick-b]').click();
+  await expect(page.locator('#toast')).toContainText('다른 사용자');
+  current = (await (await page.request.get(api + 'projects/' + p.id)).json()).project;
+  expect(current.tasks[0].items[1].doneDate).toBeNull();
+  expect(current.tasks[0].memo).toBe('동시 변경 보존');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+});
+
+test('공통 메뉴: 모든 화면 직접 이동·현재 위치·좁은 화면·미저장 입력 보호', async ({ page }) => {
+  const session = await login(page);
+  const p = await createProject(page, session, { name: '공통 탐색 구조' });
+  await selectProject(page, p, 'overview');
+  for (const [id, title] of Object.entries({
+    overview: '프로젝트 현황',
+    tasks: '업무 · 일정',
+    milestones: '마일스톤',
+    daily: '완료 체크',
+    people: '참여인력',
+    resources: '투입 계획',
+    management: '이슈 · 리스크',
+    reports: '업무 · 완료 기록',
+    weekly: '주간보고',
+  })) {
+    await page.locator('[data-view="' + id + '"]').click();
+    await expect(page.locator('#main .page-head h1')).toHaveText(title);
+    await expect(page.locator('#projectNavigation [aria-current="page"]')).toHaveCount(1);
+    await expect(page.locator('#pmManagement details')).toHaveCount(0);
+    await expect(page.locator('#pmManagement form')).toHaveCount(0);
+  }
+  await page.locator('[data-view=management]').click();
+  await page.locator('[data-management-pane=add]').first().click();
+  await page.locator('[data-pm-form=issue] [name=title]').fill('보존할 입력');
+  await page.locator('[data-view=management]').click();
+  await expect(page.locator('[data-pm-form=issue] [name=title]')).toHaveValue('보존할 입력');
+  page.once('dialog', (dialog) => dialog.dismiss());
+  await page.locator('[data-view=resources]').click();
+  await expect(page.locator('[data-pm-form=issue] [name=title]')).toHaveValue('보존할 입력');
+  await page.setViewportSize({ width: 390, height: 844 });
+  page.once('dialog', (dialog) => dialog.dismiss());
+  await page.locator('#viewSelect').selectOption('reports');
+  await expect(page.locator('#viewSelect')).toHaveValue('management');
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.locator('#viewSelect').selectOption('reports');
+  await expect(page.locator('#main h1')).toHaveText('업무 · 완료 기록');
+  await expect(page.locator('#reportHistory')).toBeVisible();
+  await page.locator('#historyOwner').selectOption(p.members[0].id);
+  await page.reload();
+  await expect(page.locator('#main h1')).toHaveText('업무 · 완료 기록');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({
+    path: test.info().outputPath('navigation-reports-phone.png'),
+    fullPage: true,
+  });
 });

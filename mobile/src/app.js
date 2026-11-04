@@ -1,16 +1,24 @@
+import { ProjectTools } from './project-tools.js';
+import { PROJECT_SCREENS, projectNavigation } from '../../shared/browser/project-navigation.js';
+import { taskView, taskLeaves, summaryIds } from '../../shared/browser/task-model.js';
 import './mobile.css';
 import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import { escapeHtml as esc } from '../../shared/browser/html.js';
 import { setLanguage } from '../../shared/browser/i18n.js';
-import { today, summary, progress } from '../../shared/browser/engine.js';
+import { today, summary, progress, validDate } from '../../shared/browser/engine.js';
 import {
   setBusinessTimeZone,
   getBusinessTimeZone,
   validateTimeZone,
 } from '../../shared/browser/business-clock.js';
 import { editorForm, applyEditor, itemEditor } from '../../shared/browser/project-editor.js';
-import { csvText, wbsRows } from '../../shared/browser/reports.js';
+import {
+  csvText,
+  wbsRows,
+  completionRecords,
+  completionRows,
+} from '../../shared/browser/reports.js';
 import { icon, pct, num } from '../../shared/browser/view-ui.js';
 import { ProjectStore } from './storage.mjs';
 import {
@@ -47,18 +55,30 @@ let undo = [],
   returnFocus = null,
   initialEditorFields = '';
 const scrollPositions = new Map();
-const titles = {
-  overview: '프로젝트 현황',
-  tasks: '업무 · 일정',
-  daily: '완료 체크',
-  more: '프로젝트 관리',
-};
-const tabs = [
-  ['overview', '현황', 'dashboard'],
-  ['tasks', '업무', 'layers'],
-  ['daily', '완료 체크', 'check'],
-  ['more', '더보기', 'more'],
-];
+const mobileViews = projectNavigation('mobile').flatMap((group) => group.views);
+const titles = Object.fromEntries(mobileViews.map((id) => [id, PROJECT_SCREENS[id].title]));
+const tabs = ['overview', 'tasks', 'daily', 'people', 'reports', 'more'].map((id) => [
+  id,
+  PROJECT_SCREENS[id].short,
+  PROJECT_SCREENS[id].icon,
+]);
+const projectTools = new ProjectTools({
+  project: () => record?.project,
+  revision: () => record?.revision,
+  save,
+  render,
+  navigate,
+  toast,
+  edit: openEditor,
+  reload: async () => {
+    await route();
+  },
+  canChange: () => !busy && !editing,
+  confirm: (message) => confirmDelete(message, { title: '변경사항 확인', action: '버리고 이동' }),
+  onDate: (date) => {
+    completionDate = date;
+  },
+});
 
 function toast(message, canUndo = false) {
   $('#toastText').textContent = message;
@@ -81,7 +101,7 @@ async function run(action) {
   $('#content').setAttribute('aria-busy', 'true');
   const controls = [
     ...document.querySelectorAll('button:not(:disabled), input[type="checkbox"]:not(:disabled)'),
-  ];
+  ].filter((element) => element.getClientRects().length);
   controls.forEach((element) => {
     element.disabled = true;
   });
@@ -107,11 +127,12 @@ function meter(value) {
   return `<div class="meter" role="meter" aria-label="진척률" aria-valuenow="${Math.round(value * 100)}" aria-valuemin="0" aria-valuemax="100"><span style="width:${value * 100}%"></span></div>`;
 }
 function status(task) {
-  return progress(task, today()) === 1
+  if (task.kind === 'summary' && !task.items.length) return ['active', '요약 업무'];
+  return progress(task, projectTools.at) === 1
     ? ['done', '완료']
-    : task.end < today()
+    : task.end < projectTools.at
       ? ['late', '지연']
-      : progress(task, today()) > 0
+      : progress(task, projectTools.at) > 0
         ? ['active', '진행 중']
         : ['active', '예정'];
 }
@@ -123,13 +144,18 @@ function filtered(project) {
   );
 }
 function taskCard(project, task, daily = false) {
+  task = taskView(project, task);
   const [style, label] = status(task);
   const member = project.members.find((member) => member.id === task.owner);
-  const items = daily ? task.items.filter((item) => !onlyOpen || !item.doneDate) : [];
+  const entries =
+    task.kind === 'milestone'
+      ? [{ id: '__milestone', title: '마일스톤 완료', hours: 0, doneDate: task.doneDate }]
+      : task.items;
+  const items = daily ? entries.filter((item) => !onlyOpen || !item.doneDate) : [];
   return `<article class="task-card"><div class="card-top"><span class="phase">${esc(task.phase || '일반')}</span><span class="badge ${style}">${label}</span></div>
     <button class="task-title" data-action="edit-task" data-id="${esc(task.id)}">${esc(task.name)}</button>
-    <p class="task-meta">${icon('users')}${esc(member?.name || '미지정')}<span>·</span>${task.start.slice(5)} – ${task.end.slice(5)}</p>
-    ${daily ? `<div class="checklist">${items.map((item) => `<label class="check-row"><input type="checkbox" data-task="${esc(task.id)}" data-item="${esc(item.id)}" ${item.doneDate ? 'checked' : ''}><span>${esc(item.title)}${item.doneDate ? `<small>완료 ${item.doneDate}</small>` : ''}</span><small>${num(item.hours)}h</small></label>`).join('') || '<p class="muted">모든 세부 작업을 완료했습니다.</p>'}</div>` : `<div class="progress-line">${meter(progress(task, today()))}<strong>${pct(progress(task, today()))}</strong></div>`}
+    <p class="task-meta">${icon('users')}${esc(task.kind === 'summary' ? '요약 업무' : member?.name || '미지정')}<span>·</span>${task.start.slice(5)} – ${task.end.slice(5)}</p>
+    ${daily ? `<div class="checklist">${items.map((item) => `<label class="check-row"><input type="checkbox" data-task="${esc(task.id)}" data-item="${esc(item.id)}" ${item.doneDate ? 'checked' : ''}><span>${esc(item.title)}${item.doneDate ? `<small>완료 ${item.doneDate}</small>` : ''}</span><small>${num(item.hours)}h</small></label>`).join('') || '<p class="muted">모든 세부 작업을 완료했습니다.</p>'}</div>` : `<div class="progress-line">${meter(progress(task, projectTools.at))}<strong>${pct(progress(task, projectTools.at))}</strong></div>`}
   </article>`;
 }
 function projectList() {
@@ -153,24 +179,24 @@ function projectList() {
             '업무와 일정을 등록하고, 완료한 작업을 바로 체크하세요. 인터넷 연결 없이 사용할 수 있습니다.',
           )
     }
-    <aside class="storage-note">${icon('check')}<div><strong>내 기기 안의 작은 작업실</strong><p>변경 내용은 이 기기에 자동 저장됩니다. 더보기에서 파일을 내보내 다른 기기로 옮길 수 있습니다.</p></div></aside>
+    <aside class="storage-note">${icon('check')}<div><strong>내 기기 안의 작은 작업실</strong><p>변경 내용은 이 기기에 자동 저장됩니다. 설정 · 파일에서 파일을 내보내 다른 기기로 옮길 수 있습니다.</p></div></aside>
     <p class="privacy-note">${button('개인정보처리방침', 'privacy', 'ghost')}</p>`;
 }
 function overview(p) {
-  const s = summary(p, today());
+  const s = summary(p, projectTools.at);
   if (!p.tasks.length) {
     return `<section class="setup-card"><span class="eyebrow">프로젝트 시작하기</span><h2>첫 업무만 적으면 시작할 수 있어요</h2><p>담당자와 세부 일정은 나중에 정해도 됩니다.</p>${button('＋ 업무 추가', 'add-task', 'primary')}<div class="setup-step"><span>1</span><div><strong>해야 할 업무를 적으세요</strong><p>업무명만 입력해도 저장할 수 있습니다.</p></div></div><div class="setup-step"><span>2</span><div><strong>완료한 작업을 체크하세요</strong><p>완료 체크에서 진척률을 기록합니다.</p></div></div><div class="setup-step"><span>3</span><div><strong>필요할 때 담당자를 추가하세요</strong><p>혼자 사용한다면 미지정으로 두어도 됩니다.</p></div></div>${button('참여인력 추가', 'add-member', 'ghost')}</section>`;
   }
   return `<section class="hero"><span class="eyebrow">PROJECT PULSE</span><div class="hero-progress"><strong>${pct(s.progress)}</strong><span>전체 진척률</span></div>${meter(s.progress)}<div class="hero-foot"><span>계획 ${pct(s.planned)}</span><span>${num(s.done)} / ${num(s.total)}h 완료</span></div></section>
     <div class="quick-actions">${button('＋ 업무 추가', 'add-task', 'primary')}<a class="button" href="#daily/${esc(p.id)}">${icon('check')}완료 기록</a></div>
-    <div class="metric-grid"><article><span>완료 업무</span><strong>${s.completed}<small> / ${p.tasks.length}</small></strong></article><article><span>지연 업무</span><strong class="${s.overdue ? 'late-text' : ''}">${s.overdue}<small>건</small></strong></article></div>
-    <section class="forecast-card">${icon('calendar')}<div><span>예상 완료일</span><strong>${s.forecast.end || '업무를 등록해 주세요'}</strong><small>${s.forecast.observed ? '최근 완료 속도를 반영했습니다.' : '현재 계획과 공수를 기준으로 계산합니다.'}</small></div></section>
-    <div class="section-heading"><h2>다가오는 업무</h2><a href="#tasks/${esc(p.id)}">모두 보기 →</a></div>
+    <div class="metric-grid"><article><span>완료 업무</span><strong>${s.completed}<small> / ${taskLeaves(p).length}</small></strong></article><article><span>지연 업무</span><strong class="${s.overdue ? 'late-text' : ''}">${s.overdue}<small>건</small></strong></article></div>
+    <section class="forecast-card">${icon('calendar')}<div><span>예상 완료일</span><strong>${s.forecast.end || '업무를 등록해 주세요'}</strong><small>보고 기준일 업무 종료 기준 · ${s.forecast.observed ? '최근 완료 속도를 반영했습니다.' : '현재 계획과 공수를 기준으로 계산합니다.'}</small></div></section>
+    ${projectTools.visuals(p)}<div class="section-heading"><h2>다가오는 업무</h2><a href="#tasks/${esc(p.id)}">모두 보기 →</a></div>
     ${
       p.tasks.length
         ? `<div class="task-list">${
-            p.tasks
-              .filter((task) => progress(task, today()) < 1)
+            taskLeaves(p)
+              .filter((task) => progress(task, projectTools.at) < 1)
               .sort((a, b) => a.end.localeCompare(b.end))
               .slice(0, 4)
               .map((task) => taskCard(p, task))
@@ -192,7 +218,13 @@ function tasks(p, daily) {
 }
 function taskList(p, daily) {
   const tasks = filtered(p).filter(
-    (task) => !daily || !onlyOpen || task.items.some((item) => !item.doneDate),
+    (task) =>
+      !daily ||
+      (!summaryIds(p).has(task.id) &&
+        (!onlyOpen ||
+          (task.kind === 'milestone'
+            ? !task.doneDate
+            : task.items.some((item) => !item.doneDate)))),
   );
   if (!p.tasks.length)
     return empty(
@@ -210,18 +242,26 @@ function taskList(p, daily) {
     )
   );
 }
+function people(p) {
+  return `<section class="settings-card"><div class="section-heading"><h2>참여인력 <span>${p.members.length}</span></h2>${button('＋ 추가', 'add-member')}</div><div class="member-list">${p.members.map((m) => `<button class="member-row" data-action="edit-member" data-id="${esc(m.id)}"><span class="member-avatar">${esc(m.name.slice(-2))}</span><span><strong>${esc(m.name)}</strong><small>${esc(m.role || '참여인력')} · ${num(m.hours)}h / 일 · ${m.allocation}%</small></span><span aria-hidden="true">›</span></button>`).join('') || '<p class="muted">함께할 사람을 추가해 보세요.</p>'}</div></section>`;
+}
+function reports() {
+  return projectTools.reports();
+}
 function more(p) {
   return `<section class="settings-card"><h2>프로젝트</h2><p>${esc(p.description || '이 프로젝트의 일정과 참여인력을 관리하세요.')}</p>${button('프로젝트 설정', 'settings')}
     <div class="history-actions">${button('↶ 실행 취소', 'undo', '', undo.length ? '' : 'disabled')}${button('↷ 다시 실행', 'redo', '', redo.length ? '' : 'disabled')}</div></section>
-    <section class="settings-card"><div class="section-heading"><h2>참여인력 <span>${p.members.length}</span></h2>${button('＋ 추가', 'add-member')}</div><div class="member-list">${p.members.map((m) => `<button class="member-row" data-action="edit-member" data-id="${esc(m.id)}"><span class="member-avatar">${esc(m.name.slice(-2))}</span><span><strong>${esc(m.name)}</strong><small>${esc(m.role || '참여인력')} · ${num(m.hours)}h / 일 · ${m.allocation}%</small></span><span aria-hidden="true">›</span></button>`).join('') || '<p class="muted">함께할 사람을 추가해 보세요.</p>'}</div></section>
-    <section class="settings-card"><h2>파일 · 보고서</h2><p>프로젝트 파일은 웹과 데스크톱에서도 가져올 수 있습니다.</p><div class="stack-actions">${button(icon('download') + ' 프로젝트 내보내기', 'export')}${button(icon('download') + ' 업무 보고서 CSV', 'csv')}${button(icon('upload') + ' 프로젝트 가져오기', 'import')}</div></section>
+
+    <section class="settings-card"><h2>파일 가져오기 · 내보내기</h2><p>프로젝트 파일은 웹과 데스크톱에서도 가져올 수 있습니다.</p><div class="stack-actions">${button(icon('download') + ' 프로젝트 내보내기', 'export')}${button(icon('upload') + ' 프로젝트 가져오기', 'import')}</div></section>
     <section class="settings-card"><h2>업무 기준 시간대</h2><p>${esc(getBusinessTimeZone())} 기준으로 오늘과 완료일을 계산합니다.</p>${button('시간대 변경', 'timezone')}</section>
-    <p class="privacy-note">PM Canvas 0.1.0 · 기기에 자동 저장<br>계정이나 서버 연결 없이 동작합니다. 앱을 삭제하면 기기의 프로젝트도 삭제될 수 있으므로 파일을 내보내 보관하세요.</p>
+    <p class="privacy-note">PM Canvas 0.2.0 · 기기에 자동 저장<br>계정이나 서버 연결 없이 동작합니다. 앱을 삭제하면 기기의 프로젝트도 삭제될 수 있으므로 파일을 내보내 보관하세요.</p>
     <p class="privacy-note">${button('개인정보처리방침', 'privacy', 'ghost')}</p>
     <div class="delete-project">${button('이 프로젝트 삭제', 'delete-project', 'danger ghost')}</div>`;
 }
 function render() {
   const p = record?.project;
+  document.title =
+    p && view !== 'projects' ? p.name + ' · ' + titles[view] + ' — PM Canvas' : 'PM Canvas';
   document.body.classList.toggle('in-project', Boolean(p && view !== 'projects'));
   $('#navigation').hidden = !p || view === 'projects';
   $('#navigation').innerHTML = p
@@ -238,7 +278,8 @@ function render() {
     return;
   }
   $('#content').innerHTML =
-    `<section class="project-heading"><div class="project-heading-line"><a class="back-link" href="#projects">← 프로젝트</a><span class="saved-label" role="status">기기에 저장됨</span></div><h1>${esc(p.name)}</h1><p class="date-caption">${titles[view]} · ${today()} · ${esc(getBusinessTimeZone())}</p></section>${view === 'overview' ? overview(p) : view === 'tasks' ? tasks(p, false) : view === 'daily' ? tasks(p, true) : more(p)}`;
+    `<section class="project-heading"><a class="back-link" href="#projects">← 프로젝트</a><div class="project-heading-line"><div><span class="eyebrow">${esc(p.name)}</span><h1>${titles[view]}</h1></div><span class="saved-label" role="status">저장됨</span></div><p class="date-caption">${projectTools.at} · ${esc(getBusinessTimeZone())}</p></section>${projectTools.controls(view)}${view === 'overview' ? overview(p) : view === 'tasks' ? tasks(p, false) : view === 'daily' ? tasks(p, true) : view === 'people' ? people(p) : view === 'reports' ? reports(p) : view === 'more' ? more(p) : projectTools.render(view)}`;
+  projectTools.attach(view);
 }
 async function route() {
   if (editing || $('#confirmation').open) {
@@ -250,6 +291,16 @@ async function route() {
     return;
   }
   const [requested, id] = location.hash.slice(1).split('/');
+  if ((requested !== view || id !== record?.id) && !(await projectTools.leave())) {
+    history.replaceState(
+      null,
+      '',
+      `#${view}${record && view !== 'projects' ? '/' + record.id : ''}`,
+    );
+    const picker = $('#projectView');
+    if (picker) picker.value = view;
+    return;
+  }
   scrollPositions.set(`${view}/${record?.id || ''}`, window.scrollY);
   records = await store.list();
   const next = records.find((entry) => entry.id === id);
@@ -263,6 +314,8 @@ async function route() {
       query = '';
       owner = '';
     }
+    projectTools.enter(requested, next.id);
+    completionDate = projectTools.at;
     view = requested;
   } else {
     $('#toast').hidden = true;
@@ -284,6 +337,11 @@ function trimHistory(stack) {
 async function save(project, history = true) {
   const previous = record?.project;
   const saved = await store.save(project, record?.id === project.id ? record.revision : 0);
+  if (previous && (previous.weeklyReports?.length || 0) !== (project.weeklyReports?.length || 0)) {
+    undo = [];
+    redo = [];
+    history = false;
+  }
   if (history && previous?.id === project.id) {
     undo.push(previous);
     trimHistory(undo);
@@ -295,6 +353,10 @@ async function save(project, history = true) {
   render();
 }
 function openEditor(type, id = '') {
+  if (projectTools.dirty() || projectTools.pending()) {
+    toast('변경사항을 먼저 저장하거나 취소해 주세요.');
+    return;
+  }
   editing = { type, id };
   returnFocus = document.activeElement;
   const form = editorForm(type, record?.project || { members: [], tasks: [] }, id, { uid });
@@ -455,8 +517,11 @@ $('#editorForm').addEventListener('submit', (event) => {
             { cause: error },
           );
         }
+        if (projectTools.at === lastDay || projectTools.at > today()) projectTools.at = today();
+        if (projectTools.range.to > projectTools.at)
+          projectTools.range = { from: projectTools.at, to: projectTools.at, owner: '' };
         lastDay = today();
-        completionDate = today();
+        completionDate = projectTools.at;
         closeEditor();
         render();
         return;
@@ -500,7 +565,8 @@ async function confirmAction(message, title = '삭제할까요?', label = '삭�
     ),
   );
 }
-const confirmDelete = (message) => confirmAction(message);
+const confirmDelete = (message, { title = '삭제할까요?', action = '삭제' } = {}) =>
+  confirmAction(message, title, action);
 $('#deleteItem').onclick = async () => {
   if (!editing || busy) return;
   if (
@@ -522,6 +588,11 @@ document.addEventListener('click', (event) => {
     event.preventDefault();
     return;
   }
+  const chartTask = event.target.closest('[data-edit-task]');
+  if (chartTask && !busy && !editing) {
+    openEditor('task', chartTask.dataset.editTask);
+    return;
+  }
   const target = event.target.closest('[data-action]');
   if (!target || busy || editing) return;
   const action = target.dataset.action;
@@ -533,7 +604,16 @@ document.addEventListener('click', (event) => {
   if (action === 'new') return openEditor('project');
   if (action === 'open') return navigate('overview', records[Number(target.dataset.index)].id);
   if (action === 'import') return $('#importFile').click();
-  if (action === 'add-task' || action === 'edit-task') return openEditor('task', target.dataset.id);
+  if (action === 'export-excel') {
+    void projectTools.excel().catch((error) => toast(errorText(error)));
+    return;
+  }
+  if (action === 'export-wbs') {
+    void projectTools.exportCsv().catch((error) => toast(errorText(error)));
+    return;
+  }
+  if (action === 'task' || action === 'add-task' || action === 'edit-task')
+    return openEditor('task', target.dataset.id);
   if (action === 'add-member' || action === 'edit-member')
     return openEditor('member', target.dataset.id);
   if (action === 'settings') return openEditor('settings');
@@ -582,12 +662,9 @@ document.addEventListener('click', (event) => {
     } else if (action === 'export') {
       await shareFile(record.project.name + '.pmcanvas', serializeProject(record.project));
     } else if (action === 'csv') {
-      const p = record.project;
-      await shareFile(
-        p.name + '-' + today() + '.csv',
-        csvText(wbsRows(p, today(), summary(p, today()).forecast)),
-        'text/csv;charset=utf-8',
-      );
+      await projectTools.exportCsv();
+    } else if (action === 'completion-csv') {
+      await projectTools.exportCsv(true);
     } else if (action === 'retry') await route();
   });
 });
@@ -610,7 +687,15 @@ document.addEventListener('change', (event) => {
     onlyOpen = element.checked;
     $('#taskList').innerHTML = taskList(record.project, true);
   }
-  if (element.id === 'completionDate') completionDate = element.value;
+  if (element.id === 'completionDate') {
+    if (!validDate(element.value) || element.value > today()) {
+      element.value = completionDate;
+      toast('오늘까지의 날짜를 선택해 주세요.');
+      return;
+    }
+    completionDate = element.value;
+    projectTools.at = element.value;
+  }
   if (element.dataset.item) {
     if (busy) {
       element.checked = !element.checked;
@@ -651,8 +736,11 @@ function refreshDate() {
     !editing &&
     !$('#confirmation').open &&
     !busy &&
+    !projectTools.dirty() &&
+    !projectTools.pending() &&
     !document.activeElement?.matches('input,textarea,select')
   ) {
+    if (projectTools.at === lastDay) projectTools.at = today();
     lastDay = today();
     completionDate = today();
     render();

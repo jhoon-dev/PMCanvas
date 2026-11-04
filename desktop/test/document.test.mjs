@@ -1,3 +1,4 @@
+import { weeklyDraft } from '../app/shared/management.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -15,7 +16,54 @@ import os from 'node:os';
 import path from 'node:path';
 import { DesktopDocument, parseDocument, serializeDocument, MAX_BYTES } from '../document.mjs';
 import { assetPath } from '../assets.mjs';
+import { normalizeTaskModel } from '../app/shared/task-model.js';
 import { summary } from '../app/shared/engine.js';
+import { legacyProject, assertUpgradedProject, assertMigratedRecovery } from './legacy-project.mjs';
+import { createHash } from 'node:crypto';
+
+test('installation fixtures retain legacy parent baseline effort and verify lossless in-memory migration', () => {
+  const legacy = legacyProject('Legacy installation', 'Legacy baseline');
+  const bytes = JSON.stringify({ format: 'pm-canvas-project', version: 1, project: legacy }),
+    upgraded = parseDocument(bytes);
+  assert.equal(legacy.baseline.tasks.find((t) => t.id === 't1').hours, 32);
+  assert.equal(upgraded.tasks.length, 4);
+  assert.equal(upgraded.baseline.tasks.find((t) => t.id === 't1').hours, 48);
+  assert.equal(upgraded.baseline.tasks.find((t) => t.id === 't1-work').hours, 32);
+  assertUpgradedProject(upgraded, legacy);
+  const tampered = structuredClone(upgraded);
+  tampered.tasks.find((t) => t.id === 't1-work').items[0].doneDate = null;
+  assert.throws(() => assertUpgradedProject(tampered, legacy));
+  assert.equal(JSON.stringify({ format: 'pm-canvas-project', version: 1, project: legacy }), bytes);
+});
+
+test('opening a legacy file preserves source bytes and writes independently verifiable migrated recovery', (t) => {
+  const root = mkdtempSync(path.join(os.tmpdir(), 'pmcanvas-migration-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const legacy = legacyProject('Legacy recovery', 'Original baseline'),
+    file = path.join(root, 'Legacy.pmcanvas'),
+    recoveryFile = path.join(root, 'recovery.json'),
+    bytes = JSON.stringify({ format: 'pm-canvas-project', version: 1, project: legacy }),
+    savedHash = createHash('sha256').update(bytes).digest('hex');
+  writeFileSync(file, bytes);
+  const doc = new DesktopDocument(recoveryFile);
+  doc.open(file);
+  const recoveryBytes = readFileSync(recoveryFile),
+    recovery = JSON.parse(recoveryBytes);
+  assertMigratedRecovery(recovery, legacy, file, savedHash);
+  assert.equal(readFileSync(file, 'utf8'), bytes);
+  const dirty = structuredClone(recovery);
+  dirty.dirty = true;
+  assert.throws(() => assertMigratedRecovery(dirty, legacy, file, savedHash));
+  const wrongHash = structuredClone(recovery);
+  wrongHash.savedHash = '0'.repeat(64);
+  assert.throws(() => assertMigratedRecovery(wrongHash, legacy, file, savedHash));
+  new DesktopDocument(recoveryFile).open(file);
+  assert.deepEqual(
+    readFileSync(recoveryFile),
+    recoveryBytes,
+    'Later opens use the same canonical recovery.',
+  );
+});
 
 const fixture = () => ({
   id: 'project1',
@@ -45,6 +93,71 @@ function temporary(t) {
   t.after(() => rmSync(root, { recursive: true, force: true }));
   return root;
 }
+
+test('closing clears the session and recovery without modifying project files or restoring on restart', (t) => {
+  const root = temporary(t);
+  const recovery = path.join(root, 'recovery.json');
+  const file = path.join(root, 'Project.pmcanvas');
+  const doc = new DesktopDocument(recovery);
+  doc.create(fixture());
+  doc.save(file);
+  const savedBytes = readFileSync(file);
+  doc.replace({ ...doc.project, description: 'Discarded session changes' }, doc.revision);
+  assert.equal(doc.snapshot().canUndo, true);
+  const before = doc.revision;
+  const closed = doc.close();
+  assert.deepEqual(closed, {
+    project: null,
+    filename: '',
+    dirty: false,
+    revision: before + 1,
+    canUndo: false,
+    canRedo: false,
+  });
+  assert.deepEqual(readFileSync(file), savedBytes);
+  assert.equal(new DesktopDocument(recovery).recovery(), null);
+  doc.open(file);
+  assert.equal(doc.project.description, '');
+  assert.equal(doc.dirty, false);
+});
+
+test('failed close keeps the project, undo history and recovery intact', (t) => {
+  const root = temporary(t);
+  const recovery = path.join(root, 'recovery.json');
+  const doc = new DesktopDocument(recovery);
+  doc.create(fixture());
+  doc.replace({ ...doc.project, description: 'Keep this change' }, doc.revision);
+  const before = doc.snapshot();
+  const bytes = readFileSync(recovery);
+  doc.recoveryFile = root;
+  assert.throws(() => doc.close());
+  assert.deepEqual(doc.snapshot(), before);
+  assert.deepEqual(readFileSync(recovery), bytes);
+});
+
+test('only a fully cleared recovery record represents a deliberately closed project', (t) => {
+  const root = temporary(t);
+  for (const override of [
+    { dirty: true },
+    { file: path.join(root, 'lost.pmcanvas') },
+    { savedHash: 'a'.repeat(64) },
+    { savedProjectHash: 'a'.repeat(64) },
+  ]) {
+    const file = path.join(root, 'recovery-' + Object.keys(override)[0] + '.json');
+    const bytes = JSON.stringify({
+      version: 1,
+      project: null,
+      file: null,
+      savedHash: null,
+      savedProjectHash: null,
+      dirty: false,
+      ...override,
+    });
+    writeFileSync(file, bytes);
+    assert.throws(() => new DesktopDocument(file).recovery(), /복구 파일/);
+    assert.equal(readFileSync(file, 'utf8'), bytes);
+  }
+});
 test('web backup round trip preserves calculations and hierarchy while removing access metadata', () => {
   const project = fixture();
   project._revision = 17;
@@ -67,8 +180,9 @@ test('web backup round trip preserves calculations and hierarchy while removing 
   assert.equal(restored._role, undefined);
   assert.equal(restored.id, project.id);
   assert.equal(restored.tasks[1].parentId, 't');
-  assert.deepEqual(restored.baseline, project.baseline);
-  assert.deepEqual(summary(restored, '2026-10-21'), summary(project, '2026-10-21'));
+  const migrated = normalizeTaskModel(structuredClone(project));
+  assert.deepEqual(restored.baseline, migrated.baseline);
+  assert.deepEqual(summary(restored, '2026-10-21'), summary(migrated, '2026-10-21'));
 });
 test('invalid formats, unfinished drafts, oversized input and broken dependencies cannot be opened', () => {
   assert.throws(() => parseDocument('{}'), /프로젝트 파일/);
@@ -235,4 +349,65 @@ test('custom protocol exposes only renderer assets, never native model, preload 
     'pmcanvas://desktop/shared/%2e%2e%2fmodel/project.mjs',
   ])
     assert.equal(assetPath(url), null, url);
+});
+
+test('v2 documents retain every predecessor and empty summary across a native file round trip', () => {
+  const p = fixture();
+  p.tasks.push({
+    ...structuredClone(p.tasks[0]),
+    id: 'other',
+    items: [{ id: 'other-item', title: 'Other', hours: 8, doneDate: null }],
+  });
+  p.tasks.push({
+    ...structuredClone(p.tasks[0]),
+    id: 'last',
+    predecessor: 't',
+    predecessors: ['t', 'other'],
+    items: [{ id: 'last-item', title: 'Last', hours: 8, doneDate: null }],
+  });
+  p.tasks.push({
+    ...structuredClone(p.tasks[0]),
+    id: 'empty',
+    kind: 'summary',
+    owner: '',
+    items: [],
+  });
+  const bytes = serializeDocument(p),
+    restored = parseDocument(bytes);
+  assert.equal(JSON.parse(bytes).version, 3);
+  assert.deepEqual(restored.tasks.find((t) => t.id === 'last').predecessors, ['t', 'other']);
+  assert.equal(restored.tasks.find((t) => t.id === 'empty').kind, 'summary');
+  assert.equal(
+    parseDocument(JSON.stringify({ format: 'pm-canvas-project', version: 1, project: fixture() }))
+      .tasks[0].id,
+    't',
+  );
+});
+
+test('published weekly snapshots survive native save/reopen and undo, and cannot be overwritten', (t) => {
+  const root = temporary(t),
+    doc = new DesktopDocument(path.join(root, 'recovery.json'));
+  doc.create(fixture());
+  const next = structuredClone(doc.project);
+  next.weeklyReports = [
+    weeklyDraft(next, {
+      id: 'report',
+      from: '2026-10-19',
+      to: '2026-10-23',
+      notes: 'Frozen',
+      nextNotes: '',
+    }),
+  ];
+  doc.replace(next, doc.revision);
+  const snapshot = structuredClone(doc.project.weeklyReports[0]);
+  doc.undo(doc.revision);
+  assert.deepEqual(doc.project.weeklyReports[0], snapshot);
+  const invalid = structuredClone(doc.project);
+  invalid.weeklyReports[0].notes = 'Changed';
+  assert.throws(() => doc.replace(invalid, doc.revision), /발행한/);
+  const file = path.join(root, 'Published.pmcanvas');
+  doc.save(file);
+  const restored = new DesktopDocument(path.join(root, 'other-recovery.json'));
+  restored.open(file);
+  assert.deepEqual(restored.project.weeklyReports[0], snapshot);
 });

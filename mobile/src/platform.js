@@ -6,12 +6,20 @@ export async function shareFile(name, text, type = 'application/json') {
   const extension = name.match(/\.[a-z0-9]{1,12}$/i)?.[0] || '';
   const base = extension ? name.slice(0, -extension.length) : name;
   const filename = base.replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_').slice(0, 80) + extension;
+  const binary = typeof text !== 'string';
   if (Capacitor.isNativePlatform()) {
+    if (binary) {
+      const bytes = text instanceof Uint8Array ? text : new Uint8Array(text);
+      let encoded = '';
+      for (let offset = 0; offset < bytes.length; offset += 32768)
+        encoded += String.fromCharCode(...bytes.subarray(offset, offset + 32768));
+      text = btoa(encoded);
+    }
     const { uri } = await Filesystem.writeFile({
       path: 'exports/' + filename,
       data: text,
       directory: Directory.Cache,
-      encoding: Encoding.UTF8,
+      ...(binary ? {} : { encoding: Encoding.UTF8 }),
       recursive: true,
     });
     await Share.share({ title: filename, dialogTitle: '프로젝트 내보내기', files: [uri] });

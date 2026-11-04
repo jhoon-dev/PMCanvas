@@ -1,4 +1,5 @@
 import { validateProject } from './engine.js';
+import { normalizeTaskModel } from './task-model.js';
 import { validatePlanning } from './planning.js';
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const copy = (v) => (v === undefined ? undefined : structuredClone(v));
@@ -62,6 +63,8 @@ export function resolvedProject(base, mine, latest, choices) {
   if (latest._role === 'viewer') throw Error('조회자는 프로젝트를 수정할 수 없습니다.');
   const result = mergeProject(base, mine, latest, choices);
   if (result.conflicts.length) throw Error('충돌 항목마다 유지할 값을 선택해 주세요.');
+  validatePlanning(result.project);
+  normalizeTaskModel(result.project);
   validateProject(result.project);
   validatePlanning(result.project);
   return result.project;

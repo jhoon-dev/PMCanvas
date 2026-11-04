@@ -24,8 +24,8 @@ function fixture() {
     members: [],
     holidays: [],
     tasks: [
-      task('parent'),
-      { ...task('child'), parentId: 'parent', predecessor: 'parent' },
+      { ...task('parent'), kind: 'summary', items: [] },
+      { ...task('child'), parentId: 'parent' },
       { ...task('follow'), predecessor: 'child' },
     ],
   };
@@ -42,7 +42,7 @@ test('bulk copies reconnect selected hierarchy/dependencies and reset only copie
   const copies = proposal.project.tasks.filter((task) => task.id.startsWith('copy-'));
   assert.equal(copies.length, 2);
   assert.equal(copies[1].parentId, copies[0].id);
-  assert.equal(copies[1].predecessor, copies[0].id);
+  assert.equal(copies[1].predecessor, '');
   assert.ok(copies.every((task) => task.items.every((item) => !item.doneDate)));
   assert.equal(proposal.project.tasks.find((task) => task.id === 'follow').predecessor, 'child');
   assert.deepEqual(proposal.project.baseline, project.baseline);
@@ -65,7 +65,7 @@ test('bulk deletion previews promoted children and detached dependencies and is 
   assert.equal(proposal.project.tasks[0].parentId, '');
   assert.equal(proposal.project.tasks[0].predecessor, '');
   assert.match(proposal.description, /하위 업무 1개/);
-  assert.match(proposal.description, /후속 업무 1개/);
+  assert.match(proposal.description, /후속 업무 0개/);
   assert.equal(proposal.project.tasks[0].items[0].doneDate, '2026-10-20');
   doc.replace(proposal.project, doc.revision);
   doc.undo(doc.revision);

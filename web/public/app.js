@@ -1,4 +1,6 @@
+import { managementView, installManagementUi } from './management-ui.js';
 import { ui } from './i18n.js';
+import { PROJECT_SCREENS, projectNavigation } from './project-navigation.js';
 import { setBusinessTimeZone } from './business-clock.js';
 import { installLanguage } from './i18n.js';
 import { createProjectEditor } from './project-editor.js';
@@ -29,6 +31,48 @@ let currentUser = null,
 let reviewLanding = location.hash === '#registration-approvals';
 let alertLanding = location.hash === '#operation-alerts';
 const $ = (s) => document.querySelector(s);
+const navigationGroups = projectNavigation('web');
+const projectViews = navigationGroups.flatMap((group) => group.views);
+let managementPage = { pane: 'list', id: '' };
+$('#projectNavigation').innerHTML = navigationGroups
+  .map(
+    (group) =>
+      '<div class="project-nav-group"><p class="side-label">' +
+      esc(ui(group.title)) +
+      '</p>' +
+      group.views
+        .map(
+          (id) =>
+            '<button type="button" data-view="' +
+            id +
+            '" class="nav-item">' +
+            icon(PROJECT_SCREENS[id].icon) +
+            esc(ui(PROJECT_SCREENS[id].title)) +
+            (id === 'tasks' ? '<span id="taskNavCount" class="nav-count"></span>' : '') +
+            '</button>',
+        )
+        .join('') +
+      '</div>',
+  )
+  .join('');
+$('#viewSelect').innerHTML = navigationGroups
+  .map(
+    (group) =>
+      '<optgroup label="' +
+      esc(ui(group.title)) +
+      '">' +
+      group.views
+        .map(
+          (id) => '<option value="' + id + '">' + esc(ui(PROJECT_SCREENS[id].title)) + '</option>',
+        )
+        .join('') +
+      '</optgroup>',
+  )
+  .join('');
+$('#viewSelect').onchange = (event) => {
+  navigate(event.target.value);
+  event.target.value = view;
+};
 const reportClock = new ReportClock();
 let TODAY = reportClock.today;
 let state = { version: 1, projects: [], activeId: null },
@@ -125,6 +169,12 @@ function toast(text) {
 function render() {
   refreshDate(false);
   document.body.dataset.appView = view;
+  $('#viewSelect').value = view;
+  document.querySelectorAll('[data-view]').forEach((button) => {
+    const active = button.dataset.view === view;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-current', active ? 'page' : 'false');
+  });
   if (!state.projects.length) {
     $('#breadcrumbProject').textContent = ui('프로젝트 시작하기');
     $('#projectSelect').innerHTML = '';
@@ -149,9 +199,10 @@ function render() {
     hydrateIcons();
     return;
   }
-  if (!['overview', 'tasks', 'daily', 'people'].includes(view)) view = 'overview';
+  if (!projectViews.includes(view)) view = 'overview';
   const p = project(),
     s = summary(p, asOf);
+  if (managementPage.projectId !== p.id) managementPage = { pane: 'list', id: '', projectId: p.id };
   $('#breadcrumbProject').textContent =
     view === 'daily' && dailyMode === 'mine' ? ui('전체 프로젝트 · 내 업무') : p.name;
   $('#projectSelect').innerHTML = state.projects
@@ -217,6 +268,18 @@ function render() {
         myProjects,
       });
       break;
+    case 'milestones':
+    case 'resources':
+    case 'weekly':
+    case 'management':
+      content = managementView(p, asOf, {
+        section: PROJECT_SCREENS[view].section,
+        page: managementPage,
+      });
+      break;
+    case 'reports':
+      content = reports.screen();
+      break;
     case 'people':
       content = peopleView(p, s, asOf);
       break;
@@ -224,6 +287,9 @@ function render() {
       content = dashboardView(p, s, asOf);
   }
   $('#main').innerHTML = notices + content;
+  const heading = $('#main .page-head h1');
+  if (heading) heading.textContent = ui(PROJECT_SCREENS[view].title);
+  document.title = p.name + ' · ' + ui(PROJECT_SCREENS[view].title) + ' — PM Canvas';
   hydrateIcons();
   updateAccessUi();
   if (view === 'tasks') wbs.attach();
@@ -242,25 +308,39 @@ function openInfo(title, body) {
   $('#infoDialog').showModal();
 }
 function openEditor(type, id = '') {
+  if (managementUi.dirty() || managementUi.pending()) {
+    toast(ui('관리 입력을 먼저 저장하거나 취소해 주세요.'));
+    return;
+  }
   editorUi.open(type, id);
 }
 function normalizeView(value) {
-  return ['overview', 'tasks', 'daily', 'people'].includes(value) ? value : 'overview';
+  return projectViews.includes(value) ? value : 'overview';
 }
 function navigate(v) {
   v = normalizeView(v);
+  if (v === view) return;
+  if (v !== view && !managementUi.leave()) return;
   if (wbs.dirty && v !== 'tasks') {
     toast(ui('WBS 변경사항을 먼저 저장하거나 취소해 주세요.'));
     return;
   }
+  if (v !== view) managementPage = { pane: 'list', id: '' };
   view = v;
   ownerFilter = '';
   statusFilter = '';
   query = '';
   location.hash = v;
   render();
+  window.scrollTo({ top: 0 });
+  $('#main').focus({ preventScroll: true });
 }
 document.addEventListener('click', (e) => {
+  const quick = e.target.closest('[data-my-complete-item]');
+  if (quick) {
+    void quickComplete(quick.dataset);
+    return;
+  }
   const daily = e.target.closest('[data-daily-mode]');
   if (daily) {
     dailyMode = daily.dataset.dailyMode;
@@ -274,6 +354,19 @@ document.addEventListener('click', (e) => {
     admin.open().catch((e) => toast(e.message));
     return;
   }
+  const pane = e.target.closest('[data-management-pane]');
+  if (pane) {
+    if (!managementUi.leave()) return;
+    managementPage = {
+      pane: pane.dataset.managementPane,
+      id: pane.dataset.managementId || '',
+      projectId: project()?.id,
+    };
+    render();
+    window.scrollTo({ top: 0 });
+    $('#main').focus({ preventScroll: true });
+    return;
+  }
   const nav = e.target.closest('[data-view]');
   if (nav) {
     navigate(nav.dataset.view);
@@ -281,6 +374,7 @@ document.addEventListener('click', (e) => {
   }
   const sw = e.target.closest('[data-project]');
   if (sw) {
+    if (!managementUi.leave()) return;
     if (storageError || wbs.dirty) {
       toast(ui('현재 변경사항을 먼저 저장하거나 백업한 뒤 취소해 주세요.'));
       return;
@@ -391,15 +485,24 @@ window.addEventListener('hashchange', () => {
   if (auth.handleHash()) return;
   const next = normalizeView(location.hash.slice(1));
   if (next === view) return;
+  if (!managementUi.leave()) {
+    history.replaceState(null, '', '#' + view);
+    return;
+  }
   if (wbs.dirty && next !== 'tasks') {
     history.replaceState(null, '', '#tasks');
     toast(ui('WBS 변경사항을 먼저 저장하거나 취소해 주세요.'));
     return;
   }
+  managementPage = { pane: 'list', id: '' };
   view = next;
   render();
 });
 $('#projectSelect').onchange = async (e) => {
+  if (!managementUi.leave()) {
+    e.target.value = state.activeId;
+    return;
+  }
   if (storageError || wbs.dirty) {
     toast(ui('WBS 변경사항을 먼저 저장하거나 취소해 주세요.'));
     render();
@@ -471,7 +574,7 @@ function showAuth(message = '') {
   auth.show(message);
 }
 async function loadProjects({ force = false, activeId = state.activeId } = {}) {
-  if (wbs.dirty || wbs.interacting) return false;
+  if (wbs.dirty || wbs.interacting || managementUi.dirty() || managementUi.pending()) return false;
   const request = workspaceReads.begin(currentUser?.id, mutationSequence);
   const data = await api('workspace/sync', {
     method: 'POST',
@@ -539,7 +642,14 @@ async function reloadServer() {
   }
 }
 window.addEventListener('beforeunload', (e) => {
-  if (saveInFlight || storageError || wbs.dirty || editorUi.isDirty()) {
+  if (
+    saveInFlight ||
+    storageError ||
+    wbs.dirty ||
+    editorUi.isDirty() ||
+    managementUi.dirty() ||
+    managementUi.pending()
+  ) {
     e.preventDefault();
     e.returnValue = '';
   }
@@ -547,10 +657,13 @@ window.addEventListener('beforeunload', (e) => {
 setInterval(async () => {
   if (
     !currentUser ||
+    managementUi.dirty() ||
+    managementUi.pending() ||
     saveInFlight ||
     storageError ||
     wbs.dirty ||
     wbs.interacting ||
+    document.activeElement?.closest('.my-work-quick') ||
     document.visibilityState !== 'visible' ||
     $('#editorDialog').open ||
     document.querySelector('dialog[open]') ||
@@ -570,6 +683,8 @@ let datePaintPending = false;
 function refreshDate(paint = true) {
   const advance =
     !saveInFlight &&
+    !managementUi.dirty() &&
+    !managementUi.pending() &&
     !storageError &&
     !wbs.dirty &&
     !wbs.interacting &&
@@ -653,6 +768,48 @@ async function refreshMyWork() {
     if (view === 'daily' && dailyMode === 'mine') render();
   } catch {
     /* A successful project save is independent of this read. */
+  }
+}
+const managementUi = installManagementUi({
+  project,
+  getDate: () => asOf,
+  toast,
+  canChange: opsCanChange,
+  save: async (next) => {
+    state.projects[state.projects.findIndex((p) => p.id === next.id)] = next;
+    if (!(await persist())) throw Error(storageError || ui('저장에 실패했습니다.'));
+    managementPage = { pane: 'list', id: '' };
+    render();
+  },
+});
+async function quickComplete(data) {
+  refreshDate(false);
+  if (!opsCanChange() || managementUi.pending()) return;
+  mutationSequence++;
+  workspaceReads.invalidate();
+  setBusy(true);
+  try {
+    const { project: p } = await api('projects/' + data.myCompleteProject);
+    if (p._role === 'viewer') throw Error(ui('조회자는 프로젝트를 수정할 수 없습니다.'));
+    const task = p.tasks.find((t) => t.id === data.myCompleteTask),
+      mine = myProjects.find((p) => p.id === data.myCompleteProject),
+      item = task?.items.find((i) => i.id === data.myCompleteItem);
+    if (!item || !mine || task.owner !== mine._memberId || item.doneDate)
+      throw Error(ui('담당 업무가 변경되었습니다. 다시 확인해 주세요.'));
+    item.doneDate = TODAY;
+    const result = await api('projects/' + p.id, {
+      method: 'PUT',
+      body: { project: p, revision: p._revision },
+    });
+    const index = state.projects.findIndex((p) => p.id === result.project.id);
+    if (index >= 0) state.projects[index] = result.project;
+    savedProjects.set(p.id, structuredClone(result.project));
+    await refreshMyWork();
+    toast(ui('오늘 완료로 기록했습니다.'));
+  } catch (error) {
+    toast(ui(error.message));
+  } finally {
+    setBusy(false);
   }
 }
 const info = createInfoDialog({ toast });
@@ -784,6 +941,8 @@ installLanguage({
   toast,
   canChange: () =>
     !saveInFlight &&
+    !managementUi.dirty() &&
+    !managementUi.pending() &&
     !storageError &&
     !wbs.dirty &&
     !$('#editorDialog').open &&

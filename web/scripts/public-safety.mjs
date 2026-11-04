@@ -38,6 +38,13 @@ const documentationHosts = new Set([
   'developer.chrome.com',
   'android.googlesource.com',
   'policies.google.com',
+  'calendar.google.com',
+  'support.google.com',
+  'www.mpm.go.kr',
+  'www.kasa.go.kr',
+  'astro.kasi.re.kr',
+  'law.go.kr',
+  'www.enterprisedb.com',
 ]);
 const fileExtensions = new Set([
   'js',
@@ -229,6 +236,7 @@ export function inspectPublicFile(file, bytes) {
       : file.replace(/^(?:web|desktop)\//, '');
   if (!publicExample(examplePath)) return [...findings.values()];
 
+  const documentationUrls = [];
   for (const match of content.matchAll(
     /\b(?:https?|ldaps?|postgres(?:ql)?):\/\/(?:\$\{[^}\r\n]*\}|[^\s<>"'`])+/gi,
   )) {
@@ -243,6 +251,8 @@ export function inspectPublicFile(file, bytes) {
       }
       if (!exampleHost(url.hostname) && !documentationHosts.has(url.hostname.toLowerCase()))
         add('NON_EXAMPLE_HOST', match.index);
+      else if (documentationHosts.has(url.hostname.toLowerCase()))
+        documentationUrls.push([match.index, match.index + raw.length]);
     } catch {
       add('INVALID_EXAMPLE_URL', match.index);
     }
@@ -251,6 +261,13 @@ export function inspectPublicFile(file, bytes) {
     /\b(?:[a-z0-9][a-z0-9-]{0,62}\.)+[a-z][a-z0-9-]{1,62}\b/gi,
   )) {
     const host = match[0].toLowerCase();
+    // The URL's host was checked above. Its path and encoded calendar ID are not hosts.
+    if (
+      documentationUrls.some(
+        ([start, end]) => match.index >= start && match.index + host.length <= end,
+      )
+    )
+      continue;
     if (
       fileExtensions.has(host.split('.').at(-1)) ||
       [

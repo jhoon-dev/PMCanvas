@@ -4,6 +4,8 @@ import { today, progress } from './engine.js';
 import { getBusinessTimeZone } from './business-clock.js';
 const palette = ['#416be8', '#27a498', '#ae7ad8', '#df9a40', '#de718c', '#66849e'];
 const icons = {
+  settings: 'M4 6h6 M14 6h6 M4 12h10 M18 12h2 M4 18h2 M10 18h10 M10 3v6 M14 9v6 M6 15v6',
+  alert: 'M12 3 2 21h20L12 3z M12 9v5 M12 17h.01',
   dashboard: 'M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z',
   layers: 'm12 3 9 5-9 5-9-5z M3 12l9 5 9-5 M3 16l9 5 9-5',
   check: 'M9 11l3 3L22 4 M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11',
@@ -57,6 +59,8 @@ function meter(value, cls = '') {
   );
 }
 function badge(t, asOf) {
+  if (t.kind === 'summary' && !t.items.length)
+    return ui('<span class="badge neutral">요약 업무</span>');
   const v = progress(t, asOf);
   if (v === 1) return ui('<span class="badge green">완료</span>');
   if (t.end < asOf) return ui('<span class="badge red">지연</span>');

@@ -54,8 +54,8 @@ test('create, edit, check, reopen offline, undo and export a project on a phone'
   await page.getByRole('button', { name: '＋ 새 프로젝트', exact: true }).click();
   await page.locator('[name="name"]').fill('모바일 출시 <검토>');
   await page.getByRole('button', { name: '저장', exact: true }).click();
-  await expect(page.getByRole('heading', { name: '모바일 출시 <검토>' })).toBeVisible();
-  await page.getByRole('link', { name: '더보기', exact: true }).click();
+  await expect(page.locator('.project-heading .eyebrow')).toHaveText('모바일 출시 <검토>');
+  await page.getByRole('link', { name: '인력', exact: true }).click();
   await page.getByRole('button', { name: '＋ 추가', exact: true }).click();
   await page.locator('[name="name"]').fill('김담당');
   await page.getByRole('button', { name: '저장', exact: true }).click();
@@ -127,10 +127,10 @@ test('imports make independent copies and malformed input preserves existing pro
 }) => {
   await page.goto('/');
   await importProject(page, backup());
-  await expect(page.getByRole('heading', { name: '가져온 프로젝트' })).toBeVisible();
+  await expect(page.locator('.project-heading .eyebrow')).toHaveText('가져온 프로젝트');
   await page.getByRole('link', { name: '← 프로젝트', exact: true }).click();
   await importProject(page, backup());
-  await expect(page.getByRole('heading', { name: '가져온 프로젝트' })).toBeVisible();
+  await expect(page.locator('.project-heading .eyebrow')).toHaveText('가져온 프로젝트');
   await page.getByRole('link', { name: '← 프로젝트', exact: true }).click();
   await expect(page.locator('.project-card')).toHaveCount(2);
   await importProject(page, '{broken');
@@ -140,7 +140,7 @@ test('imports make independent copies and malformed input preserves existing pro
   await page.getByRole('link', { name: '더보기', exact: true }).click();
   await page.getByRole('button', { name: '이 프로젝트 삭제', exact: true }).click();
   await page.locator('#confirmation').getByRole('button', { name: '취소', exact: true }).click();
-  await expect(page.getByRole('heading', { name: '가져온 프로젝트' })).toBeVisible();
+  await expect(page.locator('.project-heading .eyebrow')).toHaveText('가져온 프로젝트');
   await page.getByRole('button', { name: '이 프로젝트 삭제', exact: true }).click();
   await page.locator('#confirmation').getByRole('button', { name: '삭제', exact: true }).click();
   await expect(page.locator('.project-card')).toHaveCount(1);
@@ -154,7 +154,7 @@ test('small screens, malicious text and failed writes keep a usable editor', asy
   const value = backup();
   value.project.name = '<img src=x onerror=alert(1)>';
   await importProject(page, value);
-  await expect(page.getByRole('heading', { name: value.project.name })).toBeVisible();
+  await expect(page.locator('.project-heading .eyebrow')).toHaveText(value.project.name);
   await expect(page.locator('#content img')).toHaveCount(0);
   await page.getByRole('link', { name: '업무', exact: true }).click();
   await page.getByRole('button', { name: '배포 확인', exact: true }).click();
@@ -199,7 +199,7 @@ test('changing the business timezone cannot invalidate saved completion records'
   value.project.tasks[0].end = '2026-10-31';
   value.project.tasks[0].items[0].doneDate = '2026-10-31';
   await importProject(page, value);
-  await expect(page.getByRole('heading', { name: '가져온 프로젝트' })).toBeVisible();
+  await expect(page.locator('.project-heading .eyebrow')).toHaveText('가져온 프로젝트');
   await page.getByRole('link', { name: '더보기', exact: true }).click();
   await page.getByRole('button', { name: '시간대 변경', exact: true }).click();
   await page.locator('[name="timeZone"]').fill('UTC');
@@ -211,6 +211,47 @@ test('changing the business timezone cannot invalidate saved completion records'
   await expect(page.locator('.date-caption')).toContainText('Asia/Seoul');
   await page.getByRole('link', { name: '현황', exact: true }).click();
   await expect(page.locator('.hero-progress strong')).toHaveText('100%');
+});
+
+test('peer screens open directly and personnel and reports stay out of settings', async ({
+  page,
+}, testInfo) => {
+  await page.goto('/');
+  const value = backup();
+  value.project.tasks[0].items[0].doneDate = today();
+  await importProject(page, value);
+  for (const [label, heading] of [
+    ['현황', '프로젝트 현황'],
+    ['업무', '업무 · 일정'],
+    ['완료 체크', '완료 체크'],
+    ['인력', '참여인력'],
+    ['보고서', '업무 · 완료 기록'],
+    ['더보기', '설정 · 파일'],
+  ]) {
+    await page.getByRole('link', { name: label, exact: true }).click();
+    await expect(page.locator('.project-heading h1')).toHaveText(heading);
+    await expect(page.locator('#navigation [aria-current="page"]')).toHaveCount(1);
+    await expect(page.locator('.project-heading .eyebrow')).toHaveText('가져온 프로젝트');
+    await noOverflow(page);
+  }
+  await expect(page.locator('.member-list')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '업무 보고서 CSV', exact: true })).toHaveCount(0);
+  await page.getByRole('link', { name: '보고서', exact: true }).click();
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: '업무 보고서 CSV', exact: true }).click();
+  expect((await download).suggestedFilename()).toMatch(/\.csv$/);
+  await expect(page.locator('.completion-records')).toContainText('실기기 점검');
+  const completedDownload = page.waitForEvent('download');
+  await page.getByRole('button', { name: '완료 기록 CSV', exact: true }).click();
+  expect((await completedDownload).suggestedFilename()).toContain('완료기록');
+  await page.setViewportSize({ width: 320, height: 640 });
+  await noOverflow(page);
+  for (const link of await page.locator('#navigation a').all()) {
+    const box = await link.boundingBox();
+    expect(box.width).toBeGreaterThanOrEqual(44);
+    expect(box.height).toBeGreaterThanOrEqual(44);
+  }
+  await page.screenshot({ path: testInfo.outputPath('reports-navigation.png'), fullPage: true });
 });
 
 test('quick task entry, draft protection, completion undo and filter recovery', async ({

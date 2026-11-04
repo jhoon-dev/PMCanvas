@@ -15,6 +15,42 @@ import {
 
 const inspect = (file, text) => inspectPublicFile(file, Buffer.from(text));
 
+test('public holiday references validate exact hosts without treating URL paths or encoded IDs as domains', () => {
+  assert.deepEqual(
+    inspect(
+      'desktop/HOLIDAYS.md',
+      [
+        'https://www.kasa.go.kr/prog/view.do?plcyBrfNo=431',
+        'https://law.go.kr/LSW/lsLinkCommonInfo.do?seq=1',
+        'https://calendar.google.com/calendar/ical/ko.south_korea.official%23holiday%40group.v.calendar.google.com/public/basic.ics',
+      ].join('\n'),
+    ),
+    [],
+  );
+  for (const value of [
+    'https://law.go.kr.privatecorp.tld/view.do',
+    'https://calendar.google.com.privatecorp.tld/basic.ics',
+    'privatecorp.tld',
+  ])
+    assert.ok(inspect('desktop/HOLIDAYS.md', value).length > 0);
+});
+
+test('official PostgreSQL binary documentation links permit only the exact vendor host', () => {
+  assert.deepEqual(
+    inspect(
+      'web/docs/validation/postgres.md',
+      'https://www.enterprisedb.com/download-postgresql-binaries',
+    ),
+    [],
+  );
+  assert.ok(
+    inspect(
+      'web/docs/validation/postgres.md',
+      'https://www.enterprisedb.com.privatecorp.tld/download',
+    ).length > 0,
+  );
+});
+
 test('release identifiers and labelled MSIX versions are public metadata while private endpoints remain rejected', () => {
   assert.deepEqual(
     inspect(

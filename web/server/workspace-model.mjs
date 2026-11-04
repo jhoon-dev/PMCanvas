@@ -1,3 +1,4 @@
+import { predecessorIds, setPredecessors } from '../../shared/browser/task-model.js';
 import { cleanProject, uuid } from './project.mjs';
 import { fail } from './errors.mjs';
 
@@ -37,8 +38,16 @@ export function deletedTaskBundle(before, after) {
     tasks: before.tasks.filter((t) => ids.has(t.id)),
     positions: Object.fromEntries(before.tasks.map((t, i) => [t.id, i])),
     links: before.tasks
-      .filter((t) => !ids.has(t.id) && (ids.has(t.predecessor) || ids.has(t.parentId)))
-      .map((t) => ({ id: t.id, predecessor: t.predecessor, parentId: t.parentId })),
+      .filter(
+        (t) =>
+          !ids.has(t.id) && (predecessorIds(t).some((id) => ids.has(id)) || ids.has(t.parentId)),
+      )
+      .map((t) => ({
+        id: t.id,
+        predecessor: t.predecessor,
+        predecessors: predecessorIds(t),
+        parentId: t.parentId,
+      })),
   };
 }
 export function restoreTaskBundle(current, bundle) {
@@ -55,8 +64,11 @@ export function restoreTaskBundle(current, bundle) {
       t.owner = '';
       adjustments.push(t.name + ' · 담당자 미지정');
     }
-    if (t.predecessor && !ids.has(t.predecessor)) {
-      t.predecessor = '';
+    if (predecessorIds(t).some((id) => !ids.has(id))) {
+      setPredecessors(
+        t,
+        predecessorIds(t).filter((id) => ids.has(id)),
+      );
       adjustments.push(t.name + ' · 선행 연결 해제');
     }
     if (t.parentId && !ids.has(t.parentId)) {
@@ -68,7 +80,7 @@ export function restoreTaskBundle(current, bundle) {
   for (const link of bundle.links || []) {
     const t = p.tasks.find((t) => t.id === link.id);
     if (!t) continue;
-    if (!t.predecessor && ids.has(link.predecessor)) t.predecessor = link.predecessor;
+    setPredecessors(t, [...predecessorIds(t), ...predecessorIds(link).filter((id) => ids.has(id))]);
     if (!t.parentId && ids.has(link.parentId)) t.parentId = link.parentId;
   }
   return { project: cleanProject(p), adjustments };

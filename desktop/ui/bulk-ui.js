@@ -1,3 +1,4 @@
+import { predecessorIds } from './shared/task-model.js';
 import { ui } from './shared/i18n.js';
 import { duplicateTasks, removeTasks, reorderTasks } from './shared/wbs-model.js';
 import { hierarchy, ordered } from './shared/planning.js';
@@ -17,7 +18,7 @@ export function bulkProposal(project, ids, action, options = {}) {
       ui('선택한 ') +
       selected.size +
       ui(
-        '개 업무를 복제합니다. 복제본은 미완료 업무로 추가하며 선택한 상위·선행 관계는 복제본끼리 연결합니다. 함께 복제할 하위 업무도 선택해 주세요.',
+        '개 업무를 복제합니다. 복제본은 미완료 업무로 추가하며 선택한 상위·선행 관계는 복제본끼리 연결합니다. 하위 업무도 함께 복제합니다.',
       );
     const copiedTree = hierarchy(next);
     rows = ordered(next)
@@ -31,7 +32,7 @@ export function bulkProposal(project, ids, action, options = {}) {
     title = ui('선택 업무 삭제');
     const promoted = next.tasks.filter((task) => selected.has(before.get(task.id).parentId)).length;
     const detached = next.tasks.filter((task) =>
-      selected.has(before.get(task.id).predecessor),
+      predecessorIds(before.get(task.id)).some((id) => selected.has(id)),
     ).length;
     description =
       ui('선택한 ') +

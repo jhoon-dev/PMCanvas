@@ -129,7 +129,10 @@ function treeFixture() {
     name: id,
     parentId: id.startsWith('a') && id !== 'a' ? 'a' : id === 'b1' ? 'b' : '',
     predecessor: id === 'b' ? 'a2' : '',
-    items: [{ id: id + '-item', title: id, hours: 8, doneDate: '2026-10-20' }],
+    ...(['a', 'b'].includes(id) ? { kind: 'summary', owner: '' } : {}),
+    items: ['a', 'b'].includes(id)
+      ? []
+      : [{ id: id + '-item', title: id, hours: 8, doneDate: '2026-10-20' }],
   }));
   return p;
 }

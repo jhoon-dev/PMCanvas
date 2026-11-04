@@ -1,3 +1,4 @@
+import { rendererCommand, navigate, appSection } from './ui-actions.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -62,7 +63,14 @@ async function harness(language = 'ko', timeZone = 'Asia/Seoul', offline = false
     }
     if (name === 'setLanguage') return args[0];
     if (name === 'editing') return;
-    return { project, revision, dirty, filename: 'synthetic.pmcanvas' };
+    return {
+      project,
+      revision,
+      dirty,
+      filename: 'synthetic.pmcanvas',
+      tabId: 'fixture',
+      tabs: [{ id: 'fixture', name: project.name, filename: 'synthetic.pmcanvas', dirty }],
+    };
   });
   await page.addInitScript((language) => {
     if (!localStorage.getItem('pmcanvas.language'))
@@ -81,7 +89,9 @@ async function harness(language = 'ko', timeZone = 'Asia/Seoul', offline = false
         'applyUpdate',
       ].map((name) => [name, (...args) => window.fixtureCall(name, ...args)]),
     );
-    window.desktop.onCommand = () => {};
+    window.desktop.onCommand = (callback) => {
+      window.testCommand = callback;
+    };
     window.desktop.onDocument = () => {};
   }, language);
   await page.route('https://desktop.test/**', (route) => {
@@ -107,8 +117,7 @@ test('manual update notices preserve projects, open links only on request and ha
     const h = await harness('en', 'Asia/Seoul', offline);
     try {
       const before = structuredClone(h.getProject());
-      await h.page.getByText('File options', { exact: true }).click();
-      await h.page.getByRole('button', { name: 'App settings', exact: true }).click();
+      await appSection(h.page, 'updates');
       await h.page.locator('#checkUpdates').click();
       await h.page.waitForFunction(
         (offline) =>
@@ -123,7 +132,7 @@ test('manual update notices preserve projects, open links only on request and ha
       );
       assert.equal(h.openedReleases(), 0);
       await h.page.locator('#openRelease').click();
-      await h.page.locator('#closeUpdate').click();
+      await h.page.locator('#settingsBack').click();
       assert.equal(h.openedReleases(), 1);
       assert.deepEqual(h.getProject(), before);
       assert.deepEqual(h.errors, []);
@@ -138,10 +147,7 @@ test('Store update notices use the Store library and preserve offline project da
     const h = await harness(language, 'Asia/Seoul', false, true);
     try {
       const before = structuredClone(h.getProject());
-      await h.page
-        .getByText(language === 'en' ? 'File options' : '파일 옵션', { exact: true })
-        .click();
-      await h.page.locator('[data-command="appSettings"]').first().click();
+      await appSection(h.page, 'updates');
       await h.page.locator('#checkUpdates').click();
       await h.page.waitForFunction(() =>
         document.querySelector('#updateStatus').textContent.includes('Microsoft Store'),
@@ -164,10 +170,13 @@ test('business time zone settings survive reload, use the configured day and pre
     const before = structuredClone(getProject());
     await page.clock.fastForward(120000);
     assert.equal(await page.locator('#reportDate').inputValue(), '2026-10-28');
-    await page.getByText('File options', { exact: true }).click();
-    await page.getByRole('button', { name: 'Business time zone', exact: true }).click();
+    await rendererCommand(page, 'timeZone');
     await page.locator('#timeZoneInput').fill('Asia/Seoul');
-    await page.locator('#timeZoneForm').getByRole('button', { name: 'Apply', exact: true }).click();
+    await Promise.all([
+      page.waitForEvent('load'),
+      page.locator('#timeZoneForm').getByRole('button', { name: 'Apply', exact: true }).click(),
+    ]);
+    await page.locator('#settingsBack').click();
     await page.waitForFunction(() => document.querySelector('#reportDate')?.value === '2026-10-29');
     assert.deepEqual(getProject(), before);
     await page.reload();
@@ -205,14 +214,14 @@ test('historical dates stay fixed; midnight never replaces an open editor and de
     assert.equal(await page.locator('[name="name"]').inputValue(), '보존할 입력');
     await page.getByRole('button', { name: '취소', exact: true }).click();
     assert.equal(await page.locator('#reportDate').inputValue(), '2026-10-21');
-    await page.getByRole('button', { name: '보고서', exact: true }).click();
+    await page.getByRole('button', { name: '업무 · 완료 기록', exact: true }).click();
     assert.equal(await page.locator('#reportTo').inputValue(), '2026-10-29');
     await page.locator('#reportFrom').fill('2026-10-19');
     await page.locator('#reportTo').fill('2026-10-21');
     await page.locator('#reportDate').click();
     await page.clock.fastForward(86400000);
     await page.getByRole('button', { name: '프로젝트 현황', exact: true }).click();
-    await page.getByRole('button', { name: '보고서', exact: true }).click();
+    await page.getByRole('button', { name: '업무 · 완료 기록', exact: true }).click();
     assert.equal(await page.locator('#reportTo').inputValue(), '2026-10-21');
     assert.deepEqual(errors, []);
   } finally {
@@ -222,27 +231,36 @@ test('historical dates stay fixed; midnight never replaces an open editor and de
 test('English screens persist selection, protect open or unsaved edits, preserve Korean project data and hide unselected bulk actions', async () => {
   const { browser, page, errors, getProject } = await harness('en');
   try {
-    await page.getByRole('button', { name: 'Open', exact: true }).waitFor();
-    await page.getByText('File options', { exact: true }).click();
-    await page.getByRole('button', { name: 'Privacy policy', exact: true }).waitFor();
-    await page.getByText('File options', { exact: true }).click();
+    assert.equal(await page.locator('.desktop-toolbar,.action-menu').count(), 0);
+    await page.getByRole('button', { name: 'Team', exact: true }).waitFor();
     await page.getByRole('button', { name: 'Project overview', exact: true }).waitFor();
     await page.getByText('화면 회귀 검증', { exact: true }).first().waitFor();
-    await page.getByRole('button', { name: 'WBS · Baseline', exact: true }).click();
+    await navigate(page, 'planning');
     assert.equal(await page.locator('.desktop-bulk-tools').isHidden(), true);
     await page.getByRole('button', { name: '화면 설계', exact: true }).click();
     await page.locator('[name="name"]').fill('저장');
-    await page.locator('#languageSelect').selectOption('ko');
-    assert.equal(await page.locator('#languageSelect').inputValue(), 'en');
+    await rendererCommand(page, 'appSettings');
+    assert.equal(await page.locator('#settingsPage').isHidden(), true);
     assert.equal(await page.locator('[name="name"]').inputValue(), '저장');
     await page.getByRole('button', { name: 'Apply', exact: true }).click();
     await page.waitForFunction(() => !document.querySelector('#editorDialog').open);
     assert.equal(getProject().tasks[0].name, '저장');
+    await appSection(page, 'general');
+    assert.equal(await page.locator('#languageSelect').isDisabled(), true);
+    assert.equal(await page.locator('#settingsProjectHint').isVisible(), true);
+    await page.locator('#settingsBack').click();
+    await rendererCommand(page, 'save');
+    await page.waitForFunction(
+      async () =>
+        !(await window.desktop.snapshot()).dirty &&
+        document.querySelector('#content').getAttribute('aria-busy') !== 'true',
+    );
+    assert.equal(await page.locator('#projectWorkspace').isVisible(), true);
+    await appSection(page, 'general');
     await page.locator('#languageSelect').selectOption('ko');
-    assert.equal(await page.locator('#languageSelect').inputValue(), 'en');
-    await page.getByRole('button', { name: 'Save', exact: true }).click();
-    await page.getByText('Saved to file', { exact: true }).waitFor();
-    await page.locator('#languageSelect').selectOption('ko');
+    await page.locator('#settingsTitle').filter({ hasText: '설정' }).waitFor();
+    assert.equal(await page.locator('#languageSelect').inputValue(), 'ko');
+    await page.locator('#settingsBack').click();
     await page.getByRole('button', { name: '프로젝트 현황', exact: true }).waitFor();
     assert.equal(getProject().tasks[0].name, '저장');
     await page.reload();

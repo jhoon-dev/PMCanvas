@@ -1,8 +1,15 @@
+import { LIMITS, summaryIds, taskView } from './task-model.js';
 import { ui } from './i18n.js';
 import { columns, newTask, setCell, checkDraft } from './wbs-model.js';
 import { hierarchy } from './planning.js';
 import { taskHours } from './engine.js';
-export const importFields = [['id', '업무 ID (갱신용)'], ['parent', '상위 업무 ID'], ...columns];
+export const importFields = [
+  ['id', '업무 ID (갱신용)'],
+  ['parent', '상위 업무 ID'],
+  ['kind', '업무 유형'],
+  ['milestoneDone', '마일스톤 완료일'],
+  ...columns,
+];
 export function suggestMapping(headers) {
   const aliases = {
     predecessor: ['선행 업무 ID'],
@@ -26,7 +33,7 @@ export function previewImport(project, rows, mapping, { mode = 'append' } = {}) 
   if (
     !['append', 'update'].includes(mode) ||
     !Array.isArray(rows) ||
-    rows.length > 500 ||
+    rows.length > LIMITS.tasks ||
     rows.some((r) => !Array.isArray(r) || r.length > 40) ||
     !mapping ||
     typeof mapping !== 'object' ||
@@ -61,10 +68,47 @@ export function previewImport(project, rows, mapping, { mode = 'append' } = {}) 
         task = newTask(p);
         p.tasks.push(task);
       }
+      const parentRefs = new Set(
+        rows
+          .map((r) => (mapping.parent >= 0 ? String(r[mapping.parent] ?? '').trim() : ''))
+          .filter(Boolean),
+      );
+      if (
+        mode === 'append' &&
+        (value('kind') === 'summary' || (value('id') && parentRefs.has(value('id'))))
+      ) {
+        task.kind = 'summary';
+        task.items = [];
+        task.owner = '';
+      }
+      if (mode === 'append' && value('kind') === 'milestone') {
+        task.kind = 'milestone';
+        task.items = [];
+        task.owner = '';
+        task.doneDate = value('milestoneDone') || null;
+      }
+      if (mode === 'update' && task.kind === 'milestone' && mapping.milestoneDone >= 0)
+        task.doneDate = value('milestoneDone') || null;
       entries.push({ task, row, index, value });
       for (const [field] of columns)
         if (!['predecessor'].includes(field) && mapping[field] >= 0) {
           const text = value(field);
+          if (summaryIds(p).has(task.id) && ['owner', 'start', 'end', 'hours'].includes(field)) {
+            const view = taskView(p, task);
+            if (mode === 'append') {
+              if (field === 'start' || field === 'end') task[field] = text;
+            } else if (
+              field === 'hours'
+                ? Number(text) !== taskHours(view)
+                : field === 'owner'
+                  ? !['', '미지정', 'Unassigned', ui('미지정')].includes(text)
+                  : text !== view[field]
+            )
+              throw Error(
+                ui('요약 업무의 일정·공수는 하위 업무에서 계산합니다. 하위 업무를 수정해 주세요.'),
+              );
+            continue;
+          }
           if (
             field === 'owner' &&
             (!text || text === '미지정' || text === 'Unassigned' || text === ui('미지정'))
@@ -74,7 +118,10 @@ export function previewImport(project, rows, mapping, { mode = 'append' } = {}) 
             continue;
           else setCell(p, task, field, text);
         }
-      checkDraft({ ...p, tasks: [{ ...task, parentId: '', predecessor: '' }] });
+      checkDraft({
+        ...p,
+        tasks: [{ ...task, parentId: '', predecessor: '', predecessors: undefined }],
+      });
       changes.push({
         row: index + 2,
         id: task.id,
@@ -98,8 +145,12 @@ export function previewImport(project, rows, mapping, { mode = 'append' } = {}) 
     try {
       if (mapping.predecessor >= 0) {
         const text = e.value('predecessor');
-        if (importedIds.has(text)) e.task.predecessor = importedIds.get(text);
-        else setCell(p, e.task, 'predecessor', text);
+        const resolved = text
+          .split(/[,;\n]+/)
+          .map((v) => v.trim())
+          .filter(Boolean)
+          .map((v) => importedIds.get(v) || v);
+        setCell(p, e.task, 'predecessor', resolved.join(', '));
       }
       if (mapping.parent >= 0) {
         const parent = e.value('parent');

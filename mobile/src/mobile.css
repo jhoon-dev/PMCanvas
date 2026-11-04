@@ -1,3 +1,6 @@
+@import url('../../shared/browser/project-visuals.css');
+@import url('../../shared/browser/wbs.css');
+
 :root {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Malgun Gothic', sans-serif;
   color: #243047;
@@ -124,6 +127,21 @@ p {
   padding: calc(20px + var(--inset-top)) max(22px, var(--inset-right)) 18px
     max(22px, var(--inset-left));
 }
+.in-project .app-header {
+  padding-top: calc(12px + var(--inset-top));
+  padding-bottom: 4px;
+}
+.in-project .brand-mark {
+  width: 28px;
+  height: 28px;
+}
+.in-project .brand {
+  font-size: 16px;
+}
+.in-project .brand small,
+.in-project .offline-label {
+  display: none;
+}
 .brand {
   display: flex;
   align-items: center;
@@ -135,7 +153,7 @@ p {
 }
 .brand small {
   display: block;
-  font-size: 8px;
+  font-size: 12px;
   letter-spacing: 2px;
   color: #8992a6;
   margin-top: 4px;
@@ -149,7 +167,7 @@ p {
 }
 .offline-label {
   color: #727e91;
-  font-size: 11px;
+  font-size: 12px;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -175,7 +193,7 @@ main.with-navigation {
 .eyebrow {
   display: block;
   color: #7e8ba3;
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 1.8px;
   font-weight: 700;
   margin-bottom: 8px;
@@ -259,7 +277,7 @@ main.with-navigation {
 .project-card-body > small {
   display: block;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
   margin: 7px 0 15px;
 }
 .project-card > .icon {
@@ -271,7 +289,7 @@ main.with-navigation {
   justify-content: space-between;
   gap: 6px;
   color: #818ba0;
-  font-size: 10px;
+  font-size: 12px;
   margin-top: 9px;
 }
 .meter {
@@ -328,7 +346,7 @@ main.with-navigation {
 }
 .storage-note p {
   color: #8490a3;
-  font-size: 11px;
+  font-size: 12px;
   margin-top: 5px;
 }
 .back-link {
@@ -344,7 +362,7 @@ main.with-navigation {
   margin-bottom: 24px;
 }
 .project-heading .eyebrow {
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 0.3px;
 }
 .project-heading-line {
@@ -357,7 +375,7 @@ main.with-navigation {
   font-size: 25px;
 }
 .saved-label {
-  font-size: 10px;
+  font-size: 12px;
   color: #588d7b;
   background: #eaf3ef;
   padding: 5px 8px;
@@ -367,7 +385,7 @@ main.with-navigation {
 }
 .date-caption {
   color: #8791a3;
-  font-size: 10px;
+  font-size: 12px;
   margin-top: 11px;
 }
 .hero {
@@ -379,7 +397,7 @@ main.with-navigation {
 }
 .hero .eyebrow {
   color: #d5dcff;
-  font-size: 9px;
+  font-size: 12px;
 }
 .hero-progress {
   display: flex;
@@ -393,7 +411,7 @@ main.with-navigation {
   letter-spacing: -2px;
 }
 .hero-progress > span {
-  font-size: 11px;
+  font-size: 12px;
   color: #e0e5ff;
 }
 .hero .meter {
@@ -407,7 +425,7 @@ main.with-navigation {
   display: flex;
   justify-content: space-between;
   gap: 6px;
-  font-size: 10px;
+  font-size: 12px;
   color: #e4e9ff;
   margin-top: 13px;
 }
@@ -425,7 +443,7 @@ main.with-navigation {
 }
 .metric-grid article > span {
   display: block;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
 }
 .metric-grid strong {
@@ -459,7 +477,7 @@ main.with-navigation {
 .forecast-card div > span {
   display: block;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
 }
 .forecast-card strong {
   display: block;
@@ -468,7 +486,7 @@ main.with-navigation {
 }
 .forecast-card small {
   display: block;
-  font-size: 10px;
+  font-size: 12px;
   color: #8893a7;
 }
 .section-heading {
@@ -482,7 +500,7 @@ main.with-navigation {
   font-size: 16px;
 }
 .section-heading a {
-  font-size: 11px;
+  font-size: 12px;
 }
 .section-heading p {
   color: var(--muted);
@@ -506,13 +524,13 @@ main.with-navigation {
   align-items: center;
 }
 .phase {
-  font-size: 10px;
+  font-size: 12px;
   color: #8d97aa;
 }
 .badge {
   border-radius: 6px;
   padding: 4px 7px;
-  font-size: 9px;
+  font-size: 12px;
   background: #f1f3fa;
   color: #7c8aa6;
 }
@@ -543,7 +561,7 @@ main.with-navigation {
   flex-wrap: wrap;
   gap: 7px;
   color: #8390a4;
-  font-size: 10px;
+  font-size: 12px;
 }
 .task-meta .icon {
   width: 13px;
@@ -560,7 +578,7 @@ main.with-navigation {
   height: 4px;
 }
 .progress-line strong {
-  font-size: 10px;
+  font-size: 12px;
   color: #7c8bbf;
   font-weight: 600;
 }
@@ -598,7 +616,7 @@ main.with-navigation {
   color: #6a79af;
   border-radius: 10px;
   padding: 13px;
-  font-size: 11px;
+  font-size: 12px;
   margin-bottom: 15px;
 }
 .daily-options {
@@ -652,7 +670,7 @@ main.with-navigation {
 }
 .check-row small {
   color: #8490a6;
-  font-size: 10px;
+  font-size: 12px;
 }
 .check-row > span small {
   display: block;
@@ -717,7 +735,7 @@ main.with-navigation {
   border-radius: 50%;
   background: #eff2fb;
   color: #7886b7;
-  font-size: 11px;
+  font-size: 12px;
   flex-shrink: 0;
 }
 .member-row > span:nth-child(2) {
@@ -732,11 +750,11 @@ main.with-navigation {
 .member-row small {
   display: block;
   color: #8591a5;
-  font-size: 10px;
+  font-size: 12px;
   margin-top: 5px;
 }
 .privacy-note {
-  font-size: 10px;
+  font-size: 12px;
   color: #8c97a9;
   text-align: center;
   padding: 18px 10px;
@@ -769,7 +787,7 @@ main.with-navigation {
   gap: 6px;
   min-height: 48px;
   color: #a1aabd;
-  font-size: 10px;
+  font-size: 12px;
 }
 .bottom-nav a[aria-current] {
   color: #5368dd;
@@ -820,7 +838,7 @@ body:has(dialog[open]) {
 }
 .field small,
 .optional {
-  font-size: 10px;
+  font-size: 12px;
   color: #949eb1;
 }
 .optional {
@@ -841,13 +859,13 @@ body:has(dialog[open]) {
 .items-title {
   display: flex;
   justify-content: space-between;
-  font-size: 11px;
+  font-size: 12px;
   margin: 6px 0 12px;
   gap: 8px;
 }
 .items-title > span {
   color: #929cb0;
-  font-size: 10px;
+  font-size: 12px;
 }
 .item-editor {
   display: grid;
@@ -862,7 +880,7 @@ body:has(dialog[open]) {
   padding: 12px 8px;
 }
 .item-editor > span {
-  font-size: 10px;
+  font-size: 12px;
   color: #8b98ad;
 }
 .item-editor .icon-button {
@@ -873,7 +891,7 @@ body:has(dialog[open]) {
   width: 100%;
 }
 .form-hint {
-  font-size: 10px;
+  font-size: 12px;
   color: #8d97aa;
   margin: 12px 0 20px;
 }
@@ -889,7 +907,7 @@ body:has(dialog[open]) {
   cursor: pointer;
 }
 .task-details summary > span {
-  font-size: 10px;
+  font-size: 12px;
   margin-left: 10px;
 }
 .dialog-actions {
@@ -998,101 +1016,245 @@ body:has(dialog[open]) {
   color: #2563eb;
 }
 
-/* Shared touch-first layout for iOS, iPadOS and Android. */
-:root {
-  --muted: #59677d;
-}
-.in-project .app-header {
-  padding-top: calc(12px + var(--inset-top));
-  padding-bottom: 4px;
-}
-.in-project .brand-mark {
-  width: 28px;
-  height: 28px;
-}
-.in-project .brand {
-  font-size: 16px;
-}
-.in-project .brand small,
-.in-project .offline-label {
-  display: none;
-}
-.in-project main {
-  padding-top: 6px;
-}
-.project-heading {
-  margin-top: 0;
-  margin-bottom: 20px;
-}
-.project-heading-line {
-  align-items: center;
-}
-.back-link {
-  margin: 0;
-  font-size: 14px;
-}
-.saved-label {
-  margin-top: 0;
-  font-size: 12px;
-}
-.project-heading h1 {
-  font-size: 24px;
-}
-.date-caption {
-  margin-top: 6px;
-  font-size: 12px;
-}
-.button,
-.dialog-actions .button,
-.stack-actions .button {
-  font-size: 14px;
-}
-.page-heading p,
-.empty-state p,
-.task-meta,
-.field,
-.settings-card > p,
-.member-row strong {
-  font-size: 14px;
-}
-.project-card-body > small,
-.project-card-foot,
-.phase,
-.badge,
-.progress-line strong,
-.field small,
-.form-hint,
-.optional,
-.items-title,
-.items-title > span,
-.check-row small,
-.member-row small,
-.privacy-note,
-.storage-note p,
-.hero-foot,
-.hero-progress > span,
-.metric-grid article > span,
-.forecast-card small {
-  font-size: 12px;
-}
-.task-title {
-  font-size: 17px;
-}
-.task-meta,
-.phase,
-.check-row small,
-.form-hint {
-  color: var(--muted);
+.project-heading .eyebrow {
+  overflow-wrap: anywhere;
+  letter-spacing: 0;
 }
 .bottom-nav a {
-  color: #637089;
+  min-width: 44px;
+}
+.report-count {
+  margin: 16px 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+main:focus {
+  outline: none;
+}
+.completion-records {
+  list-style: none;
+  padding: 0;
+  margin: 16px 0;
+}
+.completion-records li {
+  display: grid;
+  gap: 6px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+.completion-records span,
+.completion-records small {
   font-size: 12px;
-  min-height: 52px;
+  color: var(--muted);
 }
-.bottom-nav a[aria-current] {
-  background: #eef0ff;
-  border-radius: 12px;
+/* Project tools retain the mobile color palette and touch targets. */
+.project-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  margin: 0 0 22px;
 }
+.project-controls label {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.project-controls input,
+.project-controls select {
+  min-height: 46px;
+  padding: 10px;
+  font-size: 14px;
+}
+.mobile-project-section {
+  min-width: 0;
+}
+.mobile-project-section .panel {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  min-width: 0;
+  padding: 18px;
+}
+.mobile-project-section .pm-management > .page-head > div:first-child {
+  display: none;
+}
+.mobile-project-section .management-page-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0 0 18px;
+}
+.mobile-project-section .management-page h2 {
+  margin-bottom: 18px;
+}
+.mobile-project-section .management-page h3 {
+  margin: 22px 0 14px;
+}
+.mobile-project-section .management-page > p {
+  margin-bottom: 18px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.mobile-project-section .pm-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+.mobile-project-section .pm-management form > .button {
+  margin: 12px 10px 0 0;
+}
+.mobile-project-section .pm-error {
+  color: #b63a54;
+  margin-bottom: 18px;
+}
+.mobile-project-section .pm-error:empty {
+  display: none;
+}
+.mobile-project-section .desktop-table-wrap,
+.mobile-project-section .pm-table-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+}
+.mobile-project-section table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.mobile-project-section th,
+.mobile-project-section td {
+  text-align: left;
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+.mobile-project-section .management-empty {
+  color: var(--muted);
+  padding: 18px 0;
+}
+.mobile-project-section #wbsWorkspace {
+  min-width: 0;
+}
+.mobile-project-section .wbs-toolbar {
+  margin-bottom: 18px;
+}
+.mobile-project-section .wbs-cell {
+  color: inherit;
+}
+.mobile-project-section .wbs-commandbar {
+  gap: 8px;
+}
+.mobile-project-section .wbs-grid-scroll {
+  max-height: 55vh;
+}
+.mobile-project-section .panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  justify-content: space-between;
+}
+.mobile-project-section .panel-head p {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 8px 0;
+}
+.mobile-project-section .wbs-inline-tools > div {
+  z-index: 8;
+}
+.report-range {
+  margin-top: 20px;
+}
+.report-range .field {
+  margin-bottom: 14px;
+}
+.excel-import-dialog {
+  overflow-y: auto;
+}
+.excel-import-dialog > label,
+.excel-import-dialog #excelMapping > label {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0;
+  font-size: 13px;
+}
+.excel-import-dialog > button {
+  margin: 8px 8px 0 0;
+}
+.excel-import-dialog #excelResult {
+  overflow-x: auto;
+}
+@media (max-width: 359px) {
+  .project-controls {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+.mobile-project-section .action-menu {
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+}
+.mobile-project-section .action-menu > summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.mobile-project-section .action-menu > summary::-webkit-details-marker {
+  display: none;
+}
+.mobile-project-section .menu-popover {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  width: 270px;
+  max-width: calc(100vw - 60px);
+  max-height: 60vh;
+  overflow: auto;
+  padding: 8px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 10px 34px #17314a20;
+  z-index: 50;
+}
+.mobile-project-section .menu-popover .button {
+  display: flex;
+  justify-content: flex-start;
+  text-align: left;
+  width: 100%;
+  border: 0;
+  padding: 10px;
+  font-size: 12px;
+  white-space: normal;
+}
+.mobile-project-section .menu-label {
+  display: block;
+  padding: 10px 12px 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* Keep browser-default small text readable too. */
+small {
+  font-size: max(0.85em, 12px);
+}
+
 .quick-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
