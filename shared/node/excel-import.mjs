@@ -1,3 +1,4 @@
+import { Buffer } from 'buffer';
 import { LIMITS } from '../browser/task-model.js';
 import { ui } from '../browser/i18n.js';
 

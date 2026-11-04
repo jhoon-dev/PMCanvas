@@ -50,6 +50,53 @@ const fixture = () =>
       task('B', { start: '2026-10-26', end: '2026-10-30', predecessor: 'M' }),
     ],
   });
+test('management screens separate reporting from planning without changing project data', () => {
+  const project = fixture();
+  const original = structuredClone(project);
+  const previous = getLanguage();
+  try {
+    for (const language of ['ko', 'en']) {
+      setLanguage(language);
+      const reports = managementView(project, '2026-10-23', { section: 'reports' });
+      const planning = managementView(project, '2026-10-23', { section: 'planning' });
+      assert.ok(
+        reports.includes(
+          language === 'ko' ? '<h1>이슈 · 보고</h1>' : '<h1>Issues &amp; reports</h1>',
+        ),
+      );
+      assert.ok(
+        planning.includes(
+          language === 'ko' ? '<h1>계획 · 투입</h1>' : '<h1>Plans &amp; staffing</h1>',
+        ),
+      );
+      for (const name of ['issue', 'weekly']) {
+        assert.ok(reports.includes('data-pm-form="' + name + '"'));
+        assert.ok(!planning.includes('data-pm-form="' + name + '"'));
+      }
+      for (const name of ['milestone', 'staffing', 'mm-basis']) {
+        assert.ok(planning.includes('data-pm-form="' + name + '"'));
+        assert.ok(!reports.includes('data-pm-form="' + name + '"'));
+      }
+      const combined = managementView(project, '2026-10-23');
+      assert.ok(
+        combined.includes('data-pm-form="issue"') && combined.includes('data-pm-form="milestone"'),
+      );
+      for (const [section, forms] of Object.entries({
+        milestones: ['milestone'],
+        staffing: ['staffing', 'mm-basis'],
+        issues: ['issue'],
+        weekly: ['weekly'],
+      })) {
+        const screen = managementView(project, '2026-10-23', { section });
+        for (const form of ['milestone', 'staffing', 'mm-basis', 'issue', 'weekly'])
+          assert.equal(screen.includes('data-pm-form="' + form + '"'), forms.includes(form));
+      }
+      assert.deepEqual(project, original);
+    }
+  } finally {
+    setLanguage(previous);
+  }
+});
 const issue = (extra = {}) => ({
   id: 'risk',
   title: 'External API',
@@ -89,6 +136,7 @@ test('마일스톤은 0공수·0기간이며 자원 경쟁 없이 선행과 후�
   assert.deepEqual(scheduleWarnings(p).overloads, []);
   assert.equal(progress(p.tasks[1], '2026-10-23'), 0);
   p.tasks[1].doneDate = '2026-10-23';
+  p.koreanHolidays = true;
   assert.equal(progress(p.tasks[1], '2026-10-23'), 1);
   assert.equal(progress(p.tasks[1], '2026-10-22'), 0);
   const csvRows = wbsRows(p, '2026-10-23', forecast(p, '2026-10-23'));
@@ -272,6 +320,7 @@ test('관리 화면은 입력을 검증하고 보고서·이슈의 HTML을 이�
 test('마일스톤 유형과 실제 완료일은 Excel 갱신과 새 사본 가져오기에서 유지', async () => {
   const p = fixture();
   p.tasks[1].doneDate = '2026-10-23';
+  p.koreanHolidays = true;
   const sheets = await readWorkbook((await projectWorkbook(p, '2026-10-23')).toString('base64')),
     sheet = sheets.find((s) => s.name === 'WBS'),
     mapping = suggestMapping(sheet.rows[0]);
@@ -289,6 +338,7 @@ test('PostgreSQL planning JSON은 관리 정보와 마일스톤 실제 완료일
   const repo = new PgRepository({}),
     p = managementChange(fixture(), 'issue', issue());
   p.tasks[1].doneDate = '2026-10-23';
+  p.koreanHolidays = true;
   p.weeklyReports = [draft(p)];
   let planning, tasks, items, members;
   const connection = {

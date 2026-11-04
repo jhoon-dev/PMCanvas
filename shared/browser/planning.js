@@ -1,3 +1,4 @@
+import { projectHolidays } from './korean-holidays.js';
 import {
   taskHours,
   earned,
@@ -155,7 +156,7 @@ export function criticalPath(project) {
   const tasks = orderTasks(executionTasks(project));
   if (!tasks.length) return { ids: new Set(), slack: {}, duration: 0 };
   const origin = tasks.map((t) => t.start).sort()[0],
-    h = project.holidays || [],
+    h = projectHolidays(project),
     early = Object.create(null),
     finish = Object.create(null),
     successors = new Map(tasks.map((t) => [t.id, []]));
@@ -190,7 +191,9 @@ export function scheduleWarnings(project) {
   for (const member of project.members) {
     const events = new Map();
     for (const t of tasks.filter((t) => t.owner === member.id && t.kind !== 'milestone')) {
-      const rate = taskHours(t) / workdays(t.start, t.end, project.holidays);
+      const duration = workdays(t.start, t.end, projectHolidays(project));
+      if (!duration) continue;
+      const rate = taskHours(t) / duration;
       events.set(t.start, (events.get(t.start) || 0) + rate);
       const end = addDays(t.end, 1);
       events.set(end, (events.get(end) || 0) - rate);
@@ -207,10 +210,10 @@ export function scheduleWarnings(project) {
       const from = dates[i],
         to = addDays(dates[i + 1], -1),
         capacity = calendar.hours(member.id, from);
-      if (load > capacity + 0.0001 && workdays(from, to, project.holidays) > 0) {
-        const first = nextWorkday(from, project.holidays);
+      if (load > capacity + 0.0001 && workdays(from, to, projectHolidays(project)) > 0) {
+        const first = nextWorkday(from, projectHolidays(project));
         let last = to;
-        while (!working(last, project.holidays)) last = addDays(last, -1);
+        while (!working(last, projectHolidays(project))) last = addDays(last, -1);
         overloads.push({
           memberId: member.id,
           name: member.name,

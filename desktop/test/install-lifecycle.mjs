@@ -227,7 +227,9 @@ try {
   );
   page = await launch(version);
   await page.waitForFunction(
-    () => document.querySelector('#projectName')?.textContent === '설치·업데이트 데이터 보존',
+    () =>
+      document.querySelector('[data-project-tab][aria-selected="true"] .project-tab-name')
+        ?.textContent === '설치·업데이트 데이터 보존',
   );
   assertUpgradedProject(
     (await page.evaluate(() => window.desktop.snapshot())).project,
@@ -250,7 +252,9 @@ try {
   unchanged(before);
   page = await launch(version);
   await page.waitForFunction(
-    () => document.querySelector('#projectName')?.textContent === '설치·업데이트 데이터 보존',
+    () =>
+      document.querySelector('[data-project-tab][aria-selected="true"] .project-tab-name')
+        ?.textContent === '설치·업데이트 데이터 보존',
   );
   assertUpgradedProject(
     (await page.evaluate(() => window.desktop.snapshot())).project,

@@ -60,8 +60,10 @@ export function serializeDocument(project) {
 function readLimited(file, max = MAX_BYTES) {
   return readBounded(file, max);
 }
-function sameFile(left, right) {
-  if (path.resolve(left) === path.resolve(right)) return true;
+export function sameFile(left, right) {
+  const resolved = (file) =>
+    process.platform === 'win32' ? path.resolve(file).toLowerCase() : path.resolve(file);
+  if (resolved(left) === resolved(right)) return true;
   try {
     if (realpathSync.native(left) === realpathSync.native(right)) return true;
     const a = statSync(left, { bigint: true }),
@@ -205,8 +207,18 @@ export class DesktopDocument {
     return this.changeHistory('redo', revision);
   }
   create(input) {
-    const project = normalizeProject(input);
+    const project = normalizeProject({ ...input, koreanHolidays: input.koreanHolidays ?? true });
     this.update({ project, file: null, savedHash: null, savedProjectHash: null, dirty: true });
+    return this.resetHistory();
+  }
+  close() {
+    this.update({
+      project: null,
+      file: null,
+      savedHash: null,
+      savedProjectHash: null,
+      dirty: false,
+    });
     return this.resetHistory();
   }
   open(file) {
@@ -274,30 +286,42 @@ export class DesktopDocument {
       if (error.code === 'ENOENT') return null;
       throw error;
     }
-    const value = JSON.parse(String(bytes));
-    if (value.version !== 1 || typeof value.dirty !== 'boolean')
-      throw Error('복구 파일 형식을 확인해 주세요.');
-    const project = normalizeProject(value.project);
-    if (value.file !== null && (typeof value.file !== 'string' || !path.isAbsolute(value.file)))
-      throw Error('복구 파일 경로가 올바르지 않습니다.');
-    if (value.savedHash !== null && !/^[a-f0-9]{64}$/.test(value.savedHash))
-      throw Error('복구 파일의 저장 정보를 확인해 주세요.');
-    if (
-      value.savedProjectHash != null &&
-      (typeof value.savedProjectHash !== 'string' || !/^[a-f0-9]{64}$/.test(value.savedProjectHash))
-    )
-      throw Error('복구 파일의 저장 기준을 확인해 주세요.');
-    return {
-      project,
-      file: value.file,
-      savedHash: value.savedHash,
-      dirty: value.dirty,
-      savedProjectHash:
-        value.savedProjectHash ?? (!value.dirty && value.file ? projectHash(project) : null),
-    };
+    return validateRecoveryRecord(JSON.parse(String(bytes)));
   }
   restore(value) {
     this.update(value);
     return this.resetHistory();
   }
+}
+export function validateRecoveryRecord(value) {
+  if (value.version !== 1 || typeof value.dirty !== 'boolean')
+    throw Error('복구 파일 형식을 확인해 주세요.');
+  if (value.project === null) {
+    if (
+      value.dirty ||
+      value.file !== null ||
+      value.savedHash !== null ||
+      value.savedProjectHash !== null
+    )
+      throw Error('복구 파일 형식을 확인해 주세요.');
+    return null;
+  }
+  const project = normalizeProject(value.project);
+  if (value.file !== null && (typeof value.file !== 'string' || !path.isAbsolute(value.file)))
+    throw Error('복구 파일 경로가 올바르지 않습니다.');
+  if (value.savedHash !== null && !/^[a-f0-9]{64}$/.test(value.savedHash))
+    throw Error('복구 파일의 저장 정보를 확인해 주세요.');
+  if (
+    value.savedProjectHash != null &&
+    (typeof value.savedProjectHash !== 'string' || !/^[a-f0-9]{64}$/.test(value.savedProjectHash))
+  )
+    throw Error('복구 파일의 저장 기준을 확인해 주세요.');
+  return {
+    project,
+    file: value.file,
+    savedHash: value.savedHash,
+    dirty: value.dirty,
+    savedProjectHash:
+      value.savedProjectHash ?? (!value.dirty && value.file ? projectHash(project) : null),
+  };
 }

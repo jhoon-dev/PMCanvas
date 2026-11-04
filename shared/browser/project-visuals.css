@@ -1,0 +1,422 @@
+/* Project-only widgets: shared markup without changing application color themes. */
+.project-visuals {
+  display: grid;
+  gap: 24px;
+  margin: 24px 0;
+  min-width: 0;
+}
+.project-visuals .panel {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+}
+.project-visuals .panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 20px 24px;
+}
+.project-visuals .panel-head h2 {
+  margin: 0;
+  font-size: 16px;
+}
+.project-visuals .panel-head p {
+  margin: 5px 0 0;
+  color: #62748a;
+  font-size: 12px;
+}
+.project-visuals .people-progress {
+  padding: 0 24px 24px;
+}
+.project-visuals .grow {
+  flex: 1;
+  min-width: 0;
+}
+.project-visuals .avatar {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  color: var(--avatar);
+  background: color-mix(in srgb, var(--avatar) 12%, white);
+  flex-shrink: 0;
+}
+
+.project-visuals .meter {
+  height: 4px;
+  border-radius: 9px;
+  background: #edf1f7;
+  overflow: hidden;
+  min-width: 30px;
+}
+.project-visuals .meter i {
+  display: block;
+  height: 100%;
+  background: #4e82e8;
+  border-radius: 9px;
+  transition: width 0.35s ease;
+}
+.project-visuals .avatar {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--avatar) 12%, white);
+  color: var(--avatar);
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.project-visuals .avatar.tiny {
+  width: 24px;
+  height: 24px;
+  font-size: 12px;
+}
+.project-visuals .avatar.large {
+  height: 46px;
+  width: 46px;
+  font-size: 14px;
+}
+.project-visuals .avatar-stack {
+  margin-left: auto;
+  display: flex;
+  align-self: center;
+}
+.project-visuals .avatar-stack .avatar {
+  margin-left: -7px;
+  border: 2px solid white;
+  width: 27px;
+  height: 27px;
+}
+.project-visuals .chart-panel .panel-head {
+  padding-bottom: 12px;
+}
+.project-visuals .legend {
+  display: flex;
+  gap: 14px;
+  font-size: 12px;
+  color: #8c9aaa;
+}
+.project-visuals .legend span:before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  margin-right: 5px;
+  background: #c8d2df;
+}
+.project-visuals .legend .actual-dot:before {
+  background: #4382ef;
+}
+.project-visuals .legend .forecast-dot:before {
+  background: #79b7b3;
+}
+.project-visuals .chart-wrap {
+  padding: 0 18px;
+  overflow-x: auto;
+}
+.project-visuals .chart-wrap svg {
+  display: block;
+  width: 100%;
+  min-width: 600px;
+  height: auto;
+  max-height: 235px;
+  overflow: visible;
+  font-family: inherit;
+}
+.project-visuals .chart-wrap svg text {
+  font-size: 15px;
+  fill: #a1adbb;
+}
+.project-visuals .chart-grid {
+  stroke: #edf1f7;
+  stroke-width: 1;
+}
+.project-visuals .plan-line {
+  stroke: #bdc9d8;
+  stroke-dasharray: 5 5;
+  stroke-width: 2;
+  fill: none;
+}
+.project-visuals .actual-line {
+  stroke: #4382ef;
+  stroke-width: 2.7;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  fill: none;
+}
+.project-visuals .report-line {
+  stroke: #d7e0ed;
+  stroke-dasharray: 3 3;
+}
+.project-visuals .forecast-line {
+  stroke: #6baca8;
+  stroke-width: 2;
+  stroke-dasharray: 4 4;
+}
+.project-visuals .chart-caption {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  padding: 0 24px 17px;
+  color: #9da9b5;
+  font-size: 12px;
+  gap: 12px;
+}
+.project-visuals .chart-empty {
+  display: grid;
+  place-items: center;
+  min-height: 220px;
+  color: #a0aebc;
+  font-size: 12px;
+}
+.project-visuals .gantt-scroll {
+  overflow: auto;
+  padding: 0 24px;
+}
+.project-visuals .gantt {
+  width: calc(240px + var(--timeline-width));
+  min-width: 100%;
+}
+.project-visuals .gantt-top {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  height: 36px;
+  font-size: 12px;
+  color: #92a2b4;
+  border-bottom: 1px solid #e8edf4;
+}
+.project-visuals .gantt-top > div:first-child {
+  padding: 8px 0;
+  background: white;
+  position: sticky;
+  left: 0;
+  z-index: 4;
+}
+.project-visuals .gantt-scale {
+  position: relative;
+}
+.project-visuals .gantt-scale span {
+  position: absolute;
+  top: 8px;
+  white-space: nowrap;
+}
+.project-visuals .gantt-scale span:last-child {
+  transform: translateX(-100%);
+}
+.project-visuals .gantt-row {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  height: 49px;
+  border-bottom: 1px solid #f0f3f7;
+}
+.project-visuals .gantt-row:last-child {
+  border: 0;
+}
+.project-visuals .gantt-label {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  border: 0;
+  background: #fff;
+  text-align: left;
+  font-size: 12px;
+  line-height: 1.3;
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  padding: 0 12px 0 0;
+}
+.project-visuals .gantt-label:hover {
+  background: #fafcff;
+}
+.project-visuals .gantt-label > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.project-visuals .gantt-label small {
+  display: block;
+  font-size: 12px;
+  color: #9aa8b7;
+  margin-top: 2px;
+}
+.project-visuals .wbs-no {
+  font-size: 12px;
+  color: #a2aebc;
+}
+.project-visuals .gantt-track {
+  position: relative;
+  background: repeating-linear-gradient(
+    to right,
+    #edf1f780 0,
+    #edf1f780 1px,
+    transparent 1px,
+    transparent 14.2857%
+  );
+}
+.project-visuals .gantt-baseline {
+  position: absolute;
+  top: 17px;
+  height: 14px;
+  background: #edf1f7;
+  border-radius: 3px;
+}
+.project-visuals .gantt-progress {
+  position: absolute;
+  height: 14px;
+  top: 17px;
+  border-radius: 3px;
+  overflow: visible;
+}
+.project-visuals .gantt-progress i {
+  display: block;
+  height: 100%;
+  background: var(--bar);
+  opacity: 0.68;
+  border-radius: 3px;
+}
+.project-visuals .gantt-progress span {
+  font-size: 12px;
+  line-height: 14px;
+  position: absolute;
+  left: 4px;
+  top: 0;
+  color: #3b5676;
+  z-index: 1;
+}
+.project-visuals .gantt-forecast {
+  position: absolute;
+  top: 34px;
+  height: 5px;
+  border-radius: 3px;
+  border: 1px solid #99b8de;
+  background: #e8f0fa;
+}
+.project-visuals .gantt-forecast.late {
+  border-color: #dab16c;
+  background: #fbf1dc;
+}
+.project-visuals .gantt-today {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 1px dashed #91b5ec;
+}
+.project-visuals .gantt-foot {
+  display: flex;
+  align-items: center;
+  gap: 17px;
+  border-top: 1px solid #f0f3f7;
+  padding: 13px 24px;
+  font-size: 12px;
+  color: #8d9cae;
+  flex-wrap: wrap;
+}
+.project-visuals .gantt-foot > span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.project-visuals .gantt-foot > .muted {
+  margin-left: auto;
+}
+.project-visuals .legend-bar {
+  display: inline-block;
+  width: 14px;
+  height: 6px;
+  background: #e8edf4;
+  border-radius: 2px;
+}
+.project-visuals .legend-bar.filled {
+  background: #82a1e7;
+}
+.project-visuals .legend-outline {
+  width: 14px;
+  height: 5px;
+  border: 1px solid #b4c7e2;
+  border-radius: 2px;
+}
+.project-visuals .grow {
+  flex: 1;
+  min-width: 0;
+}
+.project-visuals .people-progress {
+  padding: 0 24px 15px;
+}
+.project-visuals .people-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin: 12px 0;
+}
+.project-visuals .people-progress-row .meter {
+  height: 3px;
+}
+.project-visuals .person-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  margin-bottom: 7px;
+}
+.project-visuals .person-line strong {
+  font-size: 12px;
+  font-weight: 500;
+}
+.project-visuals .person-line span {
+  color: #9ba7b4;
+  font-size: 12px;
+}
+.project-visuals .person-percent {
+  font-size: 12px;
+  color: #7890a9;
+  font-weight: 500;
+  min-width: 32px;
+  text-align: right;
+}
+.project-visuals .calm-state {
+  padding: 32px 24px;
+  text-align: center;
+  font-size: 12px;
+  color: #9ba9b8;
+}
+@media (max-width: 700px) {
+  .project-visuals .panel-head {
+    padding: 18px;
+  }
+  .project-visuals .chart-wrap {
+    overflow-x: auto;
+    padding: 0 12px;
+  }
+  .project-visuals .chart-wrap svg {
+    min-width: 600px;
+    max-height: none;
+  }
+  .project-visuals .chart-caption {
+    flex-wrap: wrap;
+    padding: 12px 18px;
+    font-size: 12px;
+  }
+  .project-visuals .people-progress {
+    padding: 0 18px 18px;
+  }
+  .project-visuals .legend {
+    font-size: 12px;
+  }
+  .project-visuals .gantt-top,
+  .project-visuals .gantt-row {
+    grid-template-columns: 160px 1fr;
+  }
+  .project-visuals .gantt {
+    width: calc(160px + var(--timeline-width));
+  }
+}

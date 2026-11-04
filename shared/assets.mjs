@@ -1,11 +1,15 @@
 export const browserFiles = Object.freeze([
   'engine.js',
+  'korean-holidays.js',
+  'korean-holidays-data.js',
   'task-model.js',
   'management.js',
   'management-ui.js',
+  'project-navigation.js',
   'business-clock.js',
   'planning.js',
   'html.js',
+  'id.js',
   'i18n.js',
   'locales/en.js',
   'locales/desktop-en.js',
@@ -16,6 +20,12 @@ export const browserFiles = Object.freeze([
   'wbs-model.js',
   'report-clock.js',
   'excel-import-model.js',
+  'dashboard-view.js',
+  'wbs-workspace.js',
+  'wbs-import.js',
+  'draft-store.js',
+  'wbs.css',
+  'project-visuals.css',
   'styles.css',
 ]);
 export function browserAsset(file) {

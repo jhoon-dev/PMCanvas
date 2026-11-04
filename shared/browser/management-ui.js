@@ -1,3 +1,4 @@
+import { uid as projectUid } from './id.js';
 import { ui } from './i18n.js';
 import { escapeHtml as esc } from './html.js';
 import { today, validateProject } from './engine.js';
@@ -268,186 +269,423 @@ export function weeklyHtml(report) {
     '</body></html>'
   );
 }
-export function managementView(p, at = today()) {
+export function managementView(p, at = today(), { section = 'all', page = null } = {}) {
+  const showMilestones = ['all', 'planning', 'milestones'].includes(section),
+    showStaffing = ['all', 'planning', 'staffing'].includes(section),
+    showIssues = ['all', 'reports', 'issues'].includes(section),
+    showWeekly = ['all', 'reports', 'weekly'].includes(section);
+  const heading = {
+    reports: ['이슈 · 보고', '이슈·리스크와 주간보고를 관리하세요.'],
+    planning: ['계획 · 투입', '마일스톤과 인력 투입 기간, 월별 계획 M/M을 관리하세요.'],
+    milestones: ['마일스톤', '업무의 주요 목표일과 실제 완료일을 관리하세요.'],
+    staffing: ['투입 계획', '인력별 투입 기간과 투입률을 설정하고 월별 계획 M/M을 확인하세요.'],
+    issues: ['이슈 · 리스크', '발생한 문제와 예상 위험의 담당자·기한·조치 상태를 관리하세요.'],
+    weekly: ['주간보고', '기간별 진행 상황을 검토하고 주간보고를 발행하세요.'],
+    all: ['프로젝트 관리', '마일스톤·이슈·주간보고·월별 투입 계획'],
+  }[section];
+  if (page && ['issues', 'milestones', 'weekly', 'staffing'].includes(section))
+    return managementPageView(p, at, section, page, heading);
   const range = weekRange(at),
-    plan = monthlyPlan(p, at.slice(0, 7)),
+    plan = showStaffing ? monthlyPlan(p, at.slice(0, 7)) : null,
     readOnly = p._role === 'viewer';
   const issues = p.issues || [],
     milestones = p.tasks.filter((t) => t.kind === 'milestone');
   return (
     '<section id="pmManagement" class="pm-management"><header class="page-head"><div><h1>' +
-    esc(ui('프로젝트 관리')) +
+    esc(ui(heading[0])) +
     '</h1><p>' +
-    esc(ui('마일스톤·이슈·주간보고·월별 투입 계획')) +
+    esc(ui(heading[1])) +
     '</p></div></header><p class="pm-error" role="alert"></p>' +
-    '<details open><summary>' +
-    esc(ui('마일스톤')) +
-    ' (' +
-    milestones.length +
-    ')</summary><p>' +
-    esc(ui('공수와 자원을 사용하지 않는 완료 시점입니다. 목표일은 휴일도 지정할 수 있습니다.')) +
-    '</p>' +
-    '<fieldset ' +
-    (readOnly ? 'disabled' : '') +
-    '><details><summary>' +
-    esc(ui('마일스톤 추가')) +
-    '</summary>' +
-    milestoneForm(p, null, at) +
-    '</details>' +
-    milestones
-      .map(
-        (t) =>
-          '<details><summary>' +
-          esc(t.name) +
-          ' · ' +
-          t.start +
-          ' · ' +
-          esc(t.doneDate || ui('미완료')) +
-          '</summary>' +
-          milestoneForm(p, t, at) +
-          '</details>',
-      )
-      .join('') +
-    '</fieldset></details>' +
-    '<details open><summary>' +
-    esc(ui('이슈·리스크')) +
-    ' (' +
-    issues.filter((i) => i.status !== 'closed').length +
-    ')</summary><fieldset ' +
-    (readOnly ? 'disabled' : '') +
-    '><details><summary>' +
-    esc(ui('이슈·리스크 추가')) +
-    '</summary>' +
-    issueForm(p) +
-    '</details>' +
-    issues
-      .map(
-        (i) =>
-          '<details><summary>' +
-          esc(ui(labels[i.type])) +
-          ' · ' +
-          esc(i.title) +
-          ' · ' +
-          esc(ui(labels[i.status])) +
-          ' · ' +
-          esc(ui(labels[i.impact])) +
-          '</summary>' +
-          issueForm(p, i) +
-          '</details>',
-      )
-      .join('') +
-    '</fieldset></details>' +
-    '<details open><summary>' +
-    esc(ui('주간보고')) +
-    '</summary><p>' +
-    esc(
-      ui(
-        '미리보기로 검토한 뒤 발행하세요. 발행한 보고서는 작업·계획·이슈를 바꿔도 유지되며 수정·삭제할 수 없습니다. 정정 시 새 보고서를 발행하세요.',
-      ),
-    ) +
-    '</p><fieldset ' +
-    (readOnly ? 'disabled' : '') +
-    '><form data-pm-form="weekly"><div class="pm-fields">' +
-    input('금주 시작일', 'from', range.from, 'type="date" required') +
-    input('금주 종료일', 'to', range.to, 'type="date" required max="' + today() + '"') +
-    '</div>' +
-    area('금주 설명', 'notes') +
-    area('차주 설명', 'nextNotes') +
-    submit('주간보고 미리보기') +
-    '</form><div id="pmWeeklyPreview"></div></fieldset>' +
-    [...(p.weeklyReports || [])]
-      .reverse()
-      .map(
-        (r) =>
-          '<details data-pm-report="' +
-          esc(r.id) +
-          '"><summary>' +
-          r.from +
-          ' ~ ' +
-          r.to +
-          ' · ' +
-          esc(r.publishedAt) +
-          '</summary><button type="button" class="button" data-pm-export="' +
-          esc(r.id) +
-          '">' +
-          esc(ui('보고서 HTML 내려받기')) +
-          '</button>' +
-          '<div data-pm-report-body="' +
-          esc(r.id) +
-          '"></div>' +
-          '</details>',
-      )
-      .join('') +
-    '</details>' +
-    '<details open><summary>' +
-    esc(ui('월별 계획 M/M')) +
-    '</summary><p>' +
-    esc(
-      ui(
-        '기간별 계획이 있으면 계획 투입률을 사용하고 기간 밖은 0%입니다. 계획이 없거나 마지막 기간을 삭제하면 인력의 기본 투입률을 사용합니다. 예측·과부하·계획 M/M에 함께 적용됩니다. 160h는 편집 가능한 환산 기준이며 실제 투입 실적은 수집하지 않습니다.',
-      ),
-    ) +
-    '</p>' +
-    '<fieldset ' +
-    (readOnly ? 'disabled' : '') +
-    '><form data-pm-form="mm-basis">' +
-    input(
-      '1 M/M 기준 시간',
-      'hoursPerMM',
-      plan.hoursPerMM,
-      'type="number" min="1" max="400" step="0.1" required',
-    ) +
-    submit('환산 기준 저장') +
-    '</form><form data-pm-form="staffing"><h3>' +
-    esc(ui('투입 기간 추가')) +
-    '</h3><div class="pm-fields">' +
-    select(
-      '인력',
-      'memberId',
-      p.members.map((m) => [m.id, m.name]),
-    ) +
-    input('투입 시작일', 'start', at, 'type="date" required') +
-    input('투입 종료일', 'end', at, 'type="date" required') +
-    input(
-      '투입률 (%)',
-      'allocation',
-      100,
-      'type="number" min="0.1" max="100" step="0.1" required',
-    ) +
-    '</div>' +
-    submit() +
-    '</form></fieldset>' +
-    '<label class="field">' +
-    esc(ui('조회 월')) +
-    '<input type="month" id="pmPlanMonth" value="' +
-    at.slice(0, 7) +
-    '"></label><div id="pmPlanResult">' +
-    monthlyTable(p, at.slice(0, 7)) +
-    '</div>' +
-    '<ul>' +
-    (p.staffing?.assignments || [])
-      .map(
-        (a) =>
-          '<li>' +
-          esc(p.members.find((m) => m.id === a.memberId)?.name) +
-          ' · ' +
-          a.start +
-          ' ~ ' +
-          a.end +
-          ' · ' +
-          a.allocation +
-          '% ' +
-          (readOnly
-            ? ''
-            : '<button type="button" class="button small" data-pm-remove-assignment="' +
-              esc(a.id) +
+    (showMilestones
+      ? '<details open><summary>' +
+        esc(ui('마일스톤')) +
+        ' (' +
+        milestones.length +
+        ')</summary><p>' +
+        esc(
+          ui('공수와 자원을 사용하지 않는 완료 시점입니다. 목표일은 휴일도 지정할 수 있습니다.'),
+        ) +
+        '</p>' +
+        '<fieldset ' +
+        (readOnly ? 'disabled' : '') +
+        '><details><summary>' +
+        esc(ui('마일스톤 추가')) +
+        '</summary>' +
+        milestoneForm(p, null, at) +
+        '</details>' +
+        milestones
+          .map(
+            (t) =>
+              '<details><summary>' +
+              esc(t.name) +
+              ' · ' +
+              t.start +
+              ' · ' +
+              esc(t.doneDate || ui('미완료')) +
+              '</summary>' +
+              milestoneForm(p, t, at) +
+              '</details>',
+          )
+          .join('') +
+        '</fieldset></details>'
+      : '') +
+    (showIssues
+      ? '<details open><summary>' +
+        esc(ui('이슈·리스크')) +
+        ' (' +
+        issues.length +
+        ')</summary><fieldset ' +
+        (readOnly ? 'disabled' : '') +
+        '><details><summary>' +
+        esc(ui('이슈·리스크 추가')) +
+        '</summary>' +
+        issueForm(p) +
+        '</details>' +
+        issues
+          .map(
+            (i) =>
+              '<details><summary>' +
+              esc(ui(labels[i.type])) +
+              ' · ' +
+              esc(i.title) +
+              ' · ' +
+              esc(ui(labels[i.status])) +
+              ' · ' +
+              esc(ui(labels[i.impact])) +
+              '</summary>' +
+              issueForm(p, i) +
+              '</details>',
+          )
+          .join('') +
+        '</fieldset></details>'
+      : '') +
+    (showWeekly
+      ? '<details open><summary>' +
+        esc(ui('주간보고')) +
+        '</summary><p>' +
+        esc(
+          ui(
+            '미리보기로 검토한 뒤 발행하세요. 발행한 보고서는 작업·계획·이슈를 바꿔도 유지되며 수정·삭제할 수 없습니다. 정정 시 새 보고서를 발행하세요.',
+          ),
+        ) +
+        '</p><fieldset ' +
+        (readOnly ? 'disabled' : '') +
+        '><form data-pm-form="weekly"><div class="pm-fields">' +
+        input('금주 시작일', 'from', range.from, 'type="date" required') +
+        input('금주 종료일', 'to', range.to, 'type="date" required max="' + today() + '"') +
+        '</div>' +
+        area('금주 설명', 'notes') +
+        area('차주 설명', 'nextNotes') +
+        submit('주간보고 미리보기') +
+        '</form><div id="pmWeeklyPreview"></div></fieldset>' +
+        [...(p.weeklyReports || [])]
+          .reverse()
+          .map(
+            (r) =>
+              '<details data-pm-report="' +
+              esc(r.id) +
+              '"><summary>' +
+              r.from +
+              ' ~ ' +
+              r.to +
+              ' · ' +
+              esc(r.publishedAt) +
+              '</summary><button type="button" class="button" data-pm-export="' +
+              esc(r.id) +
               '">' +
-              esc(ui('삭제')) +
-              '</button>') +
-          '</li>',
-      )
-      .join('') +
-    '</ul></details></section>'
+              esc(ui('보고서 HTML 내려받기')) +
+              '</button>' +
+              '<div data-pm-report-body="' +
+              esc(r.id) +
+              '"></div>' +
+              '</details>',
+          )
+          .join('') +
+        '</details>'
+      : '') +
+    (showStaffing
+      ? '<details open><summary>' +
+        esc(ui('월별 계획 M/M')) +
+        '</summary><p>' +
+        esc(
+          ui(
+            '기간별 계획이 있으면 계획 투입률을 사용하고 기간 밖은 0%입니다. 계획이 없거나 마지막 기간을 삭제하면 인력의 기본 투입률을 사용합니다. 예측·과부하·계획 M/M에 함께 적용됩니다. 160h는 편집 가능한 환산 기준이며 실제 투입 실적은 수집하지 않습니다.',
+          ),
+        ) +
+        '</p>' +
+        '<fieldset ' +
+        (readOnly ? 'disabled' : '') +
+        '><form data-pm-form="mm-basis">' +
+        input(
+          '1 M/M 기준 시간',
+          'hoursPerMM',
+          plan.hoursPerMM,
+          'type="number" min="1" max="400" step="0.1" required',
+        ) +
+        submit('환산 기준 저장') +
+        '</form><form data-pm-form="staffing"><h3>' +
+        esc(ui('투입 기간 추가')) +
+        '</h3><div class="pm-fields">' +
+        select(
+          '인력',
+          'memberId',
+          p.members.map((m) => [m.id, m.name]),
+        ) +
+        input('투입 시작일', 'start', at, 'type="date" required') +
+        input('투입 종료일', 'end', at, 'type="date" required') +
+        input(
+          '투입률 (%)',
+          'allocation',
+          100,
+          'type="number" min="0.1" max="100" step="0.1" required',
+        ) +
+        '</div>' +
+        submit() +
+        '</form></fieldset>' +
+        '<label class="field">' +
+        esc(ui('조회 월')) +
+        '<input type="month" id="pmPlanMonth" value="' +
+        at.slice(0, 7) +
+        '"></label><div id="pmPlanResult">' +
+        monthlyTable(p, at.slice(0, 7)) +
+        '</div>' +
+        '<ul>' +
+        (p.staffing?.assignments || [])
+          .map(
+            (a) =>
+              '<li>' +
+              esc(p.members.find((m) => m.id === a.memberId)?.name) +
+              ' · ' +
+              a.start +
+              ' ~ ' +
+              a.end +
+              ' · ' +
+              a.allocation +
+              '% ' +
+              (readOnly
+                ? ''
+                : '<button type="button" class="button small" data-pm-remove-assignment="' +
+                  esc(a.id) +
+                  '">' +
+                  esc(ui('삭제')) +
+                  '</button>') +
+              '</li>',
+          )
+          .join('') +
+        '</ul></details>'
+      : '') +
+    '</section>'
+  );
+}
+function managementPageView(p, at, section, page, heading) {
+  const readOnly = p._role === 'viewer';
+  const records =
+    section === 'issues'
+      ? p.issues || []
+      : section === 'milestones'
+        ? p.tasks.filter((t) => t.kind === 'milestone')
+        : section === 'weekly'
+          ? [...(p.weeklyReports || [])].reverse()
+          : p.staffing?.assignments || [];
+  const record = records.find((r) => r.id === page.id);
+  const panes =
+    section === 'weekly'
+      ? ['list', 'add', 'report']
+      : section === 'staffing'
+        ? ['list', 'add', 'basis']
+        : ['list', 'add', 'edit'];
+  let pane = panes.includes(page.pane) ? page.pane : 'list';
+  if (
+    (['edit', 'report'].includes(pane) && !record) ||
+    (readOnly && ['add', 'edit', 'basis'].includes(pane))
+  )
+    pane = 'list';
+  const labelsForSection = {
+    issues: ['이슈·리스크 목록', '이슈·리스크 추가', '이슈·리스크 수정'],
+    milestones: ['마일스톤 목록', '마일스톤 추가', '마일스톤 수정'],
+    weekly: ['발행 목록', '주간보고 작성', '보고서 보기'],
+    staffing: ['투입 목록 · 월별 계획', '투입 기간 추가', '환산 기준'],
+  }[section];
+  const action = (label, target, id = '') =>
+    '<button type="button" class="button small" data-management-pane="' +
+    target +
+    '" data-management-id="' +
+    esc(id) +
+    '">' +
+    esc(ui(label)) +
+    '</button>';
+  const nav =
+    '<div class="management-page-nav head-actions">' +
+    (pane === 'list'
+      ? (!readOnly
+          ? action(labelsForSection[1], 'add').replace('button small', 'button primary')
+          : '') + (section === 'staffing' && !readOnly ? action('환산 기준', 'basis') : '')
+      : action('← 목록으로', 'list')) +
+    '</div>';
+  const table = (headers, rows) =>
+    rows.length
+      ? '<div class="desktop-table-wrap"><table class="desktop-table"><thead><tr>' +
+        headers.map((h) => '<th>' + esc(ui(h)) + '</th>').join('') +
+        '</tr></thead><tbody>' +
+        rows
+          .map((cells) => '<tr>' + cells.map((cell) => '<td>' + cell + '</td>').join('') + '</tr>')
+          .join('') +
+        '</tbody></table></div>'
+      : '<p class="management-empty">' + esc(ui('등록된 항목이 없습니다.')) + '</p>';
+  const owner = (id) => esc(p.members.find((m) => m.id === id)?.name || ui('미지정'));
+  let body = '',
+    title = labelsForSection[0];
+  if (pane === 'list') {
+    if (section === 'issues')
+      body = table(
+        ['유형', '제목', '담당자', '기한', '상태', '영향도', '작업'],
+        records.map((r) => [
+          esc(ui(labels[r.type])),
+          esc(r.title),
+          owner(r.owner),
+          esc(r.due || '—'),
+          esc(ui(labels[r.status])),
+          esc(ui(labels[r.impact])),
+          readOnly ? '' : action('수정', 'edit', r.id),
+        ]),
+      );
+    if (section === 'milestones')
+      body = table(
+        ['마일스톤명', '담당자', '목표일', '실제 완료일', '작업'],
+        records.map((r) => [
+          esc(r.name),
+          owner(r.owner),
+          esc(r.start),
+          esc(r.doneDate || ui('미완료')),
+          readOnly ? '' : action('수정', 'edit', r.id),
+        ]),
+      );
+    if (section === 'weekly')
+      body = table(
+        ['기간', '발행', '작업'],
+        records.map((r) => [
+          esc(r.from + ' ~ ' + r.to),
+          esc(r.publishedAt),
+          action('보기', 'report', r.id),
+        ]),
+      );
+    if (section === 'staffing')
+      body =
+        '<p>' +
+        esc(
+          ui(
+            '기간별 계획이 있으면 계획 투입률을 사용하고 기간 밖은 0%입니다. 계획이 없거나 마지막 기간을 삭제하면 인력의 기본 투입률을 사용합니다. 예측·과부하·계획 M/M에 함께 적용됩니다. 160h는 편집 가능한 환산 기준이며 실제 투입 실적은 수집하지 않습니다.',
+          ),
+        ) +
+        '</p><label class="field">' +
+        esc(ui('조회 월')) +
+        '<input type="month" id="pmPlanMonth" value="' +
+        at.slice(0, 7) +
+        '"></label><div id="pmPlanResult">' +
+        monthlyTable(p, at.slice(0, 7)) +
+        '</div><h3>' +
+        esc(ui('투입 기간 목록')) +
+        '</h3>' +
+        table(
+          ['인력', '투입 시작일', '투입 종료일', '투입률 (%)', '작업'],
+          records.map((r) => [
+            owner(r.memberId),
+            esc(r.start),
+            esc(r.end),
+            esc(r.allocation),
+            readOnly
+              ? ''
+              : '<button type="button" class="button small" data-pm-remove-assignment="' +
+                esc(r.id) +
+                '">' +
+                esc(ui('삭제')) +
+                '</button>',
+          ]),
+        );
+  } else if (pane === 'report') {
+    title = labelsForSection[2];
+    body =
+      '<button type="button" class="button" data-pm-export="' +
+      esc(record.id) +
+      '">' +
+      esc(ui('보고서 HTML 내려받기')) +
+      '</button><div data-pm-report-body="' +
+      esc(record.id) +
+      '">' +
+      weeklyBody(record) +
+      '</div>';
+  } else {
+    title = pane === 'add' ? labelsForSection[1] : labelsForSection[2];
+    if (section === 'issues') body = issueForm(p, pane === 'edit' ? record : undefined);
+    if (section === 'milestones')
+      body =
+        '<p>' +
+        esc(
+          ui('공수와 자원을 사용하지 않는 완료 시점입니다. 목표일은 휴일도 지정할 수 있습니다.'),
+        ) +
+        '</p>' +
+        milestoneForm(p, pane === 'edit' ? record : null, at);
+    if (section === 'weekly') {
+      const range = weekRange(at);
+      body =
+        '<p>' +
+        esc(
+          ui(
+            '미리보기로 검토한 뒤 발행하세요. 발행한 보고서는 작업·계획·이슈를 바꿔도 유지되며 수정·삭제할 수 없습니다. 정정 시 새 보고서를 발행하세요.',
+          ),
+        ) +
+        '</p><form data-pm-form="weekly"><div class="pm-fields">' +
+        input('금주 시작일', 'from', range.from, 'type="date" required') +
+        input('금주 종료일', 'to', range.to, 'type="date" required max="' + today() + '"') +
+        '</div>' +
+        area('금주 설명', 'notes') +
+        area('차주 설명', 'nextNotes') +
+        submit('주간보고 미리보기') +
+        '</form><div id="pmWeeklyPreview"></div>';
+    }
+    if (section === 'staffing')
+      body =
+        pane === 'basis'
+          ? '<form data-pm-form="mm-basis">' +
+            input(
+              '1 M/M 기준 시간',
+              'hoursPerMM',
+              monthlyPlan(p, at.slice(0, 7)).hoursPerMM,
+              'type="number" min="1" max="400" step="0.1" required',
+            ) +
+            submit('환산 기준 저장') +
+            '</form>'
+          : '<form data-pm-form="staffing"><div class="pm-fields">' +
+            select(
+              '인력',
+              'memberId',
+              p.members.map((m) => [m.id, m.name]),
+            ) +
+            input('투입 시작일', 'start', at, 'type="date" required') +
+            input('투입 종료일', 'end', at, 'type="date" required') +
+            input(
+              '투입률 (%)',
+              'allocation',
+              100,
+              'type="number" min="0.1" max="100" step="0.1" required',
+            ) +
+            '</div>' +
+            submit() +
+            '</form>';
+  }
+  return (
+    '<section id="pmManagement" class="pm-management"><header class="page-head"><div><h1>' +
+    esc(ui(heading[0])) +
+    '</h1><p>' +
+    esc(ui(heading[1])) +
+    '</p></div>' +
+    nav +
+    '</header><p class="pm-error" role="alert"></p>' +
+    '<section class="panel management-page"><h2>' +
+    esc(ui(title)) +
+    '</h2>' +
+    body +
+    '</section></section>'
   );
 }
 function monthlyTable(p, month) {
@@ -506,12 +744,7 @@ function monthlyTable(p, month) {
       : '')
   );
 }
-export function applyManagementForm(
-  p,
-  kind,
-  form,
-  { at = today(), uid = () => crypto.randomUUID() } = {},
-) {
+export function applyManagementForm(p, kind, form, { at = today(), uid = projectUid } = {}) {
   const v = (key) => String(form.get(key) || '').trim();
   if (kind === 'milestone') {
     const next = structuredClone(p),
@@ -564,6 +797,7 @@ export function installManagementUi({
   getDate = today,
   canChange = () => true,
   onDirtyChange = () => {},
+  confirmDiscard = (message) => globalThis.confirm(message),
   exportReport = null,
   savedMessage = '저장했습니다.',
   publishedMessage = '주간보고를 발행했습니다.',
@@ -728,17 +962,36 @@ export function installManagementUi({
   return {
     dirty,
     pending: () => pending,
+    reset: (form) => {
+      if (pending || !form?.matches('#pmManagement form')) return;
+      form.reset();
+      delete form.dataset.pmDirty;
+      if (form.dataset.pmForm === 'weekly') {
+        preview = null;
+        const host = document.querySelector('#pmWeeklyPreview');
+        if (host) host.innerHTML = '';
+      }
+      const error = document.querySelector('#pmManagement .pm-error');
+      if (error) error.textContent = '';
+      onDirtyChange(dirty());
+    },
     leave: () => {
       if (pending) return false;
       if (!dirty()) return true;
-      if (!globalThis.confirm(ui('저장하지 않은 관리 입력을 버리고 이동할까요?'))) return false;
-      document.querySelectorAll('#pmManagement [data-pm-dirty]').forEach((form) => {
-        form.reset();
-        delete form.dataset.pmDirty;
-      });
-      preview = null;
-      onDirtyChange(false);
-      return true;
+      const finish = (confirmed) => {
+        if (!confirmed) return false;
+        document.querySelectorAll('#pmManagement [data-pm-dirty]').forEach((form) => {
+          form.reset();
+          delete form.dataset.pmDirty;
+        });
+        preview = null;
+        const host = document.querySelector('#pmWeeklyPreview');
+        if (host) host.innerHTML = '';
+        onDirtyChange(false);
+        return true;
+      };
+      const decision = confirmDiscard(ui('저장하지 않은 관리 입력을 버리고 이동할까요?'));
+      return decision?.then ? decision.then(finish) : finish(decision);
     },
   };
 }

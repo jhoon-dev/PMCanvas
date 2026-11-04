@@ -1,3 +1,5 @@
+import { uid as projectUid } from './id.js';
+import { projectHolidays } from './korean-holidays.js';
 import { cleanManagement, detachManagementLinks } from './management.js';
 import {
   normalizeTaskModel,
@@ -66,12 +68,12 @@ export function tsvText(rows) {
     )
     .join('\r\n');
 }
-const newId = () => crypto.randomUUID();
+const newId = projectUid;
 export function newTask(
   project,
   { date = today(), id = newId, summary = false, milestone = false } = {},
 ) {
-  const start = nextWorkday(date, project.holidays);
+  const start = nextWorkday(date, projectHolidays(project));
   return {
     id: id(),
     name: ui(summary ? '새 요약 업무' : milestone ? '새 마일스톤' : '새 업무'),
@@ -80,7 +82,7 @@ export function newTask(
     phase: '',
     owner: '',
     start,
-    end: milestone ? start : shiftWorkday(start, 4, project.holidays),
+    end: milestone ? start : shiftWorkday(start, 4, projectHolidays(project)),
     predecessor: '',
     memo: '',
     items:
@@ -230,7 +232,8 @@ export function alignSuccessors(project, changedIds = null) {
         .map((id) => byId.get(id).end)
         .sort()
         .at(-1),
-      min = task.kind === 'milestone' ? end : nextWorkday(addDays(end, 1), project.holidays);
+      min =
+        task.kind === 'milestone' ? end : nextWorkday(addDays(end, 1), projectHolidays(project));
     if (task.start < min) {
       const delta = daysBetween(task.start, min);
       task.start = min;

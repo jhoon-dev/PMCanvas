@@ -751,6 +751,9 @@ export class PgRepository extends WorkspaceOperations {
       description: row.description,
       demo: row.demo,
       holidays: row.holidays,
+      ...(typeof row.planning?.koreanHolidays === 'boolean'
+        ? { koreanHolidays: row.planning.koreanHolidays }
+        : {}),
       members,
       tasks,
       createdAt: new Date(row.created_at).toISOString().slice(0, 10),
@@ -814,6 +817,7 @@ export class PgRepository extends WorkspaceOperations {
           ...(p.staffing ? { staffing: p.staffing } : {}),
           ...(p.weeklyReports ? { weeklyReports: p.weeklyReports } : {}),
         },
+        ...(p.koreanHolidays !== undefined ? { koreanHolidays: p.koreanHolidays } : {}),
         baseline: p.baseline ?? null,
       }),
     ]);
@@ -896,6 +900,7 @@ export class PgRepository extends WorkspaceOperations {
             ...(p.staffing ? { staffing: p.staffing } : {}),
             ...(p.weeklyReports ? { weeklyReports: p.weeklyReports } : {}),
           },
+          ...(p.koreanHolidays !== undefined ? { koreanHolidays: p.koreanHolidays } : {}),
           baseline: p.baseline ?? null,
         },
         role: 'owner',
@@ -940,6 +945,7 @@ export class PgRepository extends WorkspaceOperations {
             ...(p.staffing ? { staffing: p.staffing } : {}),
             ...(p.weeklyReports ? { weeklyReports: p.weeklyReports } : {}),
           },
+          ...(p.koreanHolidays !== undefined ? { koreanHolidays: p.koreanHolidays } : {}),
           baseline: p.baseline ?? null,
         },
         role: row.role,

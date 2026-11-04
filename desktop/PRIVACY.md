@@ -1,6 +1,6 @@
 # PM Canvas 앱 개인정보처리방침 / Privacy policy
 
-시행일 / Effective date: 2026-10-31
+시행일 / Effective date: 2026-11-03
 
 개발자 / Developer: jhoon-dev
 
@@ -26,6 +26,7 @@ Mac App Store 설치본은 GitHub 업데이트 API를 조회하거나 설치 파
 - 개발자는 앱을 통해 프로젝트 내용이나 파일 경로를 개발자 서버로 자동 수집·전송하지 않습니다. 앱에 광고·사용 행태 추적·자동 오류 보고 기능은 없습니다.
 - Microsoft Store 설치본은 Windows Store API로 업데이트를 확인하고 Store 업데이트 화면을 엽니다. Microsoft의 설치·업데이트·진단·백업 처리는 [Microsoft 개인정보처리방침](https://privacy.microsoft.com/privacystatement)을 따릅니다.
 - 기존 EXE 및 Mac 배포본은 설정에 따라 시작 시 또는 수동으로 GitHub의 공개 릴리스 API를 조회하고, 사용자가 요청하면 해당 설치 파일을 내려받습니다. 프로젝트 내용·참여인력·파일 경로는 이 요청에 포함하지 않습니다. GitHub 등 접속 대상에는 IP 주소와 일반적인 접속 정보가 전달될 수 있습니다. 앱에서 이 정책이나 지원 링크를 열 때에도 브라우저를 통해 GitHub에 접속합니다. [GitHub 개인정보처리방침](https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement)이 적용됩니다.
+- 공휴일 자동 갱신을 켜면 앱 시작 시와 주기적으로 Google의 공개 한국 공휴일 캘린더를 조회합니다. 임시공휴일·선거일을 포함한 공개 날짜와 이름을 PC에 캐시하며, 프로젝트 내용·참여인력·파일 경로는 이 요청에 포함하지 않습니다. 접속 대상에는 IP 주소와 일반적인 접속 정보가 전달될 수 있습니다. 앱 설정에서 자동 갱신을 끌 수 있으며, [Google 개인정보처리방침](https://policies.google.com/privacy)이 적용됩니다.
 - 사용자가 OneDrive, 다른 동기화·백업 서비스, 네트워크 폴더를 저장 위치로 선택하거나 운영체제 백업을 설정한 경우에는 해당 서비스가 파일을 처리할 수 있습니다. 앱 개발자가 이 서비스를 운영하거나 사용자의 공유 대상을 결정하지 않습니다.
 
 ### 보관, 삭제와 보안
@@ -55,6 +56,8 @@ Mac App Store installations open the Mac App Store updates page without querying
 - Microsoft Store installations check for updates through the Windows Store API and open the Store update interface. Microsoft's installation, update, diagnostic and backup processing is governed by the [Microsoft Privacy Statement](https://privacy.microsoft.com/privacystatement).
 - Legacy EXE and Mac builds check the public GitHub releases API at startup when enabled or on a manual check, and download installers when requested. These requests do not include project contents, team members or file paths. GitHub and other contacted services may receive an IP address and ordinary connection information. Opening this policy or support links also connects the browser to GitHub. The [GitHub Privacy Statement](https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement) applies.
 - Cloud synchronization, operating system backups and network storage chosen or configured by the user may process the saved files under those services' policies. The developer does not operate those services or choose the user's sharing recipients.
+
+Public holiday synchronization, when enabled, periodically fetches Google's public Korean holiday calendar and caches its public dates and names on the PC. Requests contain no project content, participant data, or file paths. Google may receive the IP address and standard connection information. Synchronization can be disabled in App settings; [Google's privacy policy](https://policies.google.com/privacy) applies.
 
 ### Retention, deletion and security
 

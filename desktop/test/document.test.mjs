@@ -93,6 +93,71 @@ function temporary(t) {
   t.after(() => rmSync(root, { recursive: true, force: true }));
   return root;
 }
+
+test('closing clears the session and recovery without modifying project files or restoring on restart', (t) => {
+  const root = temporary(t);
+  const recovery = path.join(root, 'recovery.json');
+  const file = path.join(root, 'Project.pmcanvas');
+  const doc = new DesktopDocument(recovery);
+  doc.create(fixture());
+  doc.save(file);
+  const savedBytes = readFileSync(file);
+  doc.replace({ ...doc.project, description: 'Discarded session changes' }, doc.revision);
+  assert.equal(doc.snapshot().canUndo, true);
+  const before = doc.revision;
+  const closed = doc.close();
+  assert.deepEqual(closed, {
+    project: null,
+    filename: '',
+    dirty: false,
+    revision: before + 1,
+    canUndo: false,
+    canRedo: false,
+  });
+  assert.deepEqual(readFileSync(file), savedBytes);
+  assert.equal(new DesktopDocument(recovery).recovery(), null);
+  doc.open(file);
+  assert.equal(doc.project.description, '');
+  assert.equal(doc.dirty, false);
+});
+
+test('failed close keeps the project, undo history and recovery intact', (t) => {
+  const root = temporary(t);
+  const recovery = path.join(root, 'recovery.json');
+  const doc = new DesktopDocument(recovery);
+  doc.create(fixture());
+  doc.replace({ ...doc.project, description: 'Keep this change' }, doc.revision);
+  const before = doc.snapshot();
+  const bytes = readFileSync(recovery);
+  doc.recoveryFile = root;
+  assert.throws(() => doc.close());
+  assert.deepEqual(doc.snapshot(), before);
+  assert.deepEqual(readFileSync(recovery), bytes);
+});
+
+test('only a fully cleared recovery record represents a deliberately closed project', (t) => {
+  const root = temporary(t);
+  for (const override of [
+    { dirty: true },
+    { file: path.join(root, 'lost.pmcanvas') },
+    { savedHash: 'a'.repeat(64) },
+    { savedProjectHash: 'a'.repeat(64) },
+  ]) {
+    const file = path.join(root, 'recovery-' + Object.keys(override)[0] + '.json');
+    const bytes = JSON.stringify({
+      version: 1,
+      project: null,
+      file: null,
+      savedHash: null,
+      savedProjectHash: null,
+      dirty: false,
+      ...override,
+    });
+    writeFileSync(file, bytes);
+    assert.throws(() => new DesktopDocument(file).recovery(), /복구 파일/);
+    assert.equal(readFileSync(file, 'utf8'), bytes);
+  }
+});
 test('web backup round trip preserves calculations and hierarchy while removing access metadata', () => {
   const project = fixture();
   project._revision = 17;

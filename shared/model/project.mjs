@@ -38,6 +38,7 @@ export function cleanProject(input) {
       description: text(input.description, 300, true),
       demo: input.demo === true,
       holidays: input.holidays ?? [],
+      ...(input.koreanHolidays !== undefined ? { koreanHolidays: input.koreanHolidays } : {}),
       members: input.members.map((m) => ({
         id: id(m.id),
         name: text(m.name, 80),
@@ -137,6 +138,7 @@ export function projectChanges(before, after) {
           name: p.name,
           description: p.description,
           holidays: p.holidays,
+          koreanHolidays: p.koreanHolidays,
           demo: p.demo,
           baseline: p.baseline ?? null,
           staffingHoursPerMM: p.staffing?.hoursPerMM ?? null,

@@ -78,7 +78,9 @@ try {
       'MSIX must reuse the legacy application profile.',
     );
     await page.waitForFunction(
-      () => document.querySelector('#projectName')?.textContent === 'Store 전환 데이터 보존',
+      () =>
+        document.querySelector('[data-project-tab][aria-selected="true"] .project-tab-name')
+          ?.textContent === 'Store 전환 데이터 보존',
     );
     assertUpgradedProject(
       (await page.evaluate(() => window.desktop.snapshot())).project,

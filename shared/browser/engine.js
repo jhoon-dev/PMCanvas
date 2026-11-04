@@ -1,3 +1,4 @@
+import { projectHolidays } from './korean-holidays.js';
 import { businessDate } from './business-clock.js';
 import {
   LIMITS,
@@ -113,7 +114,7 @@ export function capacityCalendar(project) {
         : (changes.get(id) || []).find((r) => r.date > date && r.allocation > 0)?.date,
     totalHours: (id, from, to) =>
       segments(id, from, to).reduce(
-        (n, s) => n + workdays(s.from, s.to, project.holidays) * s.capacity,
+        (n, s) => n + workdays(s.from, s.to, projectHolidays(project)) * s.capacity,
         0,
       ),
   };
@@ -155,7 +156,7 @@ export function orderTasks(tasks) {
   return out;
 }
 export function forecast(project, at) {
-  const h = project.holidays || [],
+  const h = projectHolidays(project),
     index = taskIndex(project),
     calendar = capacityCalendar(project),
     members = new Map(project.members.map((m) => [m.id, m])),
@@ -340,7 +341,7 @@ export function summary(project, at) {
   const tasks = taskLeaves(project),
     total = tasks.reduce((s, t) => s + taskHours(t), 0),
     done = tasks.reduce((s, t) => s + earned(t, at), 0),
-    plan = tasks.reduce((s, t) => s + planned(t, at, project.holidays), 0),
+    plan = tasks.reduce((s, t) => s + planned(t, at, projectHolidays(project)), 0),
     f = forecast(project, at),
     starts = tasks.map((t) => t.start).sort(),
     ends = tasks.map((t) => t.end).sort();
@@ -357,6 +358,8 @@ export function summary(project, at) {
   };
 }
 export function validateProject(p) {
+  if (p?.koreanHolidays !== undefined && typeof p.koreanHolidays !== 'boolean')
+    throw Error('한국 공휴일 설정을 확인해 주세요.');
   const currentDay = today();
   if (
     !p ||

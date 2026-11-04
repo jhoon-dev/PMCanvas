@@ -1,3 +1,4 @@
+import { projectHolidays } from './korean-holidays.js';
 import { taskView, predecessorIds, taskIndex } from './task-model.js';
 import {
   progress,
@@ -85,11 +86,11 @@ export function wbsRows(project, at, forecast, tasks = project.tasks) {
         task.start,
         task.end,
         total,
-        total ? +((planned(task, at, project.holidays) / total) * 100).toFixed(1) : 0,
+        total ? +((planned(task, at, projectHolidays(project)) / total) * 100).toFixed(1) : 0,
         +(actual * 100).toFixed(1),
         ui(actual === 1 ? '완료' : task.end < at ? '지연' : actual > 0 ? '진행 중' : '예정'),
         f?.end || '',
-        f?.end ? Math.max(0, workdays(addDays(task.end, 1), f.end, project.holidays)) : '',
+        f?.end ? Math.max(0, workdays(addDays(task.end, 1), f.end, projectHolidays(project))) : '',
         ui(methods[f?.method] || '계산 대기'),
         predecessorIds(task)
           .map((id) => project.tasks.find((t) => t.id === id)?.name || id)

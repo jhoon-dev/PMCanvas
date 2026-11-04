@@ -1,3 +1,4 @@
+import { Buffer } from 'buffer';
 import { taskView, predecessorIds, taskIndex } from '../browser/task-model.js';
 import { hierarchy, rollups, criticalPath, baselineDiff } from '../browser/planning.js';
 import { ui } from '../browser/i18n.js';

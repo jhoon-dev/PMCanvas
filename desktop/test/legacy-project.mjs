@@ -28,7 +28,10 @@ export function legacyProject(name, baselineName) {
 }
 
 export function assertUpgradedProject(actual, legacy) {
-  assert.deepEqual(actual, { ...cleanProject(legacy), ...(legacy.id ? { id: legacy.id } : {}) });
+  assert.deepEqual(actual, {
+    ...cleanProject(legacy),
+    ...(legacy.id ? { id: legacy.id } : {}),
+  });
   // Independently verify original records and baseline effort, beyond normalized shape.
   assert.deepEqual(
     actual.tasks.flatMap((t) => t.items),

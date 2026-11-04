@@ -1,3 +1,4 @@
+import { projectHolidays } from './korean-holidays.js';
 import {
   addDays,
   daysBetween,
@@ -309,7 +310,7 @@ export function weeklyDraft(
   });
   const total = tasks.reduce((n, t) => n + taskHours(t), 0),
     done = tasks.reduce((n, t) => n + earned(t, to), 0),
-    plan = tasks.reduce((n, t) => n + planned(t, to, project.holidays), 0);
+    plan = tasks.reduce((n, t) => n + planned(t, to, projectHolidays(project)), 0);
   const baselineParents = new Set((project.baseline?.tasks || []).map((t) => t.parentId));
   const base = (project.baseline?.tasks || []).filter((t) => !baselineParents.has(t.id));
   const baseTotal = base.reduce((n, t) => n + t.hours, 0);
@@ -321,15 +322,15 @@ export function weeklyDraft(
         t.hours *
           Math.min(
             1,
-            workdays(t.start, date < t.end ? date : t.end, project.holidays) /
-              Math.max(1, workdays(t.start, t.end, project.holidays)),
+            workdays(t.start, date < t.end ? date : t.end, projectHolidays(project)) /
+              Math.max(1, workdays(t.start, t.end, projectHolidays(project))),
           ),
       0,
     );
     return {
       date,
       planned: total
-        ? tasks.reduce((n, t) => n + planned(t, date, project.holidays), 0) / total
+        ? tasks.reduce((n, t) => n + planned(t, date, projectHolidays(project)), 0) / total
         : 0,
       actual: total ? tasks.reduce((n, t) => n + earned(t, date), 0) / total : 0,
       baseline: baseTotal ? baseline / baseTotal : null,
@@ -402,7 +403,9 @@ export function monthlyPlan(project, month) {
       .filter((t) => t.owner === m.id)
       .reduce(
         (n, t) =>
-          n + planned(t, to, project.holidays) - planned(t, addDays(from, -1), project.holidays),
+          n +
+          planned(t, to, projectHolidays(project)) -
+          planned(t, addDays(from, -1), projectHolidays(project)),
         0,
       );
     return {

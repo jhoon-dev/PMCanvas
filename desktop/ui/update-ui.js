@@ -104,7 +104,6 @@ export function createUpdateUI({ api, root = document, ui, settings = {}, onOpen
       render({ ...value, status: 'error', error: 'check' });
     }
   }
-  $('#closeUpdate').onclick = () => $('#updateDialog').close();
   $('#checkUpdates').onclick = () => {
     void check();
   };
@@ -150,11 +149,12 @@ export function createUpdateUI({ api, root = document, ui, settings = {}, onOpen
   api.onUpdate?.(render);
   render();
   return {
+    pending: () => saving || applying,
     async initialise() {
       if (api.updateState) render(await api.updateState());
     },
     async open(checkNow = false) {
-      if (!$('#updateDialog').open) $('#updateDialog').showModal();
+      render();
       if (checkNow) await check();
     },
   };

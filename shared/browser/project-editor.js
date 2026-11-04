@@ -1,3 +1,5 @@
+import { uid as projectUid } from './id.js';
+import { projectHolidays } from './korean-holidays.js';
 import { detachManagementLinks } from './management.js';
 import { summaryIds, normalizeTaskModel, predecessorIds, setPredecessors } from './task-model.js';
 import { ui } from './i18n.js';
@@ -27,18 +29,24 @@ export function editorForm(
   type,
   p,
   id = '',
-  {
-    currentDate = today(),
-    uid = () => crypto.randomUUID(),
-    extraFields = '',
-    expandDetails = false,
-  } = {},
+  { currentDate = today(), uid = projectUid, extraFields = '', expandDetails = false } = {},
 ) {
   let body = '',
     title = '';
   if (type === 'project' || type === 'settings') {
     title = type === 'project' ? ui('새 프로젝트') : ui('프로젝트 설정');
     body =
+      '<label class="field">' +
+      ui('한국 공휴일 자동 반영') +
+      '<select name="koreanHolidays"><option value="true" ' +
+      (type === 'project' || p.koreanHolidays === true ? 'selected' : '') +
+      '>' +
+      ui('사용') +
+      '</option><option value="false" ' +
+      (type !== 'project' && p.koreanHolidays !== true ? 'selected' : '') +
+      '>' +
+      ui('사용 안 함') +
+      '</option></select></label>' +
       field(
         ui('프로젝트명'),
         'name',
@@ -65,8 +73,8 @@ export function editorForm(
     const t = p.tasks.find((x) => x.id === id) || {
       name: '',
       owner: p.members[0]?.id || '',
-      start: nextWorkday(currentDate, p.holidays),
-      end: shiftWorkday(nextWorkday(currentDate, p.holidays), 4, p.holidays),
+      start: nextWorkday(currentDate, projectHolidays(p)),
+      end: shiftWorkday(nextWorkday(currentDate, projectHolidays(p)), 4, projectHolidays(p)),
       phase: '개발',
       predecessor: '',
       items: [{ id: uid(), title: '', hours: 4, doneDate: null }],
@@ -171,7 +179,7 @@ export function applyEditor(
   editor,
   f,
   items = [],
-  { currentDate = today(), uid = () => crypto.randomUUID() } = {},
+  { currentDate = today(), uid = projectUid } = {},
 ) {
   const value = (n) => String(f.get(n) || '').trim();
   let target = structuredClone(p),
@@ -198,6 +206,7 @@ export function applyEditor(
         members: [],
         tasks: [],
       };
+      if (f.has('koreanHolidays')) target.koreanHolidays = value('koreanHolidays') === 'true';
       validateProject(target);
       created = true;
       message = ui('새 프로젝트를 만들었습니다. 참여인력부터 추가해 보세요.');
@@ -205,6 +214,7 @@ export function applyEditor(
       target.name = value('name');
       target.description = value('description');
       target.holidays = holidays;
+      if (f.has('koreanHolidays')) target.koreanHolidays = value('koreanHolidays') === 'true';
       validateProject(target);
     }
   } else if (editor.type === 'member') {
@@ -261,7 +271,7 @@ export function createProjectEditor({
   currentDate = today,
   document = globalThis.document,
   confirm = globalThis.confirm,
-  uid = () => crypto.randomUUID(),
+  uid = projectUid,
 }) {
   const $ = (s) => document.querySelector(s),
     currentDay = () => (typeof currentDate === 'function' ? currentDate() : currentDate);

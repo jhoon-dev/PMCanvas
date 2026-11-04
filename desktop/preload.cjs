@@ -8,8 +8,22 @@ contextBridge.exposeInMainWorld(
   'desktop',
   Object.freeze({
     snapshot: () => call('snapshot'),
+    dialogsReady: () => call('dialogsReady'),
+    respondDialog: (id, response) => call('dialogResponse', id, response),
+    onDialog: (callback) => {
+      ipcRenderer.on('desktop:dialog', (_event, request) => callback(request));
+    },
     setLanguage: (language) => call('language', language),
     settings: () => call('settings'),
+    navigationContext: (value) => call('navigationContext', value),
+    holidayState: () => call('holidayState'),
+    refreshHolidays: (force = true) => call('refreshHolidays', force),
+    setHolidayPreference: (enabled) => call('holidayPreference', enabled),
+    onHolidayCalendar: (callback) => {
+      const listener = (_event, value) => callback(value);
+      ipcRenderer.on('desktop:holidayCalendar', listener);
+      return () => ipcRenderer.removeListener('desktop:holidayCalendar', listener);
+    },
     setTimeZone: (value) => call('timeZone', value),
     info: () => call('info'),
     checkUpdates: () => call('updates'),
@@ -22,8 +36,10 @@ contextBridge.exposeInMainWorld(
     replace: (project, revision) => call('replace', project, revision),
     undo: (revision) => call('undo', revision),
     redo: (revision) => call('redo', revision),
-    newProject: () => call('new'),
+    newProject: (project) => call('new', project),
     open: () => call('open'),
+    closeProject: (id) => call('close', id),
+    activateTab: (id) => call('activateTab', id),
     save: () => call('save', false),
     saveAs: () => call('save', true),
     exportWeb: () => call('exportWeb'),

@@ -53,23 +53,7 @@
         ></a
       >
       <div class="side-label">WORKSPACE</div>
-      <nav aria-label="주 메뉴">
-        <button data-view="overview" class="nav-item active">
-          <span data-icon="dashboard"></span>프로젝트 한눈에</button
-        ><button data-view="tasks" class="nav-item">
-          <span data-icon="layers"></span>업무 · 일정<span
-            id="taskNavCount"
-            class="nav-count"
-          ></span></button
-        ><button data-view="daily" class="nav-item">
-          <span data-icon="check"></span>내 업무<span class="small-dot"></span></button
-        ><button data-view="people" class="nav-item">
-          <span data-icon="users"></span>참여인력
-        </button>
-        <button data-view="management" class="nav-item">
-          <span data-icon="calendar"></span>이슈 · 보고
-        </button>
-      </nav>
+      <nav id="projectNavigation" aria-label="현재 프로젝트 메뉴"></nav>
       <div class="side-line"></div>
       <div class="side-label">
         내 프로젝트
@@ -124,6 +108,9 @@
         </div>
       </header>
       <a class="skip-link" href="#main">본문으로 건너뛰기</a>
+      <label class="compact-navigation"
+        >화면 이동<select id="viewSelect" aria-label="화면 이동"></select
+      ></label>
       <main id="main" tabindex="-1"></main>
       <footer>
         <span>작은 체크가 모여, 프로젝트의 다음이 보입니다.</span

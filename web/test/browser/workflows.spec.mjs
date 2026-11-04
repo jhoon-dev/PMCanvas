@@ -133,7 +133,9 @@ async function selectProject(page, p, view = 'tasks') {
   if (await page.locator('#projectSelect').isVisible())
     await page.locator('#projectSelect').selectOption(p.id);
   else await page.locator('#projectList [data-project="' + p.id + '"]').click();
-  await page.locator('[data-view="' + view + '"]').click();
+  if (await page.locator('#viewSelect').isVisible())
+    await page.locator('#viewSelect').selectOption(view);
+  else await page.locator('[data-view="' + view + '"]').click();
 }
 
 test('계층 WBS 위로 이동은 하위 묶음과 함께 표시 순서를 바꾸고 서버에 보존', async ({ page }) => {
@@ -791,7 +793,7 @@ test('영어 UI·언어 유지·사용자 데이터 보존·미저장 언어 전
     });
   await selectProject(page, p);
   await expect(page.locator('[data-cell=name]')).toHaveValue('완료');
-  await expect(page.locator('#main h1')).toHaveText('Tasks and schedule');
+  await expect(page.locator('#main h1')).toHaveText('Tasks · Schedule');
   await expect(page.getByRole('textbox', { name: 'Row 1 Task name', exact: true })).toBeVisible();
   await page.screenshot({ path: '.playwright-mcp/v0.20.0/english.png' });
   await page.locator('[data-cell=name]').fill('바꾼 이름');
@@ -1121,9 +1123,10 @@ test('투입 계획을 저장·재조회하면 대시보드·인력·M/M에 반�
         },
       ],
     });
-  await selectProject(page, p, 'management');
+  await selectProject(page, p, 'resources');
   const host = page.locator('#pmManagement'),
     form = host.locator('[data-pm-form=staffing]');
+  await host.locator('[data-management-pane=add]').click();
   await form.locator('[name=start]').fill('2026-11-02');
   await form.locator('[name=end]').fill('2026-11-30');
   await form.locator('[name=allocation]').fill('25');
@@ -1140,7 +1143,7 @@ test('투입 계획을 저장·재조회하면 대시보드·인력·M/M에 반�
   await page.locator('[data-view=people]').click();
   await expect(page.locator('.member-stats')).toContainText('25');
   await expect(page.locator('.member-stats')).toContainText('2h');
-  await selectProject(page, p, 'management');
+  await selectProject(page, p, 'resources');
   await host.locator('[data-pm-remove-assignment]').click();
   await expect(host.locator('[data-pm-remove-assignment]')).toHaveCount(0);
   await expect(host.locator('#pmPlanResult tbody tr td').nth(4)).toHaveText('기본 투입률로 추정');
@@ -1161,19 +1164,18 @@ test('PM 관리: 마일스톤·이슈·투입 계획·주간보고 발행과 불
   await page.clock.setFixedTime(new Date('2026-11-03T08:00:00Z'));
   const session = await login(page),
     p = await createProject(page, session, { name: 'PM 관리 검증' });
-  await selectProject(page, p, 'management');
+  await selectProject(page, p, 'milestones');
   const host = page.locator('#pmManagement');
   const milestone = host.locator('[data-pm-form=milestone]').first();
-  await milestone.locator('xpath=ancestor::details[1]').locator('summary').first().click();
+  await host.locator('[data-management-pane=add]').click();
   await milestone.locator('[name=name]').fill('서비스 오픈');
   await milestone.locator('[name=start]').fill('2026-11-06');
   await milestone.locator('[name=owner]').selectOption(p.members[0].id);
   await milestone.locator('button[type=submit]').click();
   await expect(host).toContainText('서비스 오픈');
-  let weekly = host.locator('[data-pm-form=weekly]');
-  await weekly.locator('[name=notes]').fill('다른 양식을 저장해도 보존할 금주 설명');
+  await page.locator('[data-view=management]').click();
+  await host.locator('[data-management-pane=add]').click();
   let risk = host.locator('[data-pm-form=issue]').first();
-  await risk.locator('xpath=ancestor::details[1]').locator('summary').first().click();
   await risk.locator('[name=title]').fill('외부 API 검토');
   await risk.locator('[name=type]').selectOption('risk');
   await risk.locator('[name=impact]').selectOption('high');
@@ -1181,7 +1183,9 @@ test('PM 관리: 마일스톤·이슈·투입 계획·주간보고 발행과 불
   await risk.locator('[name=taskId]').selectOption(p.tasks[0].id);
   await risk.locator('[name=action]').fill('계약 확인');
   await risk.locator('button[type=submit]').click();
-  await expect(weekly.locator('[name=notes]')).toHaveValue('다른 양식을 저장해도 보존할 금주 설명');
+  await expect(host).toContainText('외부 API 검토');
+  await page.locator('[data-view=resources]').click();
+  await host.locator('[data-management-pane=add]').click();
   const staffing = host.locator('[data-pm-form=staffing]');
   await staffing.locator('[name=memberId]').selectOption(p.members[0].id);
   await staffing.locator('[name=start]').fill('2026-11-02');
@@ -1189,7 +1193,10 @@ test('PM 관리: 마일스톤·이슈·투입 계획·주간보고 발행과 불
   await staffing.locator('[name=allocation]').fill('50');
   await staffing.locator('button[type=submit]').click();
   await expect(host.locator('#pmPlanResult')).toContainText('20');
-  await expect(weekly.locator('[name=notes]')).toHaveValue('다른 양식을 저장해도 보존할 금주 설명');
+  await page.locator('[data-view=weekly]').click();
+  await host.locator('[data-management-pane=add]').click();
+  const weekly = host.locator('[data-pm-form=weekly]');
+  await weekly.locator('[name=notes]').fill('금주 설명');
   await weekly.locator('[name=from]').fill('2026-10-26');
   await weekly.locator('[name=to]').fill('2026-10-30');
   await weekly.locator('[name=nextNotes]').fill('차주 계획');
@@ -1201,8 +1208,8 @@ test('PM 관리: 마일스톤·이슈·투입 계획·주간보고 발행과 불
   expect(stored.weeklyReports).toHaveLength(1);
   expect(stored.tasks.find((t) => t.name === '서비스 오픈').kind).toBe('milestone');
   const snapshot = structuredClone(stored.weeklyReports[0]);
-  const report = host.locator('[data-pm-report]');
-  await report.locator('summary').click();
+  await host.locator('[data-management-pane=report]').click();
+  const report = host;
   await expect(report).toContainText('외부 API 검토');
   const download = page.waitForEvent('download');
   await report.locator('[data-pm-export]').click();
@@ -1301,4 +1308,51 @@ test('모바일 내 업무에서 오늘 완료를 바로 저장하고 동시 수
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   );
+});
+
+test('공통 메뉴: 모든 화면 직접 이동·현재 위치·좁은 화면·미저장 입력 보호', async ({ page }) => {
+  const session = await login(page);
+  const p = await createProject(page, session, { name: '공통 탐색 구조' });
+  await selectProject(page, p, 'overview');
+  for (const [id, title] of Object.entries({
+    overview: '프로젝트 현황',
+    tasks: '업무 · 일정',
+    milestones: '마일스톤',
+    daily: '완료 체크',
+    people: '참여인력',
+    resources: '투입 계획',
+    management: '이슈 · 리스크',
+    reports: '업무 · 완료 기록',
+    weekly: '주간보고',
+  })) {
+    await page.locator('[data-view="' + id + '"]').click();
+    await expect(page.locator('#main .page-head h1')).toHaveText(title);
+    await expect(page.locator('#projectNavigation [aria-current="page"]')).toHaveCount(1);
+    await expect(page.locator('#pmManagement details')).toHaveCount(0);
+    await expect(page.locator('#pmManagement form')).toHaveCount(0);
+  }
+  await page.locator('[data-view=management]').click();
+  await page.locator('[data-management-pane=add]').first().click();
+  await page.locator('[data-pm-form=issue] [name=title]').fill('보존할 입력');
+  await page.locator('[data-view=management]').click();
+  await expect(page.locator('[data-pm-form=issue] [name=title]')).toHaveValue('보존할 입력');
+  page.once('dialog', (dialog) => dialog.dismiss());
+  await page.locator('[data-view=resources]').click();
+  await expect(page.locator('[data-pm-form=issue] [name=title]')).toHaveValue('보존할 입력');
+  await page.setViewportSize({ width: 390, height: 844 });
+  page.once('dialog', (dialog) => dialog.dismiss());
+  await page.locator('#viewSelect').selectOption('reports');
+  await expect(page.locator('#viewSelect')).toHaveValue('management');
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.locator('#viewSelect').selectOption('reports');
+  await expect(page.locator('#main h1')).toHaveText('업무 · 완료 기록');
+  await expect(page.locator('#reportHistory')).toBeVisible();
+  await page.locator('#historyOwner').selectOption(p.members[0].id);
+  await page.reload();
+  await expect(page.locator('#main h1')).toHaveText('업무 · 완료 기록');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({
+    path: test.info().outputPath('navigation-reports-phone.png'),
+    fullPage: true,
+  });
 });

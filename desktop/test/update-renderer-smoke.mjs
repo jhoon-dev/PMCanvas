@@ -43,8 +43,9 @@ try {
           async openRelease(){window.calls.pages++}
         };
         window.updateUI=createUpdateUI({api:window.api,ui,settings:{checkUpdatesOnStart:localStorage.getItem('test.update-auto')!=='false'},
-          onOpen:()=>window.updateUI.open(),onError:error=>{document.querySelector('#toast').textContent=error.message;document.querySelector('#toast').hidden=false}});
-        document.querySelector('[data-command="appSettings"]').onclick=()=>window.updateUI.open();
+          onOpen:()=>window.openTestSettings(),onError:error=>{document.querySelector('#toast').textContent=error.message;document.querySelector('#toast').hidden=false}});
+        window.openTestSettings=()=>{document.querySelector('#settingsHeader').hidden=false;document.querySelector('#settingsPage').hidden=false;document.querySelector('#content').hidden=true;return window.updateUI.open();};
+        document.querySelector('#settingsBack').onclick=()=>{document.querySelector('#settingsHeader').hidden=true;document.querySelector('#settingsPage').hidden=true;document.querySelector('#content').hidden=false;};
         await window.updateUI.initialise(); window.updateReady=true;
       `,
       });
@@ -66,7 +67,7 @@ try {
   await page.goto('https://desktop.test/index.html');
   await page.waitForFunction(() => window.updateReady);
   assert.equal(await page.locator('#updateNotice').isVisible(), false);
-  assert.equal(await page.locator('#updateDialog').evaluate((dialog) => dialog.open), false);
+  assert.equal(await page.locator('#settingsPage').isVisible(), false);
   await page.evaluate(() => {
     document.querySelector('#dialogBody').innerHTML =
       '<input id="draftName" value="작업 중인 입력">';
@@ -82,7 +83,7 @@ try {
   });
   assert.equal(await page.locator('#editorDialog').evaluate((dialog) => dialog.open), true);
   assert.equal(await page.locator('#draftName').inputValue(), '작업 중인 입력');
-  assert.equal(await page.locator('#updateDialog').evaluate((dialog) => dialog.open), false);
+  assert.equal(await page.locator('#settingsPage').isVisible(), false);
   assert.deepEqual(await page.evaluate(() => window.calls), {
     checks: 0,
     downloads: 0,
@@ -146,7 +147,7 @@ try {
     path: 'test-results/desktop-update-settings-compact.png',
     fullPage: true,
   });
-  await page.locator('#closeUpdate').click();
+  await page.locator('#settingsBack').click();
   await page.evaluate(() =>
     window.publishUpdate({
       ...window.update,
@@ -157,8 +158,7 @@ try {
       version: null,
     }),
   );
-  await page.locator('details.action-menu summary').click();
-  await page.getByRole('button', { name: '앱 설정', exact: true }).click();
+  await page.evaluate(() => window.openTestSettings());
   assert.equal(await page.locator('#openRelease').isVisible(), false);
   assert.equal(await page.locator('#installUpdate').textContent(), 'Microsoft Store에서 업데이트');
   await page.locator('#installUpdate').click();
@@ -180,14 +180,13 @@ try {
   await page
     .getByText('Mac App Store에서 업데이트를 확인할 수 있습니다.', { exact: true })
     .waitFor();
-  await page.locator('#closeUpdate').click();
+  await page.locator('#settingsBack').click();
   await page.evaluate(() => {
     localStorage.setItem('pmcanvas.language', 'en');
   });
   await page.reload();
   await page.waitForFunction(() => window.updateReady);
-  await page.locator('details.action-menu summary').click();
-  await page.getByRole('button', { name: 'App settings', exact: true }).click();
+  await page.evaluate(() => window.openTestSettings());
   assert.equal(await page.locator('#autoCheckUpdates').isChecked(), false);
   await page.evaluate(() => {
     window.offline = true;

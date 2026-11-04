@@ -67,7 +67,7 @@ export function scheduleForm(project, id = '') {
         '<p class="form-hint">완료 기록·공수·기준 계획은 보존합니다. 이동 후 근무일이 없는 일정은 적용할 수 없습니다. 후속 일정은 달력상 기간을 유지하며 뒤로 조정합니다.</p>',
       ) +
       ui(
-        '<button class="button" type="button" id="previewSchedule">일정 변경 미리보기</button><div id="schedulePreview" aria-live="polite"></div>',
+        '<button class="button" type="button" id="previewSchedule">일정 변경 미리보기</button><p id="scheduleApplyHint" class="form-hint" role="status">일정 변경을 미리 본 뒤 적용할 수 있습니다.</p><div id="schedulePreview" aria-live="polite"></div>',
       ),
   };
 }

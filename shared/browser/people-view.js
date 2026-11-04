@@ -2,7 +2,7 @@ import { ui } from './i18n.js';
 import { escapeHtml as esc } from './html.js';
 import { taskHours, earned, validateProject } from './engine.js';
 import { pageHead, btn, icon, avatar, num, pct, meter, empty, field } from './view-ui.js';
-export function peopleView(p, s, asOf) {
+export function peopleView(p, s, asOf, { controls = '' } = {}) {
   return (
     pageHead(
       'PROJECT TEAM',
@@ -10,6 +10,7 @@ export function peopleView(p, s, asOf) {
       ui('누가 어떤 일을 맡고 있는지, 투입 현황을 함께 확인하세요.'),
       btn(ui('＋ 참여인력 추가'), 'member', 'primary'),
     ) +
+    controls +
     '<div class="notice">' +
     icon('users') +
     ui(

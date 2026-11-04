@@ -2,7 +2,7 @@ import { normalizeTaskModel } from './task-model.js';
 import { ui } from './i18n.js';
 import { getLanguage } from './i18n.js';
 import { escapeHtml as esc } from './html.js';
-import { num } from './view-ui.js';
+import { num, pageHead, dateToolbar } from './view-ui.js';
 import { today, addDays, summary, validateProject } from './engine.js';
 import { csvText, wbsRows, completionRecords, completionRows } from './reports.js';
 import { backupPendingCells } from './wbs-model.js';
@@ -185,7 +185,9 @@ export function createReportUi({
   };
 
   // Reports use the same task data and calculation results as the dashboard.
-  let historyQuery;
+  let historyQuery,
+    historyProjectId,
+    historyHost = '#infoBody';
   function downloadReport(rows, label) {
     const blob = new Blob([csvText(rows)], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob),
@@ -210,7 +212,30 @@ export function createReportUi({
       'WBS-' + getDate(),
     );
   }
+  function reportScreen() {
+    historyHost = '#reportHistory';
+    if (!historyQuery || historyProjectId !== project().id || historyQuery.to > getDate())
+      historyQuery = { from: addDays(getDate(), -13), to: getDate(), owner: '' };
+    historyProjectId = project().id;
+    return (
+      pageHead(
+        'REPORTS',
+        ui('업무 · 완료 기록'),
+        ui('기준일별 업무 현황과 기간별 완료 기록을 확인하세요.'),
+        '',
+      ) +
+      dateToolbar(getDate()) +
+      ui(
+        '<section class="panel report-screen-panel"><div class="panel-head"><h2>업무 현황</h2></div><p>보고 기준일까지의 업무와 진척률을 파일로 저장합니다.</p><div class="head-actions"><button class="button" data-action="export-excel">Excel 내보내기</button><button class="button" data-action="export-wbs">CSV 출력</button></div></section><section class="panel report-screen-panel"><div class="panel-head"><h2>완료 기록</h2></div>',
+      ) +
+      '<div id="reportHistory">' +
+      historyBody(project(), historyQuery, getDate()) +
+      '</div></section>'
+    );
+  }
   function openHistory() {
+    historyHost = '#infoBody';
+    historyProjectId = project().id;
     historyQuery = { from: addDays(getDate(), -13), to: getDate(), owner: getOwner() };
     openInfo(ui('일자별 완료 내역'), '');
     $('#infoDialog').classList.add('report-dialog');
@@ -218,7 +243,7 @@ export function createReportUi({
   }
   function renderHistory() {
     const body = historyBody(project(), historyQuery, getDate());
-    $('#infoBody').innerHTML = body;
+    $(historyHost).innerHTML = body;
   }
   function exportHistory() {
     downloadReport(
@@ -226,7 +251,7 @@ export function createReportUi({
       ui('완료내역-') + historyQuery.from + '_' + historyQuery.to,
     );
   }
-  $('#infoBody').addEventListener('change', (e) => {
+  const changeHistory = (e) => {
     if (!['historyFrom', 'historyTo', 'historyOwner'].includes(e.target.id)) return;
     const next = {
       from: $('#historyFrom').value,
@@ -242,7 +267,9 @@ export function createReportUi({
       toast(ui(error.message));
       renderHistory();
     }
-  });
+  };
+  $('#infoBody').addEventListener('change', changeHistory);
+  $('#main')?.addEventListener('change', changeHistory);
 
   let exportingExcel = false;
   async function exportExcel() {
@@ -289,5 +316,11 @@ export function createReportUi({
     }
   }
 
-  return { wbs: exportWbs, excel: exportExcel, history: openHistory, historyCsv: exportHistory };
+  return {
+    wbs: exportWbs,
+    excel: exportExcel,
+    history: openHistory,
+    historyCsv: exportHistory,
+    screen: reportScreen,
+  };
 }
