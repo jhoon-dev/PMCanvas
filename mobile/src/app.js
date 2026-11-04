@@ -368,8 +368,11 @@ function openEditor(type, id = '') {
   $('#editor').showModal();
   $('#editorBody').scrollTop = 0;
   initialEditorFields = editorFields();
-  // Native WebViews respect the user's keyboard gesture on the triggering click.
-  $('#editorBody').querySelector('input,textarea,select')?.focus();
+  // On iOS, focusing a select while the dialog opens can retain its native
+  // input session and swallow the next text-field tap. Let the user focus the
+  // desired field after the sheet has opened.
+  if (Capacitor.getPlatform() !== 'ios')
+    $('#editorBody').querySelector('input,textarea,select')?.focus();
 }
 function editorFields() {
   return JSON.stringify([

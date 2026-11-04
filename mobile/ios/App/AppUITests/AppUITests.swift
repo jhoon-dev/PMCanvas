@@ -27,15 +27,18 @@ final class AppUITests: XCTestCase {
     }
 
     private func enter(_ text: String, in field: XCUIElement, app: XCUIApplication) {
-        XCTAssertTrue(field.waitForExistence(timeout: 10))
+        XCTAssertTrue(field.wait(for: \.isHittable, toEqual: true, timeout: 10))
         field.tap()
-        // A second tap during the bottom sheet's keyboard resize can land on
-        // a keyboard key (for example inserting W before the intended text).
-        // Keep the focus from the first tap; typeText re-resolves the field.
-        _ = app.keyboards.firstMatch.waitForExistence(timeout: 5)
+        let keyboard = app.keyboards.firstMatch
+        // Allow the software keyboard's resize to settle. An attached hardware
+        // keyboard (including iPad's input assistant) has no Keyboard element;
+        // native typeText still verifies that a first responder accepts input.
+        _ = keyboard.waitForExistence(timeout: 5)
         // A single rapid key sequence can outrun WKWebView on shared CI hosts.
         // Let XCTest idle between characters, then commit the keyboard input.
-        for character in text { field.typeText(String(character)) }
+        // Send keys to the application's native first responder. Re-resolving a
+        // WKWebView field for every character can lose its native focus snapshot.
+        for character in text { app.typeText(String(character)) }
         dismissKeyboard(app)
         let committed = XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "value == %@", text), object: field
@@ -62,19 +65,19 @@ final class AppUITests: XCTestCase {
         app.launch()
         let web = app.webViews.firstMatch
         let create = web.buttons["＋ 새 프로젝트"]
-        XCTAssertTrue(create.waitForExistence(timeout: 120), "Bundled Store screen did not load")
+        XCTAssertTrue(create.wait(for: \.isHittable, toEqual: true, timeout: 120), "Bundled Store screen did not load")
         web.buttons["개인정보처리방침"].tap()
-        XCTAssertTrue(web.staticTexts["기기에 보관하는 정보"].waitForExistence(timeout: 10))
+        XCTAssertTrue(web.staticTexts["기기에 보관하는 정보"].waitForExistence(timeout: 20))
         web.buttons["개인정보처리방침 닫기"].tap()
         create.tap()
         let projectName = "Autumn Release Plan"
-        let name = web.textFields.firstMatch
+        let name = web.textFields["프로젝트명"]
         XCTAssertTrue(name.waitForExistence(timeout: 10))
         enter(projectName, in: name, app: app)
         web.buttons["저장"].tap()
         XCTAssertTrue(web.staticTexts[projectName].waitForExistence(timeout: 10))
 
-        web.links["더보기"].tap()
+        web.links["인력"].tap()
         web.buttons["＋ 추가"].tap()
         let person = web.textFields["이름"]
         XCTAssertTrue(person.waitForExistence(timeout: 5))
@@ -106,7 +109,7 @@ final class AppUITests: XCTestCase {
         web.links["현황"].tap()
         XCTAssertTrue(web.staticTexts["33%"].waitForExistence(timeout: 10))
         keepStoreScreenshot(app, "overview")
-        web.links["더보기"].tap()
+        web.links["인력"].tap()
         keepStoreScreenshot(app, "people")
 
         app.terminate(); app.launch()
@@ -119,25 +122,19 @@ final class AppUITests: XCTestCase {
     func testProjectSurvivesRelaunchAndPolicyIsAvailableOffline() {
         continueAfterFailure = false
         let app = XCUIApplication()
+        storeApp = app
         app.launch()
         let web = app.webViews.firstMatch
         let create = web.buttons["＋ 새 프로젝트"]
-        XCTAssertTrue(create.waitForExistence(timeout: 30), "Bundled iPhone screen did not load")
+        XCTAssertTrue(create.wait(for: \.isHittable, toEqual: true, timeout: 120), "Bundled iPhone screen did not load")
 
         web.buttons["개인정보처리방침"].tap()
-        XCTAssertTrue(web.staticTexts["기기에 보관하는 정보"].waitForExistence(timeout: 5))
+        XCTAssertTrue(web.staticTexts["기기에 보관하는 정보"].waitForExistence(timeout: 20))
         web.buttons["개인정보처리방침 닫기"].tap()
 
         create.tap()
-        let name = web.textFields.firstMatch
-        XCTAssertTrue(name.waitForExistence(timeout: 5))
-        name.tap()
-        name.typeText("iPhone persistence check")
-        // WKWebView's accessory toolbar covers the form actions while typing.
-        // Dismiss it through the same native Done control available to users.
-        let keyboardDone = app.toolbars.buttons["Done"]
-        XCTAssertTrue(keyboardDone.waitForExistence(timeout: 5))
-        keyboardDone.tap()
+        let name = web.textFields["프로젝트명"]
+        enter("iPhone persistence check", in: name, app: app)
         web.buttons["저장"].tap()
         XCTAssertTrue(web.staticTexts["iPhone persistence check"].waitForExistence(timeout: 10), app.debugDescription)
 
