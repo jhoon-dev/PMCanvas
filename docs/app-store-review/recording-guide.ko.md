@@ -4,10 +4,10 @@
 
 ## 설치할 TestFlight 빌드
 
-| 기기        | 앱 버전 (빌드)   | 내부 그룹            |
-| ----------- | ---------------- | -------------------- |
-| iPhone·iPad | **0.1.0 (20.1)** | PM Canvas Release QA |
-| Mac         | **0.8.3 (60)**   | PM Canvas Release QA |
+| 기기        | 앱 버전 (빌드)      | 내부 그룹                              |
+| ----------- | ------------------- | -------------------------------------- |
+| iPhone·iPad | **0.1.0 (20.1)**    | PM Canvas Release QA                   |
+| Mac         | 현재 데스크톱 1.9.0 | 현재 버전 TestFlight 빌드 준비 후 검증 |
 
 초대받은 개발자 Apple 계정으로 각 기기의 TestFlight에서 초대를 수락하고 PM Canvas를 설치합니다. iPhone·iPad는 같은 iOS 빌드입니다. TestFlight의 앱 상세 화면에서 실제 버전·빌드 번호를 확인하세요. 다른 빌드가 표시되면 먼저 알려주세요. 새 ID의 앱은 이전 앱과 별개이므로, 이전 앱을 삭제하지 않고 기존 프로젝트가 필요할 때만 파일로 내보내 가져옵니다.
 
@@ -63,9 +63,9 @@ Mac은 실물 Mac의 TestFlight 설치본으로 촬영합니다. 기존 iOS 요�
 
 ## 전달할 결과와 메모 마무리
 
-영상 파일은 `PMCanvas-iPhone-0.1.0-20.1-YYYYMMDD.mov`, `PMCanvas-iPad-0.1.0-20.1-YYYYMMDD.mov`, `PMCanvas-Mac-0.8.3-60-YYYYMMDD.mov`처럼 구분합니다. 기기가 만든 원본 확장자 `.mp4`도 유지해도 됩니다. 결과표에 실제 기기·OS·날짜·성공/실패·영상 파일명을 적습니다.
+영상 파일은 `PMCanvas-iPhone-0.1.0-20.1-YYYYMMDD.mov`, `PMCanvas-iPad-0.1.0-20.1-YYYYMMDD.mov`, `PMCanvas-Mac-1.9.0-BUILD-YYYYMMDD.mov`처럼 구분합니다. 기기가 만든 원본 확장자 `.mp4`도 유지해도 됩니다. 결과표에 실제 기기·OS·날짜·성공/실패·영상 파일명을 적습니다.
 
-[iOS 영문 심사 메모](ios-review-notes.txt)와 [Mac 영문 심사 메모](macos-review-notes.txt)는 이전 요청 1~6번에 대응합니다. 현재 1번의 `[PENDING]`은 실제 결과·영상 링크로 교체해야 합니다. 실제 테스트를 마친 뒤 준비 중 문구를 제거하고, 제출 빌드와 영상 빌드가 같은지 확인합니다. 메모는 각각 4,000자 이내로 유지합니다.
+[iOS 영문 심사 메모](ios-review-notes.txt)는 이전 iOS 요청 1~6번에 대응합니다. Mac은 현재 버전의 실제 검증 결과로 새 심사 메모를 작성합니다. 현재 1번의 `[PENDING]`은 실제 결과·영상 링크로 교체해야 합니다. 실제 테스트를 마친 뒤 준비 중 문구를 제거하고, 제출 빌드와 영상 빌드가 같은지 확인합니다. 메모는 각각 4,000자 이내로 유지합니다.
 
 Apple 심사 첨부가 영상 형식·크기를 지원하면 첨부하고, 그렇지 않으면 로그인이나 접근 승인 없이 심사자가 재생할 수 있는 링크를 제공합니다. 링크 재생을 확인한 다음 메모에 넣습니다. 현재 심사 제출 단계는 실물 QA·영상 확보 후입니다.
 
@@ -76,4 +76,4 @@ Apple 심사 첨부가 영상 형식·크기를 지원하면 첨부하고, 그�
 - [Apple: 내부 TestFlight 테스터](https://developer.apple.com/help/app-store-connect/test-a-beta-version/add-internal-testers/)
 - [Apple: iPhone·iPad 화면 기록](https://support.apple.com/en-us/102653)
 - [Apple: Mac 화면 기록](https://support.apple.com/en-us/102618)
-- [iOS 서명·업로드 성공](https://github.com/jhoon-dev/PMCanvas/actions/runs/41296552107), [Mac 서명·업로드 성공](https://github.com/jhoon-dev/PMCanvas/actions/runs/41293690010)
+- [iOS 서명·업로드 성공](https://github.com/jhoon-dev/PMCanvas/actions/runs/41296552107)

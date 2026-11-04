@@ -6,7 +6,7 @@
 
 Windows는 **Microsoft Store MSIX만 배포**합니다. `npm run dist:win`으로 만든 제출용 MSIX는 Partner Center에 제출하며, 사용자는 Microsoft Store가 서명한 패키지를 설치합니다. 제출 전 unsigned MSIX를 사용자 다운로드로 공개하지 않습니다. [Windows Store 절차](WINDOWS-STORE.md)를 따르세요.
 
-EXE 공개 배포와 모든 플랫폼의 무서명 설치 파일 공개는 종료했습니다. 기존 무서명 데스크톱 릴리스 0.7.1·0.7.2·0.8.0·0.8.1·0.8.2는 공개 배포를 해제했습니다. EXE 배포·무서명 배포용 npm 명령과 CI 작업을 제거했으며, 게시 스크립트와 CI 계획 검사는 이전 실행의 재시도에서도 Windows EXE·무서명 게시를 거부합니다.
+Windows EXE와 모든 플랫폼의 무서명 설치 파일은 공개 배포하지 않습니다. 게시 스크립트와 CI는 이 정책을 검사합니다.
 
 macOS의 GitHub 배포는 Developer ID 서명·Apple 공증을 모두 검증한 파일만 허용합니다. Mac App Store는 별도 [MAS 절차](MAC-APP-STORE.md)를 사용합니다. 인증서가 없거나 공증에 실패하면 무서명 파일로 대체 게시하지 않습니다.
 
@@ -47,6 +47,6 @@ gh workflow run desktop.yml --ref main -f platform=mac -f signed=true -f publish
 
 공개만 재시도할 때도 `platform=mac`, `signed=true`, `publish=true`, `release_run=검증된_실행_ID`를 사용합니다. 원본 작업의 성공·소스 커밋·버전·설치 기록·파일 크기·SHA-256·서명·공증을 다시 검증합니다. 공개된 동일 버전이나 다른 커밋의 초안을 덮어쓰지 않습니다. 과거 무서명 실행의 재공개는 허용하지 않습니다.
 
-이전 설치본은 공개 해제한 초안으로 보관합니다. CI는 고정 소스 커밋 `7c57c3d10129a761b61dfc5ae06f55e8103570b0`에서 **0.7.1 마이그레이션 검증 설치본을 일회용으로 재현**합니다. 당시 lockfile의 생산 의존성, 기존 앱 ID·프로필·설치 설정을 사용하고 패키지 원본·소스 커밋·생성 파일 SHA-256을 확인합니다. 재현한 설치본은 당시 공개 파일과 바이트 동일성을 주장하지 않으며, 러너 임시 폴더에만 두고 artifact로 공개하지 않습니다. 추가 토큰이나 저장소 쓰기 권한을 부여하지 않습니다.
+CI의 마이그레이션 검증 설치본은 고정된 호환성 검증 소스에서 일회용으로 재현합니다. 검증 설치본은 러너 임시 폴더에만 두며 공개 artifact나 사용자 다운로드로 제공하지 않습니다.
 
 웹 서버 배포 ZIP은 별도 제품·워크플로로 관리합니다.

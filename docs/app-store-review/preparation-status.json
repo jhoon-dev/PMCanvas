@@ -21,19 +21,6 @@
     "physicalRecordings": "PENDING",
     "signedUploadWorkflowRun": "41296552107"
   },
-  "macos": {
-    "version": "0.8.3",
-    "build": "60",
-    "buildId": "dddca368-38d9-4fd6-ae74-b7d2a9783704",
-    "internalGroupBuildState": "TESTING",
-    "whatToTestSaved": true,
-    "reviewNotesDraftSaved": true,
-    "buildAttachedToStoreVersion": true,
-    "reviewState": "PREPARE_FOR_SUBMISSION",
-    "physicalQa": "PENDING",
-    "physicalRecordings": "PENDING",
-    "signedUploadWorkflowRun": "41293690010"
-  },
   "newBuildDispatchedInThisTask": false,
   "appReviewSubmittedInThisTask": false,
   "previousRequest": {

@@ -11,7 +11,8 @@ App Store Connect의 신규 앱 등록이 **계약 업데이트** 안내로 차�
 개발자는 **jhoon-dev**, 브랜드는 **Toolmoa**, 표시 이름은 **PM Canvas**, Bundle ID는 **`app.toolmoa.pmcanvas`**로 통일합니다. [공통 표기 규칙](../README.md#제품-식별표기-규칙)을 따릅니다. Apple 계정의 법적 판매자명·팀 정보는 실제 등록 정보를 사용하며, 표시 이름에 개발자명·브랜드·플랫폼 접미사를 붙이지 않습니다. 빌드 산출물 내부의 앱 번들은 `PM Canvas.app`입니다.
 
 1. [Certificates, Identifiers & Profiles](https://developer.apple.com/account/resources/identifiers/list)에서 명시적 App ID **`app.toolmoa.pmcanvas`**, 설명 **PM Canvas**를 사용합니다. 데스크톱 패키지 설정의 `build.appId`·`build.mac.appId`, 모바일 `appId`, iOS Bundle Identifier, Android application ID도 같은 값입니다.
-2. 2026-11-01 [새 App Store Connect의 PM Canvas](https://appstoreconnect.apple.com/apps/6829387538/distribution/info)를 등록했습니다. 플랫폼 **macOS·iOS**, 이름 **PM Canvas**, 기본 언어 **한국어**, Bundle ID **`app.toolmoa.pmcanvas`**, SKU **PMCanvas-ToolMoa**, Apple ID **6829387538**입니다. 이전 앱 레코드(Apple ID 6829098378)의 iOS·macOS 심사 제출을 취소하고 연결된 iOS 빌드와 모든 지역 배포를 해제한 뒤 앱을 삭제했습니다. 새 레코드만 출시 대상으로 사용합니다. 새 App ID용 iOS·Mac App Store 프로파일을 발급해 기존 배포 환경에 등록했습니다. Mac **0.8.3 (60)**은 [서명·Apple 검증·업로드](https://github.com/jhoon-dev/PMCanvas/actions/runs/41293690010)를 통과하고 Apple 처리 후 새 macOS 버전에 연결했습니다. 심사 제출·공개 출시는 아직 완료하지 않았습니다.
+2. [App Store Connect의 PM Canvas](https://appstoreconnect.apple.com/apps/6829387538/distribution/info)를 사용합니다. Apple ID는 **6829387538**, Bundle ID는 **`app.toolmoa.pmcanvas`**입니다. 현재 데스크톱 소스 버전은 **1.9.0**입니다. Mac App Store 배포에는 이 버전으로 서명·업로드·실기기 검증을 별도로 완료해야 합니다.
+
 3. **Apple Distribution**(또는 Mac App Distribution) 앱 서명 인증서와 **Mac Installer Distribution / 3rd Party Mac Developer Installer** 설치 패키지 인증서를 발급합니다. 개인 키를 포함한 P12를 각각 내보냅니다. Developer ID Application·Installer 인증서는 이 Store 경로에 사용하지 않습니다.
 4. 위 App ID와 앱 서명 인증서에 연결한 **Mac App Store Connect 배포 프로비저닝 프로파일**을 발급합니다. 개발·Developer ID 프로파일을 사용하지 않습니다.
 5. App Store Connect → 사용자 및 액세스 → 통합에서 업로드 권한을 가진 **Team API Key**를 준비합니다. P8은 한 번만 내려받을 수 있으며 Key ID·Issuer ID를 함께 보관합니다. 기존 키가 있다면 권한을 확인해 재사용할 수 있습니다.
@@ -51,11 +52,7 @@ base64는 암호화가 아닙니다. `gh secret set NAME --env desktop-mac-store
 
 ## 샌드박스 실행과 심사
 
-2026-11-01 새 앱에 한국어 소개, 실제 Mac 스크린샷 4장, 기존 PM Canvas의 심사 연락처와 새 심사 메모를 저장했습니다. 공통 카테고리는 생산성, 연령 등급은 4+, 개인정보 표시는 데이터 수집 없음이며, 무료·175개 지역·승인 후 자동 출시로 설정했습니다. 연락처는 이전 앱에 이미 있었지만 새 앱 레코드에 자동 복사되지 않아 iOS·macOS 각각에 옮겼습니다. 연락처 원문은 저장소에 기록하지 않습니다.
-
-내부 TestFlight 그룹 **PM Canvas Release QA**에 Mac **0.8.3 (60)**, iOS **0.1.0 (20.1)**과 계정 소유자 본인을 추가했습니다. 두 빌드는 **테스트 중**, 본인 테스터 상태는 **초대됨**입니다. 자동 배포는 껐습니다. 초대받은 Apple 계정으로 Mac의 TestFlight에서 초대를 수락하고 PM Canvas를 설치합니다. 실제 Mac의 TestFlight 설치본에서 아래 샌드박스 실행 항목을 확인한 뒤 App Review에 제출합니다. CI의 서명·업로드 성공은 실제 샌드박스 실행 검증 결과가 아닙니다.
-
-2026-11-02 두 빌드의 내부 그룹 **테스트 중** 상태와 본인 테스터 **초대됨** 상태를 다시 확인했습니다. 플랫폼별 TestFlight 테스트 내용을 저장하고, 이전 iOS Guideline 2.1 요청의 여섯 항목을 반영한 새 iOS·macOS 심사 메모 초안을 저장했습니다. iOS 버전에는 빌드 **20.1**도 연결했습니다. 실제 기기·OS·QA 결과·영상 링크는 대기 중으로 명시했으며 App Review에는 아직 제출하지 않았습니다. [심사 준비 자료·기기별 촬영 안내](../docs/app-store-review/README.md)를 사용해 실물 검증을 완료합니다.
+현재 데스크톱 [1.9.0 매뉴얼](../docs/manuals/desktop/1.9.0/README.ko.md)을 기준으로 소개·스크린샷·심사 메모를 준비합니다. 처리된 현재 버전의 TestFlight 빌드에서 실제 샌드박스 실행을 검증한 뒤 App Review에 제출합니다. Windows Store 제출 성공은 Mac App Store 업로드·심사·출시 완료를 뜻하지 않습니다.
 
 MAS는 GitHub 설치 파일을 내려받지 않고 Mac App Store 업데이트 화면을 엽니다. 프로젝트를 다시 열기 위한 보안 범위 북마크는 앱 컨테이너의 `file-access.json`에 보관합니다. 파일을 임시 파일로 쓴 뒤 교체하는 안전한 저장을 유지하기 위해, 첫 저장 때 사용자가 대상 파일의 **상위 폴더**를 직접 선택해야 합니다. 다른 폴더 선택이나 취소로는 저장하지 않습니다. 내보내기의 일시 권한은 완료·실패 후 해제합니다.
 
@@ -66,7 +63,7 @@ MAS는 GitHub 설치 파일을 내려받지 않고 Mac App Store 업데이트 �
 - Excel 가져오기·작업 프로세스·템플릿·Excel/CSV/JSON 내보내기.
 - 한국어·영어, 개인정보처리방침 링크, Mac App Store 업데이트 이동.
 
-App Store Connect에서 버전 **0.8.3**, 생산성 카테고리, 연령 등급, 실제 개인정보 처리 내역, 지원 URL, 개인정보처리방침 URL, macOS 스크린샷, 가격·지역·심사 연락처·심사 메모를 작성하고 처리된 빌드를 선택합니다. 가격·지역·법적 선언·연락처는 소유자가 확정합니다. 앱은 오프라인·계정 없이 사용하며 프로젝트를 개발자 서버로 수집하지 않습니다. 개인정보 표시의 최종 답변은 Apple 질문과 [실제 방침](PRIVACY.md)을 대조합니다. App Review 승인과 출시 설정이 완료되어야 실제 게시됩니다.
+App Store Connect에서 현재 데스크톱 버전 **1.9.0**, 생산성 카테고리, 연령 등급, 실제 개인정보 처리 내역, 지원 URL, 개인정보처리방침 URL, macOS 스크린샷, 가격·지역·심사 연락처·심사 메모를 작성하고 처리된 빌드를 선택합니다. 가격·지역·법적 선언·연락처는 소유자가 확정합니다. 앱은 오프라인·계정 없이 사용하며 프로젝트를 개발자 서버로 수집하지 않습니다. 개인정보 표시의 최종 답변은 Apple 질문과 [실제 방침](PRIVACY.md)을 대조합니다. App Review 승인과 출시 설정이 완료되어야 실제 게시됩니다.
 
 ## 근거
 
