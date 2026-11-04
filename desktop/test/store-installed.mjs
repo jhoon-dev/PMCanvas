@@ -123,25 +123,28 @@ try {
     assert.ok(fs.statSync(file).size > 1000, 'Packaged Store Excel export must complete.');
     await app.close();
     app = null;
-    // Opening a legacy document rewrites recovery in the current schema. Servicing
-    // must preserve that verified new recovery, not its pre-launch legacy bytes.
-    const recoveryFile = path.join(runtime.profile, 'recovery.json'),
-      hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex'),
-      recoveryEntry = expected.hashes.find((entry) => entry.file === recoveryFile);
-    assert.ok(recoveryEntry, 'Recovery must be part of the installation preservation checks.');
-    for (const entry of expected.hashes.filter((entry) => entry.file !== recoveryFile))
+    // Tab migration retains the original single-document recovery and writes a
+    // separate workspace. Verify both, then preserve both through servicing.
+    const recoveryFile = path.join(runtime.profile, 'workspace.json'),
+      hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+    for (const entry of expected.hashes)
       assert.equal(
         hash(entry.file),
         entry.sha256,
-        'Opening/exporting must preserve project and preference bytes.',
+        'Opening/exporting must preserve original files and the migrated workspace.',
       );
+    const recovery = JSON.parse(fs.readFileSync(recoveryFile));
+    assert.equal(recovery.version, 1);
+    assert.equal(recovery.tabs.length, 1);
+    assert.equal(recovery.activeId, recovery.tabs[0].id);
     assertMigratedRecovery(
-      JSON.parse(fs.readFileSync(recoveryFile)),
+      recovery.tabs[0].document,
       expected.project,
       expected.file,
       expected.hashes.find((entry) => entry.file === expected.file).sha256,
     );
-    recoveryEntry.sha256 = hash(recoveryFile);
+    if (!expected.hashes.some((entry) => entry.file === recoveryFile))
+      expected.hashes.push({ file: recoveryFile, sha256: hash(recoveryFile) });
     fs.writeFileSync(request.expected, JSON.stringify(expected));
   }
   fs.writeFileSync(

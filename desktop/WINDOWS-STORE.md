@@ -2,7 +2,13 @@
 
 Windows의 유일한 공개 배포 경로는 **MSIX → Partner Center → Microsoft Store**입니다. Mac은 Developer ID 서명·공증 후 GitHub Release를 사용합니다. Store는 제출된 MSIX를 심사한 뒤 서명을 제공하므로 Store 배포를 위해 Windows 코드 서명 인증서를 따로 구매할 필요가 없습니다. CI가 만드는 제출 파일은 아직 Store 서명이 없는 파일이며 사용자에게 직접 설치용으로 배포하지 않습니다. [Microsoft 배포 안내](https://learn.microsoft.com/en-us/windows/apps/publish/get-started)
 
-## 현재 출시 대상 — 2026-11-01
+## 0.8.4 제출 패키지 — 2026-11-04
+
+앱 **0.8.4**, MSIX **1.8.7.0**을 현재 제출 대상으로 준비했습니다. 소스 커밋은 `24dab05afedd78e5b9f7c068ff0fd25f8c3b0f99`, SHA-256은 `33a9088cdd0227aebacd1f867291cfea9b789c65f5410e2bf5ef844084f85b77`입니다. 실제 앱 실행·저장·재시작·Excel, MakeAppx 생성·추출, 전체 payload 비교와 ASAR 소스 검증을 통과했습니다. 설치·업데이트·제거·재설치 검증은 새 프로젝트 탭의 `workspace.json`과 기존 `recovery.json`·프로젝트·설정 원본을 모두 보존하는지 확인합니다.
+
+[버전별 매뉴얼](../docs/manuals/README.md)과 [데스크톱 0.8.4 사용 매뉴얼](../docs/manuals/desktop/0.8.4/README.ko.md)을 추가했습니다. 현재 대규모 가상 예제의 한국어·영어 화면을 각각 6장씩 1920×1080으로 촬영했으며, 소스·해상도·파일 해시는 [캡처 목록](../docs/manuals/screenshots.json)에 보존합니다. 제출 상태의 최종 근거는 [Partner Center](https://partner.microsoft.com/ko-kr/dashboard/products/9NV119XJGQ7J/overview)입니다. 패키지 준비·업로드와 Microsoft 심사·게시 완료는 서로 다릅니다.
+
+## 이전 제출 기록 — 2026-11-01
 
 새 [PM Canvas 제품](https://partner.microsoft.com/ko-kr/dashboard/products/9NV119XJGQ7J/overview)(Store ID **`9NV119XJGQ7J`**)을 출시 대상으로 사용합니다. 기존 PM Canvas Desktop의 인증을 취소하고 제출 초안을 삭제했습니다. 로컬 `.env.msix`와 GitHub `desktop-store` 환경 변수도 새 제품으로 갱신했습니다.
 

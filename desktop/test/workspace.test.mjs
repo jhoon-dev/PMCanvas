@@ -14,6 +14,8 @@ import path from 'node:path';
 import os from 'node:os';
 import { DesktopWorkspace } from '../workspace.mjs';
 import { DesktopDocument } from '../document.mjs';
+import { createHash } from 'node:crypto';
+import { legacyProject, assertMigratedRecovery } from './legacy-project.mjs';
 const project = (name) => ({
   id: 'same-id',
   name,
@@ -136,6 +138,37 @@ test('restart restores every dirty tab, reloads clean files, preserves missing-f
   const empty = new DesktopWorkspace(file('workspace.json'));
   empty.restore(empty.recovery());
   assert.equal(empty.tabs.size, 0, 'Legacy recovery must not reopen deliberately closed tabs.');
+});
+
+test('legacy hierarchy and baseline migrate into a workspace while original recovery and project bytes survive restart', (t) => {
+  const { file } = fixture(t),
+    legacy = legacyProject('Legacy Store project', 'Original baseline'),
+    hash = (bytes) => createHash('sha256').update(bytes).digest('hex'),
+    projectFile = file('Legacy.pmcanvas'),
+    projectBytes = JSON.stringify({ format: 'pm-canvas-project', version: 1, project: legacy }),
+    savedHash = hash(projectBytes),
+    recoveryBytes = JSON.stringify({
+      version: 1,
+      project: legacy,
+      file: projectFile,
+      savedHash,
+      savedProjectHash: hash(JSON.stringify(legacy)),
+      dirty: false,
+    });
+  writeFileSync(projectFile, projectBytes);
+  writeFileSync(file('recovery.json'), recoveryBytes);
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const w = new DesktopWorkspace(file('workspace.json'));
+    const saved = w.recovery();
+    if (saved.workspace) w.restore(saved);
+    else w.open(saved.file);
+    const recovery = JSON.parse(readFileSync(file('workspace.json')));
+    assert.equal(recovery.tabs.length, 1);
+    assert.equal(recovery.activeId, recovery.tabs[0].id);
+    assertMigratedRecovery(recovery.tabs[0].document, legacy, projectFile, savedHash);
+    assert.equal(readFileSync(projectFile, 'utf8'), projectBytes);
+    assert.equal(readFileSync(file('recovery.json'), 'utf8'), recoveryBytes);
+  }
 });
 
 test('corrupt workspace recovery is preserved before replacement', (t) => {
