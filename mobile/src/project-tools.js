@@ -1,3 +1,4 @@
+import { getBusinessTimeZone } from '../../shared/browser/business-clock.js';
 import { PROJECT_SCREENS, projectNavigation } from '../../shared/browser/project-navigation.js';
 import { WbsWorkspace } from '../../shared/browser/wbs-workspace.js';
 import { DraftStore } from '../../shared/browser/draft-store.js';
@@ -110,36 +111,11 @@ export class ProjectTools {
     if (this.range.owner && !project.members.some((member) => member.id === this.range.owner))
       this.range.owner = '';
   }
+  dateControl() {
+    return `<label class="report-date"><span>보고 기준일</span><input id="projectReportDate" aria-label="보고 기준일" type="date" max="${esc(today())}" value="${esc(this.at)}"></label>`;
+  }
   controls(view) {
-    return (
-      '<div class="project-controls"><label>화면 이동<select id="projectView" aria-label="화면 이동">' +
-      projectNavigation('mobile')
-        .map(
-          (group) =>
-            '<optgroup label="' +
-            esc(group.title) +
-            '">' +
-            group.views
-              .map(
-                (id) =>
-                  '<option value="' +
-                  id +
-                  '" ' +
-                  (view === id ? 'selected' : '') +
-                  '>' +
-                  esc(PROJECT_SCREENS[id].title) +
-                  '</option>',
-              )
-              .join('') +
-            '</optgroup>',
-        )
-        .join('') +
-      '</select></label><label>보고 기준일<input id="projectReportDate" aria-label="보고 기준일" type="date" max="' +
-      today() +
-      '" value="' +
-      this.at +
-      '"></label></div>'
-    );
+    return `<div class="desktop-controls date-only">${this.dateControl()}<span class="date-caption">${esc(view && this.at === today() ? '오늘' : '과거 조회')} · ${esc(getBusinessTimeZone())} · 저장됨</span></div>`;
   }
   visuals(project) {
     return dashboardVisuals(project, summary(project, this.at), this.at);
@@ -171,6 +147,29 @@ export class ProjectTools {
       }
     }
     const host = document.querySelector('#pmManagement');
+    // Keep every desktop field and action in the DOM. On phones the same row
+    // becomes a labeled record, so actions never disappear beyond the viewport.
+    for (const table of host?.querySelectorAll('table') || []) {
+      const headings = [...table.querySelectorAll('thead th')].map((cell) =>
+        cell.textContent.trim(),
+      );
+      if (!headings.length) continue;
+      table.classList.add('mobile-record-table');
+      for (const row of table.querySelectorAll('tbody tr')) {
+        [...row.cells].forEach((cell, index) => {
+          cell.dataset.label = headings[index] || '';
+          if (/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?Z$/.test(cell.textContent.trim())) {
+            const date = new Date(cell.textContent.trim());
+            if (Number.isFinite(date.getTime()))
+              cell.textContent = new Intl.DateTimeFormat('ko-KR', {
+                dateStyle: 'medium',
+                timeStyle: 'short',
+                timeZone: getBusinessTimeZone(),
+              }).format(date);
+          }
+        });
+      }
+    }
     for (const form of host?.querySelectorAll('form') || []) {
       const submit = form.querySelector('button[type="submit"]');
       if (!submit) continue;
@@ -192,8 +191,8 @@ export class ProjectTools {
   reports() {
     const p = this.options.project(),
       completed = this.records();
-    return `<section class="settings-card"><h2>업무 현황</h2><p>보고 기준일의 업무 일정과 진척률을 저장합니다.</p><p class="report-count">기준일 ${this.at} · 업무 ${p.tasks.length}개</p><div class="stack-actions"><button class="button" data-action="csv">업무 보고서 CSV</button><button class="button" data-project-tool="excel">업무 보고서 Excel</button><button class="button" data-project-tool="template">Excel 입력 양식</button><button class="button" data-project-tool="import-excel">Excel 가져오기</button></div></section>
-    <section class="settings-card"><h2>완료 기록</h2><div class="report-range"><label class="field">시작일<input id="toolReportFrom" aria-label="조회 시작일" type="date" value="${this.range.from}" max="${this.at}"></label><label class="field">종료일<input id="toolReportTo" aria-label="조회 종료일" type="date" value="${this.range.to}" max="${this.at}"></label><label class="field">담당자<select id="toolReportOwner" aria-label="조회 담당자"><option value="">전체 담당자</option>${p.members.map((member) => `<option value="${esc(member.id)}" ${this.range.owner === member.id ? 'selected' : ''}>${esc(member.name)}</option>`).join('')}</select></label><button type="button" class="button" data-project-tool="all-records">전체 기록</button></div><p class="report-count">조회 기간의 완료 작업 ${completed.length}건</p>
+    return `<section class="settings-card panel"><h2>업무 현황</h2><p>보고 기준일의 업무 일정과 진척률을 저장합니다.</p><p class="report-count">기준일 ${esc(this.at)} · 업무 ${p.tasks.length}개</p><div class="stack-actions"><button class="button" data-action="csv">업무 보고서 CSV</button><button class="button" data-project-tool="excel">업무 보고서 Excel</button><button class="button" data-project-tool="template">Excel 입력 양식</button><button class="button" data-project-tool="import-excel">Excel 가져오기</button></div></section>
+    <section class="settings-card panel"><h2>완료 기록</h2><div class="report-range"><label class="field">시작일<input id="toolReportFrom" aria-label="조회 시작일" type="date" value="${esc(this.range.from)}" max="${esc(this.at)}"></label><label class="field">종료일<input id="toolReportTo" aria-label="조회 종료일" type="date" value="${esc(this.range.to)}" max="${esc(this.at)}"></label><label class="field">담당자<select id="toolReportOwner" aria-label="조회 담당자"><option value="">전체 담당자</option>${p.members.map((member) => `<option value="${esc(member.id)}" ${this.range.owner === member.id ? 'selected' : ''}>${esc(member.name)}</option>`).join('')}</select></label><button type="button" class="button" data-project-tool="all-records">전체 기록</button></div><p class="report-count">조회 기간의 완료 작업 ${completed.length}건</p>
     ${
       completed.length
         ? `<ul class="completion-records">${completed

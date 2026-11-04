@@ -1,0 +1,44 @@
+{
+  "version": "0.3.0",
+  "platform": "mobile-browser-preview",
+  "project": "스마트워크 통합 플랫폼 구축",
+  "nativeCapture": false,
+  "screenshots": [
+    {
+      "file": "images/navigation.jpg",
+      "width": 390,
+      "height": 844,
+      "sha256": "bc695b60bdc50d89ccf55d8033e4c6edd1f2abbfe4a6a04c77d42eadc75a2299"
+    },
+    {
+      "file": "images/overview.jpg",
+      "width": 375,
+      "height": 812,
+      "sha256": "79e617e7c7a46b2848cd3aa9aff95a2a85c41802f3e1ad5f8cc193cf4ae0a017"
+    },
+    {
+      "file": "images/people.jpg",
+      "width": 375,
+      "height": 812,
+      "sha256": "e51a069bb4ce686db90e5244356742dd9c25d9b17056c776f2f8feaa46f579e7"
+    },
+    {
+      "file": "images/planning.jpg",
+      "width": 375,
+      "height": 812,
+      "sha256": "136de1024cdceee59f06dbc1766f690d5f10268a37cba2f07e330e236c3857a1"
+    },
+    {
+      "file": "images/tasks.jpg",
+      "width": 375,
+      "height": 812,
+      "sha256": "4fc366226e2b512684b10c5b2ced9952c42b4c8bcda0a8fea2eb097f867f0c2f"
+    },
+    {
+      "file": "images/weekly.jpg",
+      "width": 375,
+      "height": 812,
+      "sha256": "5c98715fc1235a673e3edba35f3027d9921f491738bfbddf2aa2d63fa20502da"
+    }
+  ]
+}

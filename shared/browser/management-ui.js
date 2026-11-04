@@ -445,7 +445,7 @@ export function managementView(p, at = today(), { section = 'all', page = null }
         '<label class="field">' +
         esc(ui('조회 월')) +
         '<input type="month" id="pmPlanMonth" value="' +
-        at.slice(0, 7) +
+        esc(at.slice(0, 7)) +
         '"></label><div id="pmPlanResult">' +
         monthlyTable(p, at.slice(0, 7)) +
         '</div>' +
@@ -580,7 +580,7 @@ function managementPageView(p, at, section, page, heading) {
         '</p><label class="field">' +
         esc(ui('조회 월')) +
         '<input type="month" id="pmPlanMonth" value="' +
-        at.slice(0, 7) +
+        esc(at.slice(0, 7)) +
         '"></label><div id="pmPlanResult">' +
         monthlyTable(p, at.slice(0, 7)) +
         '</div><h3>' +
@@ -692,9 +692,9 @@ function monthlyTable(p, month) {
   const result = monthlyPlan(p, month);
   return (
     '<div class="pm-table-scroll"><table><caption>' +
-    result.from +
+    esc(result.from) +
     ' ~ ' +
-    result.to +
+    esc(result.to) +
     ' · 1 M/M = ' +
     result.hoursPerMM +
     'h</caption><thead><tr>' +

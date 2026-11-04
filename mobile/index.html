@@ -12,20 +12,51 @@
     <link rel="icon" type="image/png" href="./assets/icon.png" />
     <script type="module" src="/src/app.js"></script>
   </head>
-  <body>
+  <body class="mobile-app">
     <a class="skip-link" href="#content">본문으로 건너뛰기</a>
-    <header class="app-header">
-      <a class="brand" href="#projects" aria-label="PM Canvas 프로젝트 목록"
-        ><img class="brand-mark" src="./assets/icon.png" width="37" height="37" alt="" /><span
-          >PM Canvas<small>MOBILE WORKSPACE</small></span
-        ></a
+    <header class="app-header mobile-header">
+      <button
+        id="openWorkspaceMenu"
+        type="button"
+        class="icon-button"
+        aria-label="프로젝트 메뉴 열기"
+        aria-controls="workspaceDrawer"
+        aria-expanded="false"
+        hidden
       >
-      <span class="offline-label"><i></i>오프라인</span>
+        ☰
+      </button>
+      <a id="projectListLink" class="workspace-brand" href="#projects" aria-label="프로젝트 목록">
+        <img src="./assets/icon.png" width="30" height="30" alt="" />
+        <span><strong>PM Canvas</strong><small id="activeProjectName">프로젝트 관리</small></span>
+      </a>
+      <details id="workspaceFiles" class="action-menu workspace-files" hidden>
+        <summary class="icon-button" aria-label="프로젝트 파일과 설정">⋯</summary>
+        <div class="menu-popover"></div>
+      </details>
     </header>
     <main id="content" tabindex="-1">
       <p class="loading" role="status">프로젝트를 불러오고 있습니다…</p>
     </main>
     <nav id="navigation" class="bottom-nav" aria-label="주 메뉴" hidden></nav>
+    <dialog id="workspaceDrawer" aria-labelledby="workspaceMenuTitle">
+      <header class="drawer-head">
+        <div>
+          <h2 id="workspaceMenuTitle">프로젝트 메뉴</h2>
+          <p id="drawerProjectName"></p>
+        </div>
+        <button
+          id="closeWorkspaceMenu"
+          type="button"
+          class="icon-button"
+          aria-label="프로젝트 메뉴 닫기"
+        >
+          ×
+        </button>
+      </header>
+      <nav id="workspaceNavigation" aria-label="현재 프로젝트 메뉴"></nav>
+      <a class="drawer-projects" href="#projects">← 프로젝트 목록</a>
+    </dialog>
     <dialog id="editor" aria-labelledby="editorTitle">
       <form id="editorForm">
         <div class="dialog-head">

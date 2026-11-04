@@ -1,3 +1,4 @@
+import { openView } from './browser/navigation.mjs';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { execFile } from 'node:child_process';
@@ -213,31 +214,34 @@ try {
       await fillField(page.locator('[name="name"]'), name);
       await fillField(page.locator('[name="description"]'), 'Android 에뮬레이터 기능 검증');
       await page.getByRole('button', { name: '저장', exact: true }).click();
-      await expect(page.locator('.project-heading .eyebrow')).toHaveText(name);
+      await expect(page.locator('#activeProjectName')).toHaveText(name);
       projectId = page.url().split('/').at(-1);
       await stopApp();
       await device.shell(`am start -n ${appId}/.MainActivity`);
       await attach();
       await page.getByRole('button', { name: new RegExp(name) }).click();
-      await expect(page.locator('.project-heading .eyebrow')).toHaveText(name);
+      await expect(page.locator('#activeProjectName')).toHaveText(name);
       await page.getByRole('link', { name: '인력', exact: true }).click();
-      await page.getByRole('button', { name: '＋ 추가', exact: true }).click();
+      await page
+        .locator('.page-head')
+        .getByRole('button', { name: '＋ 참여인력 추가', exact: true })
+        .click();
       await fillField(page.locator('[name="name"]'), '모바일 담당자');
       await page.getByRole('button', { name: '저장', exact: true }).click();
       await expect(page.getByText('모바일 담당자', { exact: true })).toBeVisible();
-      await page.locator('.member-row').filter({ hasText: '모바일 담당자' }).click();
+      await page.getByRole('button', { name: '모바일 담당자 수정', exact: true }).click();
       await fillField(page.locator('[name="role"]'), 'Android QA');
       await fillField(page.locator('[name="hours"]'), '6');
       await fillField(page.locator('[name="allocation"]'), '80');
       await page.getByRole('button', { name: '저장', exact: true }).click();
-      await expect(page.locator('.member-row')).toContainText('Android QA');
-      await expect(page.locator('.member-row')).toContainText('6h / 일 · 80%');
+      await expect(page.locator('.member-card')).toContainText('Android QA');
+      await expect(page.locator('.member-card')).toContainText('4.8');
     },
   );
   await step('create and edit a task with a weighted checklist', async () => {
     await page.getByRole('link', { name: '업무', exact: true }).click();
     await page
-      .locator('.section-heading')
+      .locator('.page-head')
       .getByRole('button', { name: '＋ 업무 추가', exact: true })
       .click();
     await fillField(page.locator('[name="name"]'), 'Android 주요 기능');
@@ -263,14 +267,14 @@ try {
     await screenshot('02-checklist');
     await page.getByRole('link', { name: '업무', exact: true }).click();
     await fillField(page.getByRole('searchbox', { name: '업무 검색' }), '없는 업무');
-    await expect(page.getByRole('heading', { name: '검색 결과가 없습니다' })).toBeVisible();
+    await expect(page.locator('#workspaceResults')).toContainText('표시할 업무가 없습니다.');
     await fillField(page.getByRole('searchbox', { name: '업무 검색' }), '');
     const ownerId = await page.locator('#owner option').nth(1).getAttribute('value');
     await page.getByLabel('담당자 필터').selectOption(ownerId);
-    await expect(page.locator('.task-card')).toHaveCount(1);
+    await expect(page.locator('.desktop-table tbody tr')).toHaveCount(1);
     await page.getByLabel('담당자 필터').selectOption('');
     await page.getByRole('link', { name: '현황', exact: true }).click();
-    await expect(page.locator('.hero-progress strong')).toHaveText('25%');
+    await expect(page.locator('.desktop-metric:first-child > strong')).toHaveText('25%');
     assert.equal(
       await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
       true,
@@ -280,14 +284,14 @@ try {
   await step('undo and redo while network requests are offline', async () => {
     await page.context().setOffline(true);
     try {
-      await page.getByRole('link', { name: '더보기', exact: true }).click();
+      await openView(page, 'more');
       await page.getByRole('button', { name: '↶ 실행 취소', exact: true }).click();
       await page.getByRole('link', { name: '현황', exact: true }).click();
-      await expect(page.locator('.hero-progress strong')).toHaveText('0%');
-      await page.getByRole('link', { name: '더보기', exact: true }).click();
+      await expect(page.locator('.desktop-metric:first-child > strong')).toHaveText('0%');
+      await openView(page, 'more');
       await page.getByRole('button', { name: '↷ 다시 실행', exact: true }).click();
       await page.getByRole('link', { name: '현황', exact: true }).click();
-      await expect(page.locator('.hero-progress strong')).toHaveText('25%');
+      await expect(page.locator('.desktop-metric:first-child > strong')).toHaveText('25%');
     } finally {
       await page.context().setOffline(false);
     }
@@ -321,12 +325,12 @@ try {
     await device.shell(`am start -n ${appId}/.MainActivity`);
     await attach();
     await page.getByRole('button', { name: new RegExp(name) }).click();
-    await expect(page.locator('.hero-progress strong')).toHaveText('25%');
+    await expect(page.locator('.desktop-metric:first-child > strong')).toHaveText('25%');
   });
   await step(
     'native project sharing writes a valid backup and opens Android Sharesheet',
     async () => {
-      await page.getByRole('link', { name: '더보기', exact: true }).click();
+      await openView(page, 'more');
       await page.getByRole('button', { name: '프로젝트 내보내기', exact: true }).click();
       const xml = await waitForNative('04-share', /chooser|resolver/i);
       assert.match(xml, /chooser|resolver/i, 'Android share UI must be visible.');
@@ -343,7 +347,7 @@ try {
     },
   );
   await step('native CSV sharing writes a report', async () => {
-    await page.getByRole('link', { name: '보고서', exact: true }).click();
+    await openView(page, 'reports');
     await page.getByRole('button', { name: '업무 보고서 CSV', exact: true }).click();
     const xml = await waitForNative('05-csv-share', /chooser|resolver/i);
     assert.match(xml, /chooser|resolver/i);
@@ -359,7 +363,7 @@ try {
     assert.ok(csv.includes('Android 주요 기능 검증'));
     await writeFile(path.join(output, 'report.csv'), csv);
     await back();
-    await page.getByRole('link', { name: '더보기', exact: true }).click();
+    await openView(page, 'more');
     await expect(
       page.getByRole('button', { name: '프로젝트 가져오기', exact: true }),
     ).toBeEnabled();
@@ -369,6 +373,7 @@ try {
       await readFile(path.join(output, 'project.pmcanvas')),
       '/sdcard/Download/PMCanvas-Native-Smoke.pmcanvas',
     );
+    await openView(page, 'more');
     await page.getByRole('button', { name: '프로젝트 가져오기', exact: true }).click();
     await waitForNative('06-picker-initial', /documentsui/i);
     await screenshot('06-picker-initial', { webView: false });
@@ -376,11 +381,11 @@ try {
     await nativeTap({ text: /^(Downloads|다운로드)$/, 'resource-id': 'android:id/title' });
     await screenshot('06-picker-downloads', { webView: false });
     await nativeTap({ text: 'PMCanvas-Native-Smoke.pmcanvas', enabled: 'true' });
-    await expect(page.locator('.hero-progress strong')).toHaveText('25%');
+    await expect(page.locator('.desktop-metric:first-child > strong')).toHaveText('25%');
     const importedId = page.url().split('/').at(-1);
     assert.notEqual(importedId, projectId, 'Import must create a copy.');
     await screenshot('07-imported');
-    await page.getByRole('link', { name: '← 프로젝트', exact: true }).click();
+    await page.locator('#projectListLink').click();
     await expect(page.locator('.project-card').filter({ hasText: name })).toHaveCount(2);
   });
   await step('delete task, member and imported project without changing the original', async () => {
@@ -392,18 +397,19 @@ try {
     await expect(page.locator('#editor')).toBeVisible();
     await page.locator('#deleteItem').click();
     await page.locator('#confirmation').getByRole('button', { name: '삭제', exact: true }).click();
-    await expect(page.locator('.task-card')).toHaveCount(0);
-    await page.getByRole('link', { name: '더보기', exact: true }).click();
-    await page.locator('.member-row').click();
+    await expect(page.locator('.desktop-table tbody tr')).toHaveCount(0);
+    await openView(page, 'people');
+    await page.locator('[data-edit-member]').click();
     await page.locator('#deleteItem').click();
     await page.locator('#confirmation').getByRole('button', { name: '삭제', exact: true }).click();
-    await expect(page.locator('.member-row')).toHaveCount(0);
+    await expect(page.locator('.member-card')).toHaveCount(0);
+    await openView(page, 'more');
     await page.getByRole('button', { name: '이 프로젝트 삭제', exact: true }).click();
     await page.locator('#confirmation').getByRole('button', { name: '삭제', exact: true }).click();
     await expect(page.locator('.project-card').filter({ hasText: name })).toHaveCount(1);
     await page.locator('.project-card').filter({ hasText: name }).click();
     assert.equal(page.url().split('/').at(-1), projectId, 'The original project must remain.');
-    await expect(page.locator('.hero-progress strong')).toHaveText('25%');
+    await expect(page.locator('.desktop-metric:first-child > strong')).toHaveText('25%');
     await screenshot('08-original-preserved');
   });
   assert.deepEqual(errors, [], 'The installed app must not throw JavaScript errors.');
