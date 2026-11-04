@@ -30,10 +30,10 @@ final class AppUITests: XCTestCase {
         XCTAssertTrue(field.wait(for: \.isHittable, toEqual: true, timeout: 10))
         field.tap()
         let keyboard = app.keyboards.firstMatch
-        // A WebKit field can report DOM focus before the native keyboard is ready.
-        // Re-tap only after the initial resize has settled, never during it.
-        if !keyboard.waitForExistence(timeout: 10) { field.tap() }
-        XCTAssertTrue(keyboard.waitForExistence(timeout: 10), app.debugDescription)
+        // Allow the software keyboard's resize to settle. An attached hardware
+        // keyboard (including iPad's input assistant) has no Keyboard element;
+        // native typeText still verifies that a first responder accepts input.
+        _ = keyboard.waitForExistence(timeout: 5)
         // A single rapid key sequence can outrun WKWebView on shared CI hosts.
         // Let XCTest idle between characters, then commit the keyboard input.
         // Send keys to the application's native first responder. Re-resolving a
