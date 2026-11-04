@@ -58,6 +58,9 @@ const launch = async () => {
   page = await app.firstWindow();
   page.setDefaultTimeout(15000);
   await page.locator('[data-project-tab]').first().waitFor();
+  // Keep the forecast assertion independent of the day this test is run.
+  await page.locator('#reportDate').fill('2026-11-03');
+  await page.locator('#reportDate').dispatchEvent('change');
 };
 const inject = async (holidays) =>
   app.evaluate(
@@ -74,6 +77,8 @@ try {
   await launch();
   await page.evaluate(() => localStorage.setItem('pmcanvas.language', 'ko'));
   await page.reload();
+  await page.locator('#reportDate').fill('2026-11-03');
+  await page.locator('#reportDate').dispatchEvent('change');
   const before = await snapshot();
   await inject([{ date: '2026-11-05', name: '임시공휴일' }]);
   const firstRefresh = await page.evaluate(() => window.desktop.refreshHolidays());
@@ -85,6 +90,8 @@ try {
   assert.equal((await snapshot()).dirty, false);
   assert.equal((await snapshot()).canUndo, false);
   await page.locator('[data-project-tab="' + a + '"]').click();
+  await page.locator('#reportDate').fill('2026-11-03');
+  await page.locator('#reportDate').dispatchEvent('change');
   await page.getByText('2026-11-06', { exact: true }).first().waitFor();
   await nativeCommand(app, 'projectSettings');
   await page.locator('[name="name"]').fill('저장하면 안 되는 입력');

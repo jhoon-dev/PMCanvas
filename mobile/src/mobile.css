@@ -127,6 +127,21 @@ p {
   padding: calc(20px + var(--inset-top)) max(22px, var(--inset-right)) 18px
     max(22px, var(--inset-left));
 }
+.in-project .app-header {
+  padding-top: calc(12px + var(--inset-top));
+  padding-bottom: 4px;
+}
+.in-project .brand-mark {
+  width: 28px;
+  height: 28px;
+}
+.in-project .brand {
+  font-size: 16px;
+}
+.in-project .brand small,
+.in-project .offline-label {
+  display: none;
+}
 .brand {
   display: flex;
   align-items: center;

@@ -1,5 +1,6 @@
 # PM Canvas 0.8.3 — Windows·macOS
 
+[버전별 사용 매뉴얼](../docs/manuals/desktop/0.8.4/README.ko.md)
 Developer **jhoon-dev** · Brand **Toolmoa** · App ID **`app.toolmoa.pmcanvas`** · Display Name **PM Canvas**. [제품 식별·표기 규칙](../README.md#제품-식별표기-규칙)을 따릅니다.
 
 [개인정보처리방침 / Privacy policy](PRIVACY.md). 앱의 **파일 옵션 → 개인정보처리방침** 또는 네이티브 **파일** 메뉴에서도 확인할 수 있습니다.
