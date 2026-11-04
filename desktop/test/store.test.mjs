@@ -16,7 +16,7 @@ test('Store builds require exact configured Partner Center identities and reject
   assert.equal(config.identityName, env.PM_STORE_IDENTITY_NAME);
   assert.equal(config.displayName, 'PM Canvas');
   const custom = storeConfiguration({ ...env, PM_STORE_DISPLAY_NAME: 'PM Canvas & Work' });
-  assert.match(storeManifest(custom, '0.7.4'), /DisplayName="PM Canvas &amp; Work"/);
+  assert.match(storeManifest(custom, '1.9.0'), /DisplayName="PM Canvas &amp; Work"/);
   for (const key of Object.keys(env))
     assert.throws(() => storeConfiguration({ ...env, [key]: '' }), /Configure/);
   for (const [key, value] of [
@@ -29,19 +29,27 @@ test('Store builds require exact configured Partner Center identities and reject
   ])
     assert.throws(() => storeConfiguration({ ...env, [key]: value }));
 });
-test('Store package versions remain increasing and reserve a zero fourth field with nonzero major', () => {
-  assert.equal(storeVersion('0.7.4'), '1.7.4.0');
-  assert.equal(storeVersion('1.0.0'), '2.0.0.0');
-  assert.equal(storeVersion('65534.65535.65535'), '65535.65535.65535.0');
-  for (const v of ['0.7.4-dev', '0.7.4.1', '65535.0.0', '0.65536.0', '0.1.65536', '01.0.0'])
+test('Store package versions match the application and reserve a zero fourth field with nonzero major', () => {
+  assert.equal(storeVersion('1.9.0'), '1.9.0.0');
+  assert.equal(storeVersion('1.0.0'), '1.0.0.0');
+  assert.equal(storeVersion('65535.65535.65535'), '65535.65535.65535.0');
+  for (const v of [
+    '0.8.4',
+    '1.9.0-dev',
+    '1.9.0.1',
+    '65536.0.0',
+    '1.65536.0',
+    '1.0.65536',
+    '01.0.0',
+  ])
     assert.throws(() => storeVersion(v));
 });
 test('MSIX manifest preserves external AppData, escapes identities and uses full-trust desktop activation', () => {
-  const xml = storeManifest(storeConfiguration(env), '0.7.4');
+  const xml = storeManifest(storeConfiguration(env), '1.9.0');
   const doc = new DOMParser().parseFromString(xml, 'application/xml');
   const element = (name) => doc.getElementsByTagName(name)[0];
   assert.equal(element('Identity').getAttribute('Publisher'), env.PM_STORE_PUBLISHER);
-  assert.equal(element('Identity').getAttribute('Version'), '1.7.4.0');
+  assert.equal(element('Identity').getAttribute('Version'), '1.9.0.0');
   assert.equal(element('PublisherDisplayName').textContent, 'Example & Company');
   assert.equal(element('Application').getAttribute('Executable'), 'app\\PM Canvas.exe');
   assert.equal(element('uap:VisualElements').getAttribute('BackgroundColor'), '#2c2e3a');
@@ -52,16 +60,29 @@ test('MSIX manifest preserves external AppData, escapes identities and uses full
   assert.doesNotMatch(xml, /RegistryWriteVirtualization|runFullTrust.*runFullTrust/s);
 });
 
-test('rebuilding the same application gets a distinct Store identity without using the reserved fourth field', () => {
-  assert.equal(storeVersion('0.8.3', 70), '1.8.73.0');
-  assert.equal(storeVersion('0.8.3', '71'), '1.8.74.0');
-  const xml = storeManifest(storeConfiguration(env), '0.8.3', 71);
+test('workflow build numbers cannot make the Store version diverge from the application', () => {
+  assert.equal(storeVersion('1.9.0', 0), '1.9.0.0');
+  assert.equal(storeVersion('1.9.1', '0'), '1.9.1.0');
+  const xml = storeManifest(storeConfiguration(env), '1.9.1');
   const doc = new DOMParser().parseFromString(xml, 'application/xml');
-  assert.equal(doc.getElementsByTagName('Identity')[0].getAttribute('Version'), '1.8.74.0');
-  for (const build of ['', -1, 0.5, '01', ' 1', '1\n', 'nope', NaN, Infinity, 2 ** 53, null, true])
-    assert.throws(() => storeVersion('0.8.3', build));
-  assert.equal(storeVersion('0.8.3', 65532), '1.8.65535.0');
-  assert.throws(() => storeVersion('0.8.3', 65533), /65535/);
+  assert.equal(doc.getElementsByTagName('Identity')[0].getAttribute('Version'), '1.9.1.0');
+  for (const build of [
+    1,
+    '130',
+    '',
+    -1,
+    0.5,
+    '01',
+    ' 1',
+    '1\n',
+    'nope',
+    NaN,
+    Infinity,
+    2 ** 53,
+    null,
+    true,
+  ])
+    assert.throws(() => storeVersion('1.9.0', build));
 });
 test('Store installations direct updates to the fixed Store library without requesting GitHub releases', async () => {
   const updates = new StoreUpdateService();
