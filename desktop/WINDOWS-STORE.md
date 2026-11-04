@@ -6,6 +6,8 @@ Windows의 유일한 공개 배포 경로는 **MSIX → Partner Center → Micro
 
 앱 표시 버전 **1.9.0**과 Store 버전의 앞 세 숫자를 통일합니다. Windows의 네 번째 예약 필드만 붙여 MSIX **1.9.0.0**으로 제출합니다. 2026-11-04 Partner Center에서 확인한 기존 패키지 MSIX **1.8.128.0**보다 높습니다. 앱 버전 외의 빌드 번호로 Store 버전을 변경하지 않으며, 다른 패키지를 다시 제출할 때는 앱 버전도 함께 올립니다. 제출 파일의 소스·해시·네이티브 실행·MakeAppx 검증 결과는 빌드가 생성한 `store-manifest.json`에 기록합니다.
 
+검증한 제출 파일은 소스 `25aae7f326f69b2c9a877c72fe4cf7818c32ccc2`, SHA-256 `36e288e03e88331e7bc40bb7db44a8bcd2df4bf297ca361dcfaf6e3b532cf69f`입니다. 실제 실행·저장·재시작·Excel, MakeAppx 생성·추출, 전체 payload 비교와 ASAR 소스 검증을 통과했습니다. 필수 GitHub 검증을 통과한 [PR #36](https://github.com/jhoon-dev/PMCanvas/pull/36)으로 앱·버전별 매뉴얼·현재 예제 화면을 main에 병합했습니다.
+
 [버전별 매뉴얼](../docs/manuals/README.md)과 [데스크톱 1.9.0 사용 매뉴얼](../docs/manuals/desktop/1.9.0/README.ko.md)을 추가했습니다. 현재 대규모 가상 예제의 한국어·영어 화면을 각각 6장씩 1920×1080으로 촬영했으며, 해상도·파일 해시는 [캡처 목록](../docs/manuals/screenshots.json)에 보존합니다. 설치·업데이트·제거·재설치 검증에서는 새 `workspace.json`과 기존 `recovery.json`·프로젝트·설정 원본을 모두 확인합니다. 최종 심사·게시 상태는 [Partner Center](https://partner.microsoft.com/ko-kr/dashboard/products/9NV119XJGQ7J/overview)에서 확인합니다.
 
 ## 이전 제출 기록 — 2026-11-01
