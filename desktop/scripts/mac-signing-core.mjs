@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { url as inspectorUrl } from 'node:inspector';
+import { windowsSystemPath, windowsPowerShellPath } from './windows-system.mjs';
 import {
   X509Certificate,
   createHash,
@@ -138,8 +139,7 @@ export function secureDirectory(folder, create = false) {
   privatePath(folder, { directory: true });
   if (process.platform === 'win32') {
     // Git for Windows ships a different whoami; never resolve ACL tools through PATH.
-    const system32 = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32');
-    const sid = quietRun(path.join(system32, 'whoami.exe'), ['/user', '/fo', 'csv', '/nh'])
+    const sid = quietRun(windowsSystemPath('whoami.exe'), ['/user', '/fo', 'csv', '/nh'])
       .toString()
       .match(/S-1-[0-9-]+/)?.[0];
     if (!sid) fail('현재 Windows 사용자 SID를 확인할 수 없습니다.');
@@ -169,7 +169,7 @@ foreach($r in $a.GetAccessRules($true,$true,[System.Security.Principal.SecurityI
 if(!$ok) { exit 1 }
 `;
     quietRun(
-      path.join(system32, 'WindowsPowerShell', 'v1.0', 'powershell.exe'),
+      windowsPowerShellPath(),
       [
         '-NoProfile',
         '-NonInteractive',

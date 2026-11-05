@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { generateKeyPairSync, createPublicKey, createHash } from 'node:crypto';
+import { dpapi } from './update-key-protection.mjs';
 import {
   quietRun,
   secureDirectory,
@@ -21,24 +22,6 @@ if (created) fs.mkdirSync(folder);
 secureDirectory(folder, created);
 const file = path.join(folder, 'update-key.dpapi');
 const source = fileURLToPath(new URL('../update-trust.mjs', import.meta.url));
-const dpapi = (bytes, protect) => {
-  const script = `Add-Type -AssemblyName System.Security; $b=[Convert]::FromBase64String([Console]::In.ReadToEnd()); $r=[Security.Cryptography.ProtectedData]::${protect ? 'Protect' : 'Unprotect'}($b,$null,[Security.Cryptography.DataProtectionScope]::CurrentUser); [Console]::Out.Write([Convert]::ToBase64String($r))`;
-  const result = quietRun(
-    'powershell.exe',
-    [
-      '-NoProfile',
-      '-NonInteractive',
-      '-EncodedCommand',
-      Buffer.from(script, 'utf16le').toString('base64'),
-    ],
-    { input: bytes.toString('base64'), label: 'Windows update key protection failed.' },
-  );
-  try {
-    return Buffer.from(result.toString(), 'base64');
-  } finally {
-    result.fill(0);
-  }
-};
 let secret;
 try {
   if (fs.existsSync(file)) {
