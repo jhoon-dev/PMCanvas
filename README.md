@@ -1,22 +1,8 @@
 # PM Canvas
 
 [버전별 사용 매뉴얼](docs/manuals/README.md)
-웹·데스크톱·모바일을 별도 제품으로 관리하는 저장소입니다.
 
 프로젝트 관리 기능은 세 환경에서 공통으로 제공합니다. 진척 그래프·WBS와 기준 계획·일정 점검·마일스톤·참여인력과 투입 계획·이슈/리스크·주간보고·Excel/CSV·프로젝트 파일은 공통 모델과 계산을 사용합니다. 화면 배치는 플랫폼에 맞추고 로그인·팀 공유·서버 관리 기능은 웹에서 제공합니다.
-
-## 제품 식별·표기 규칙
-
-| 항목         | 적용 값                    |
-| ------------ | -------------------------- |
-| Developer    | `jhoon-dev`                |
-| Brand        | `Toolmoa`                  |
-| App ID       | `app.toolmoa.{product-id}` |
-| Display Name | 실제 제품명                |
-
-PM Canvas의 제품 키는 `pmcanvas`, App ID는 **`app.toolmoa.pmcanvas`**, 표시 이름은 **PM Canvas**입니다. 웹·데스크톱·모바일 구분은 플랫폼 설명에 쓰며 제품 표시 이름에 붙이지 않습니다. 다른 제품도 같은 규칙을 적용합니다. 예: 제품 키 `ppm` → `app.toolmoa.ppm`, 표시 이름 **Project Planning Manager**.
-
-개발자와 브랜드는 패키지 메타데이터·앱 정보·개인정보처리방침·출시 문서에 동일하게 표기합니다. Apple의 법적 판매자명과 Microsoft의 발급된 `Identity/Name`, `Publisher`, `PublisherDisplayName`은 Store 계정에서 제공하는 값을 그대로 사용합니다. 일반 App ID나 개발자 표기로 이 값을 대체하지 않습니다.
 
 | 경로       | 역할                                     | 실행·설치 안내                                                                      |
 | ---------- | ---------------------------------------- | ----------------------------------------------------------------------------------- |
@@ -27,6 +13,8 @@ PM Canvas의 제품 키는 `pmcanvas`, App ID는 **`app.toolmoa.pmcanvas`**, 표
 | `.github/` | 제품별 CI·빌드 워크플로                  | [웹 검증](.github/workflows/ci.yml), [데스크톱 빌드](.github/workflows/desktop.yml) |
 
 각 제품은 자체 `package.json`, 의존성, 실행 명령, 테스트와 배포 설정을 갖습니다. 최상위 `package.json`은 명령을 각 제품에 전달하는 용도이며 루트에서 의존성을 설치하지 않습니다.
+
+개발·운영 기준: [제품 식별·표기 규칙](docs/product-identity.md) · [로컬 작업 폴더 관리](docs/workspace-maintenance.md). 루트 패키지의 `0.1.0`은 개발 명령용 메타데이터이며 제품 출시 버전은 각 제품의 `package.json`을 기준으로 합니다.
 
 ## 웹
 
