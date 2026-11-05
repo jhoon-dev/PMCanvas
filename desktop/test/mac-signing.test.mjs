@@ -191,6 +191,33 @@ test('secret prompts do not echo keys or passwords and restore terminal mode on 
 });
 
 test(
+  'Windows workspace permissions work without system tools on PATH',
+  { skip: process.platform !== 'win32' },
+  (t) => {
+    const root = temp(t);
+    const module = new URL('../scripts/mac-signing-core.mjs', import.meta.url).href;
+    const source = `import {newWorkspace,secureDirectory} from ${JSON.stringify(module)};
+      const folder=newWorkspace(process.argv[1]);
+      secureDirectory(folder);
+      process.stdout.write('private');`;
+    const env = Object.fromEntries(
+      Object.entries(process.env).filter(([name]) => name.toLowerCase() !== 'path'),
+    );
+    // Resolve no commands from the inherited PATH or the repository working directory.
+    env.PATH = root;
+    const result = spawnSync(process.execPath, ['--input-type=module', '-e', source, root], {
+      env,
+      cwd: root,
+      encoding: 'utf8',
+      windowsHide: true,
+      timeout: 30000,
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, 'private');
+  },
+);
+
+test(
   'private workspaces reject repositories, worktrees, symlinks and nonprivate access; locks protect existing keys',
   { skip: process.platform !== 'win32' },
   (t) => {
