@@ -1,6 +1,6 @@
 # PM Canvas — iPhone·Android
 
-[버전별 사용 매뉴얼](../docs/manuals/mobile/0.3.0/README.ko.md)
+[버전별 사용 매뉴얼](../docs/manuals/mobile/0.3.1/README.ko.md)
 Developer **jhoon-dev** · Brand **Toolmoa** · App ID **`app.toolmoa.pmcanvas`** · Display Name **PM Canvas**. [제품 식별·표기 규칙](../README.md#제품-식별표기-규칙)을 따릅니다. iOS·Android의 홈 화면 이름도 `PM Canvas`입니다.
 
 iPhone과 Android에서 사용하는 오프라인 프로젝트 관리 앱입니다. Capacitor 8의 네이티브 프로젝트와 휴대폰 전용 화면을 포함합니다. 공통 계산·검증·편집 코드는 `shared/`에서 가져오며 웹 서버나 Electron에 의존하지 않습니다.
