@@ -147,9 +147,29 @@ export class ProjectTools {
       }
     }
     const host = document.querySelector('#pmManagement');
+    if (host) this.formatTables(host);
+    for (const form of host?.querySelectorAll('form') || []) {
+      const submit = form.querySelector('button[type="submit"]');
+      if (!submit) continue;
+      const actions = document.createElement('div');
+      actions.className = 'mobile-form-actions';
+      const cancel = document.createElement('button');
+      cancel.type = 'button';
+      cancel.className = 'button';
+      cancel.dataset.pmReset = '';
+      cancel.textContent = '입력 취소';
+      submit.before(actions);
+      actions.append(submit, cancel);
+    }
+    const staffing = host?.querySelector('[data-pm-form="staffing"]');
+    if (staffing && !this.options.project().members.length)
+      staffing.innerHTML =
+        '<p>투입 기간을 등록하려면 참여인력을 먼저 추가해 주세요.</p><button type="button" class="button primary" data-action="add-member">참여인력 추가</button>';
+  }
+  formatTables(host) {
     // Keep every desktop field and action in the DOM. On phones the same row
     // becomes a labeled record, so actions never disappear beyond the viewport.
-    for (const table of host?.querySelectorAll('table') || []) {
+    for (const table of host.querySelectorAll('table')) {
       const headings = [...table.querySelectorAll('thead th')].map((cell) =>
         cell.textContent.trim(),
       );
@@ -158,6 +178,11 @@ export class ProjectTools {
       for (const row of table.querySelectorAll('tbody tr')) {
         [...row.cells].forEach((cell, index) => {
           cell.dataset.label = headings[index] || '';
+          cell.classList.toggle(
+            'mobile-record-title',
+            ['제목', '마일스톤명', '기간', '인력'].includes(headings[index]),
+          );
+          cell.classList.toggle('mobile-record-actions', Boolean(cell.querySelector('button')));
           if (/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?Z$/.test(cell.textContent.trim())) {
             const date = new Date(cell.textContent.trim());
             if (Number.isFinite(date.getTime()))
@@ -170,20 +195,6 @@ export class ProjectTools {
         });
       }
     }
-    for (const form of host?.querySelectorAll('form') || []) {
-      const submit = form.querySelector('button[type="submit"]');
-      if (!submit) continue;
-      const cancel = document.createElement('button');
-      cancel.type = 'button';
-      cancel.className = 'button';
-      cancel.dataset.pmReset = '';
-      cancel.textContent = '입력 취소';
-      submit.after(cancel);
-    }
-    const staffing = host?.querySelector('[data-pm-form="staffing"]');
-    if (staffing && !this.options.project().members.length)
-      staffing.innerHTML =
-        '<p>투입 기간을 등록하려면 참여인력을 먼저 추가해 주세요.</p><button type="button" class="button primary" data-action="add-member">참여인력 추가</button>';
   }
   records() {
     return completionRecords(this.options.project(), this.range);
@@ -255,6 +266,7 @@ export class ProjectTools {
       this.page = { pane: pane.dataset.managementPane, id: pane.dataset.managementId || '' };
       this.options.render();
       document.querySelector('#content').focus({ preventScroll: true });
+      window.scrollTo(0, 0);
       return;
     }
     const reset = event.target.closest('[data-pm-reset]');
@@ -285,6 +297,11 @@ export class ProjectTools {
   }
   change(event) {
     const el = event.target;
+    // The management listener replaces the monthly table before this listener runs.
+    if (el.id === 'pmPlanMonth') {
+      this.formatTables(document.querySelector('#pmManagement'));
+      return;
+    }
     if (el.id === 'projectView') {
       this.options.navigate(el.value);
       return;

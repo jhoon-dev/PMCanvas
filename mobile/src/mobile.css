@@ -16,6 +16,7 @@
 }
 html {
   scroll-padding-top: calc(76px + var(--inset-top));
+  scroll-padding-bottom: calc(88px + var(--inset-bottom));
 }
 body.mobile-app {
   margin: 0;
@@ -119,7 +120,7 @@ textarea:focus-visible {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 62vw;
+  max-width: 100%;
 }
 .workspace-files {
   margin-left: auto;
@@ -218,9 +219,9 @@ textarea:focus-visible {
 }
 .desktop-controls .report-date {
   display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
 }
 .desktop-controls .report-date input {
   width: 158px;
@@ -228,10 +229,14 @@ textarea:focus-visible {
 .desktop-controls.date-only {
   margin-bottom: 20px;
   gap: 10px 16px;
+  align-items: flex-end;
 }
 .date-caption {
   font-size: 12px;
   color: #7c899b;
+}
+.desktop-controls.date-only .date-caption {
+  padding-bottom: 12px;
 }
 .workspace-filters > label {
   display: grid;
@@ -351,10 +356,16 @@ textarea:focus-visible {
   flex-wrap: wrap;
   gap: 12px;
   margin-bottom: 12px;
+  padding: 0 0 12px;
 }
 .check-task-head > div {
   min-width: 0;
   flex: 1;
+}
+.check-task-head .task-name {
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .check-task-head h2 {
   font-size: 16px;
@@ -399,6 +410,9 @@ textarea:focus-visible {
 .check-item .desktop-check-date {
   grid-column: 2 / -1;
   margin-left: 0;
+}
+.check-item .desktop-check-date:empty {
+  display: none;
 }
 .mobile-app .team-grid {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
@@ -447,6 +461,16 @@ textarea:focus-visible {
 .mobile-app .pm-management .head-actions {
   display: flex;
   flex-wrap: wrap;
+}
+.mobile-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 20px;
+}
+.mobile-form-actions .button {
+  flex: 1 1 150px;
+  white-space: normal;
 }
 .mobile-project-section {
   min-width: 0;
@@ -509,6 +533,13 @@ textarea:focus-visible {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
   gap: 12px;
+  align-items: end;
+}
+.report-range .field {
+  margin: 0;
+}
+.report-range > .button {
+  align-self: end;
 }
 .report-count {
   color: #62748a;
@@ -741,6 +772,7 @@ dialog::backdrop {
 .items-title > span {
   color: #7c899b;
   font-size: 12px;
+  margin-right: 0;
 }
 .item-editor {
   display: grid;
@@ -755,6 +787,11 @@ dialog::backdrop {
 }
 .item-editor .icon-button {
   background: #f5f7fb;
+  width: 44px;
+}
+.item-editor input[name='itemTitle'],
+.item-editor input[name='itemHours'] {
+  width: 100%;
 }
 .add-item {
   width: 100%;
@@ -960,6 +997,32 @@ dialog::backdrop {
 }
 
 @media (max-width: 600px) {
+  .desktop-controls.date-only {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .desktop-controls.date-only .report-date input {
+    width: 100%;
+  }
+  .desktop-controls.date-only .date-caption {
+    padding-bottom: 0;
+  }
+  .workspace-filters > label:not(.switch-label) {
+    flex-basis: 100%;
+  }
+  .mobile-app .form-grid,
+  .report-range {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .mobile-app .pm-management .mobile-record-table caption {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 0 0 16px;
+    font-size: 12px;
+    line-height: 1.7;
+    overflow-wrap: anywhere;
+  }
   .mobile-app .pm-management .mobile-record-table {
     display: block;
     width: 100%;
@@ -1000,20 +1063,21 @@ dialog::backdrop {
     font-size: 12px;
     font-weight: 400;
   }
-  .mobile-record-table td:first-child {
+  .mobile-record-table .mobile-record-title {
     grid-column: 1 / -1;
+    order: -1;
     font-weight: 600;
   }
-  .mobile-record-table td:last-child:has(button) {
+  .mobile-record-table .mobile-record-actions {
+    grid-column: 1 / -1;
     display: flex;
     align-items: flex-start;
     justify-content: flex-end;
     flex-wrap: wrap;
     gap: 6px;
   }
-  .mobile-record-table td:last-child:has(button)::before {
-    width: 100%;
-    text-align: right;
+  .mobile-record-table .mobile-record-actions::before {
+    display: none;
   }
   .mobile-record-table td .button {
     min-height: 44px;
@@ -1049,6 +1113,7 @@ dialog::backdrop {
     max-width: none;
     white-space: normal;
     font-size: 13px;
+    overflow-wrap: anywhere;
   }
   .mobile-app .workspace-results .desktop-table td::before {
     content: attr(data-label);
@@ -1104,6 +1169,83 @@ dialog::backdrop {
   }
   .item-editor [name='itemTitle'] {
     grid-column: 1 / -1;
+  }
+  .items-title {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+  }
+  .task-details > summary {
+    flex-wrap: wrap;
+    padding: 12px;
+  }
+  .task-details > summary span {
+    margin: 0;
+  }
+  .task-details-body {
+    padding: 4px 12px 0;
+  }
+  .holiday-toolbar {
+    grid-template-columns: 44px minmax(0, 1.2fr) minmax(0, 1fr) 44px;
+    gap: 6px;
+  }
+  .holiday-toolbar .button {
+    padding: 8px 4px;
+  }
+  .holiday-toolbar [data-holiday-today] {
+    grid-column: 1 / -1;
+  }
+  .holiday-day {
+    padding: 6px 0;
+  }
+  .holiday-auto {
+    min-height: 44px;
+  }
+  .holiday-auto input {
+    flex: 0 0 22px;
+    min-height: 0;
+    height: 22px;
+    margin: 0;
+  }
+  #wbsWorkspace .wbs-filters > label,
+  #wbsWorkspace .wbs-filters .wbs-search {
+    flex: 1 1 100%;
+    min-width: 0;
+    max-width: none;
+  }
+  #wbsWorkspace .wbs-filters select {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    flex: 1 1 100%;
+  }
+  /* Keep selection and row numbers pinned while other columns can be reached. */
+  #wbsWorkspace .wbs-grid th:nth-child(2),
+  #wbsWorkspace .wbs-grid td:nth-child(2) {
+    width: 88px;
+    white-space: nowrap;
+  }
+  #wbsWorkspace [data-wbs-fold] {
+    display: inline-grid;
+    place-items: center;
+    width: 44px;
+    padding: 0;
+    margin-left: 4px;
+    vertical-align: middle;
+  }
+  #wbsWorkspace .wbs-grid th:nth-child(3),
+  #wbsWorkspace .wbs-grid td:nth-child(3) {
+    position: static;
+    box-shadow: none;
+  }
+  #wbsWorkspace .wbs-gantt-name {
+    position: static;
+  }
+  #wbsWorkspace .wbs-grid input[type='checkbox'] {
+    width: 22px;
+    height: 22px;
+    min-height: 0;
+    margin: 0;
   }
   .stack-actions {
     display: grid;

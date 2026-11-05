@@ -99,6 +99,8 @@ npm run test:ios
 
 모델·저장소 테스트는 파일 호환성, WBS·기준 계획 유지, 잘못된 입력, 완료 체크, 삭제 시 연결 정리, 재연결 복원, 동시 수정 충돌과 트랜잭션 실패를 검사합니다. 브라우저 테스트는 Android 크기의 Chromium과 iPhone 크기의 WebKit에서 생성·편집·체크·복원·내보내기·가져오기·삭제 취소·작은 화면·저장 충돌을 검사합니다. 브라우저 에뮬레이션은 실제 기기 검증을 대체하지 않습니다.
 
+[모바일 레이아웃 검사](test/browser/layout.spec.mjs)는 데이터가 있는 전체 11개 메뉴를 320·360·390·430·600·768·1024px 폭에서 확인합니다. 짧은 입력창의 날짜·세부 작업·저장 버튼, 휴무일 연·월 선택, 관리 폼의 버튼 정렬, 월 변경 후 카드 배치, 주간보고 미리보기, WBS 가로 이동과 계층 버튼의 접근성도 검사합니다.
+
 CI는 브라우저 검증과 개발용 Android APK 빌드, Mac에서 iPhone 시뮬레이터의 XCTest 실행 및 서명 전 기기용 아카이브를 수행합니다. iPhone 테스트는 앱 실행, 개인정보처리방침, 프로젝트 생성, 앱 종료·재실행 후 저장 복원을 확인하며 자신이 만든 시뮬레이터만 정리합니다. `PMCanvas-iPhone-verification-NOT-for-submission` 아티팩트에 시뮬레이터 앱·서명 전 기기 아카이브·XCTest 결과를 ZIP으로 보존합니다. 이 파일은 서명된 IPA나 Store 제출본이 아닙니다. Store 배포 전 실제 iPhone과 Android에서 파일 선택·공유·키보드·백그라운드 복귀·업그레이드 후 데이터 보존을 추가로 확인하세요.
 
 아이콘 원본은 `../desktop/build/icon-source.png`이며 공통 배경은 `icon-settings.json`의 `#2c2e3a`입니다. Chromium 설치 후 `npm run prepare:icons`를 실행하면 Windows ICO·Mac·iPhone·Android 실행 아이콘과 시작 화면, 앱 내부 로고, 웹 파비콘을 같은 불투명 원본으로 갱신합니다. Mac·iPhone의 1024px 파일은 바이트까지 같으며 Android 적응형 배경과 Windows Store 타일도 같은 색을 사용합니다. `npm run verify:icons`는 실제 이미지의 투명도·배경색·크기와 플랫폼 설정을 검사합니다. 생성된 PNG는 소스 관리하며 일반 앱 빌드에는 브라우저 도구가 필요하지 않습니다.
