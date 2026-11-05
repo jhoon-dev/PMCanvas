@@ -134,6 +134,9 @@ test('imports make independent copies and malformed input preserves existing pro
   await importProject(page, backup());
   await expect(page.locator('#activeProjectName')).toHaveText('가져온 프로젝트');
   await page.locator('#projectListLink').click();
+  // setInputFiles bypasses the disabled import button while the route is still loading.
+  await expect(page.locator('.project-card')).toHaveCount(1);
+  await expect(page.locator('#content')).toHaveAttribute('aria-busy', 'false');
   await importProject(page, backup());
   await expect(page.locator('#activeProjectName')).toHaveText('가져온 프로젝트');
   await page.locator('#projectListLink').click();
