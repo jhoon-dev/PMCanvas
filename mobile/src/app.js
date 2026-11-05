@@ -66,11 +66,6 @@ let undo = [],
 const scrollPositions = new Map();
 const mobileViews = projectNavigation('mobile').flatMap((group) => group.views);
 const titles = Object.fromEntries(mobileViews.map((id) => [id, PROJECT_SCREENS[id].title]));
-const tabs = ['overview', 'tasks', 'daily', 'people'].map((id) => [
-  id,
-  PROJECT_SCREENS[id].short,
-  PROJECT_SCREENS[id].icon,
-]);
 const projectTools = new ProjectTools({
   project: () => record?.project,
   revision: () => record?.revision,
@@ -231,7 +226,6 @@ function render() {
   );
   $('#openWorkspaceMenu').hidden = !active;
   $('#workspaceFiles').hidden = !active;
-  $('#navigation').hidden = !active;
   $('#drawerProjectName').textContent = p?.name || '';
   $('#workspaceNavigation').innerHTML = active
     ? projectNavigation('mobile')
@@ -245,15 +239,6 @@ function render() {
               .join('')}</section>`,
         )
         .join('')
-    : '';
-  $('#navigation').innerHTML = active
-    ? tabs
-        .map(
-          ([key, label, glyph]) =>
-            `<a href="#${key}/${esc(p.id)}" ${key === view ? 'aria-current="page"' : ''}>${icon(glyph)}<span>${label}</span></a>`,
-        )
-        .join('') +
-      `<button type="button" data-workspace-menu ${!tabs.some(([key]) => key === view) ? 'class="is-active"' : ''} aria-label="전체 프로젝트 메뉴">${icon('more')}<span>전체</span></button>`
     : '';
   $('#workspaceFiles .menu-popover').innerHTML = active
     ? `${button('프로젝트 설정', 'settings')}${button('프로젝트 내보내기', 'export')}${button('프로젝트 가져오기', 'import')}<hr>${button('↶ 실행 취소', 'undo', '', undo.length ? '' : 'disabled')}${button('↷ 다시 실행', 'redo', '', redo.length ? '' : 'disabled')}`
@@ -585,9 +570,6 @@ $('#workspaceDrawer').addEventListener('close', () =>
 $('#workspaceDrawer').addEventListener('click', (event) => {
   if (event.target === $('#workspaceDrawer') || event.target.closest('a'))
     $('#workspaceDrawer').close();
-});
-document.addEventListener('click', (event) => {
-  if (event.target.closest('[data-workspace-menu]')) showWorkspaceMenu();
 });
 document.addEventListener('click', (event) => {
   if (event.target.closest('[data-reset-filters]') && !busy && !editing) {

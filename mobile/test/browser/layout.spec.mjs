@@ -1,76 +1,8 @@
 import { test, expect } from '@playwright/test';
 import { openView } from './navigation.mjs';
 import { today, addDays } from '../../../shared/browser/engine.js';
-import { weeklyDraft } from '../../../shared/browser/management.js';
+import { layoutProject as project } from './fixtures/layout-project.mjs';
 import { PROJECT_SCREENS } from '../../../shared/browser/project-navigation.js';
-
-function project() {
-  const at = today();
-  const value = {
-    id: 'layout',
-    name: '스마트워크 통합 플랫폼 구축 · 긴 프로젝트 이름과 모바일 정렬 검증',
-    description: '여러 단계의 업무와 인력, 투입 계획, 이슈 및 주간보고를 확인합니다.',
-    holidays: [],
-    koreanHolidays: true,
-    members: ['김하늘', '이서준', '박지민', '최서연'].map((name, index) => ({
-      id: 'm' + index,
-      name,
-      role: '서비스 기획 및 플랫폼 개발',
-      grade: '고급',
-      hours: 8,
-      allocation: 100,
-    })),
-    tasks: Array.from({ length: 12 }, (_, index) => ({
-      id: 't' + index,
-      name: '통합 플랫폼 / 인터페이스 정의와 개발 결과 검토 ' + (index + 1),
-      phase: '공통 플랫폼 개발',
-      owner: 'm' + (index % 4),
-      start: addDays(at, -10),
-      end: addDays(at, 7),
-      predecessor: '',
-      memo: '모바일과 데스크톱의 프로젝트 관리 기능을 확인합니다.',
-      items: [
-        { id: 'i' + index + 'a', title: '요구사항 및 인터페이스 검토', hours: 4, doneDate: at },
-        { id: 'i' + index + 'b', title: '통합 구현과 결과 검증', hours: 8, doneDate: null },
-      ],
-    })),
-    issues: [
-      {
-        id: 'issue',
-        title: '외부 API 응답 규격 변경에 따른 인터페이스 조정',
-        type: 'risk',
-        impact: 'high',
-        probability: 'medium',
-        status: 'open',
-        owner: 'm0',
-        due: addDays(at, 7),
-        action: '변경 규격 검토',
-        taskId: 't0',
-      },
-    ],
-    staffing: {
-      hoursPerMM: 160,
-      assignments: [
-        { id: 'a', memberId: 'm0', start: addDays(at, -10), end: addDays(at, 20), allocation: 80 },
-      ],
-    },
-  };
-  value.tasks.push({
-    id: 'milestone',
-    name: '통합 플랫폼 / 단계 종료 검토 및 승인',
-    kind: 'milestone',
-    owner: 'm0',
-    start: at,
-    end: at,
-    predecessor: '',
-    phase: '검토',
-    items: [],
-    memo: '',
-    doneDate: null,
-  });
-  value.weeklyReports = [weeklyDraft(value, { from: addDays(at, -6), to: at, id: 'weekly' })];
-  return value;
-}
 
 async function start(page, value = project()) {
   await page.goto('/');
@@ -79,8 +11,9 @@ async function start(page, value = project()) {
     mimeType: 'application/json',
     buffer: Buffer.from(JSON.stringify(value)),
   });
-  await expect(page.locator('#activeProjectName')).toHaveText(project().name);
+  await expect(page.locator('#activeProjectName')).toHaveText(value.name);
   await expect(page.locator('#content')).toHaveAttribute('aria-busy', 'false');
+  await expect(page.locator('#navigation, .bottom-nav')).toHaveCount(0);
 }
 
 async function move(page, view) {
@@ -285,4 +218,121 @@ test('dynamic month cards and weekly previews fit phones and WBS fields remain r
   ).toBe(true);
   await layoutFits(page);
   await page.screenshot({ path: info.outputPath('wbs-panned.png') });
+});
+
+test('long Korean text, identifiers and badges reflow without clipped content at phone and tablet boundaries', async ({
+  page,
+}, info) => {
+  test.setTimeout(180000);
+  await start(page, project({ longText: true }));
+  for (const width of [320, 359, 361, 390, 600, 601, 768, 900]) {
+    await page.setViewportSize({ width, height: 812 });
+    for (const view of ['overview', 'tasks', 'daily', 'people', 'management']) {
+      await move(page, view);
+      await layoutFits(page);
+      const overflow = await page.locator('#content').evaluate((root) =>
+        [
+          ...root.querySelectorAll(
+            '.desktop-metric, .desktop-metric strong, .check-panel, .check-task-head, .check-item, .member-card, .member-role, .member-stats, .project-card, .page-head, .head-actions, .button',
+          ),
+        ]
+          .filter((el) => el.clientWidth > 0 && el.scrollWidth > el.clientWidth + 2)
+          .map((el) => ({
+            selector: el.className,
+            text: el.textContent.trim().slice(0, 60),
+            width: el.clientWidth,
+            scroll: el.scrollWidth,
+          })),
+      );
+      expect(overflow, view + ' at ' + width).toEqual([]);
+      if (width <= 760 && ['tasks', 'management'].includes(view)) {
+        const hiddenColumns = await page.locator('#content').evaluate((root) =>
+          [
+            ...root.querySelectorAll(
+              '.workspace-results .desktop-table td, .mobile-record-table td',
+            ),
+          ]
+            .filter((el) => {
+              const box = el.getBoundingClientRect();
+              return box.width && (box.left < 0 || box.right > innerWidth);
+            })
+            .map((el) => el.dataset.label),
+        );
+        expect(hiddenColumns).toEqual([]);
+      }
+      if (view === 'people') {
+        const rows = await page
+          .locator('.member-stats')
+          .evaluateAll((elements) =>
+            elements.map((el) =>
+              [...el.querySelectorAll('strong')].map((value) => value.getBoundingClientRect().top),
+            ),
+          );
+        for (const row of rows) expect(Math.max(...row) - Math.min(...row)).toBeLessThan(1);
+      }
+      const splitWords = await page.locator('#content').evaluate((root) => {
+        const split = [],
+          range = document.createRange();
+        const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+        while (walker.nextNode()) {
+          const node = walker.currentNode,
+            parent = node.parentElement;
+          if (!parent || parent.closest('select, textarea, svg, .desktop-table, .pm-table-scroll'))
+            continue;
+          const style = getComputedStyle(parent),
+            box = parent.getBoundingClientRect();
+          if (!box.width || style.whiteSpace === 'nowrap') continue;
+          for (const match of node.textContent.matchAll(/[가-힣]{2,8}/g)) {
+            range.setStart(node, match.index);
+            range.setEnd(node, match.index + match[0].length);
+            const lines = [...range.getClientRects()].filter((rect) => rect.width > 0);
+            // A short word that fits on a line should not be broken into syllables.
+            if (
+              new Set(lines.map((rect) => Math.round(rect.top))).size > 1 &&
+              box.width > match[0].length * parseFloat(style.fontSize)
+            )
+              split.push(match[0]);
+          }
+        }
+        return split;
+      });
+      expect(splitWords, view + ' at ' + width).toEqual([]);
+      if (width === 390 && ['daily', 'people'].includes(view))
+        await page.screenshot({ path: info.outputPath('long-' + view + '.png') });
+    }
+  }
+});
+
+test('the top menu retains all destinations and file actions without reserving a bottom navigation area', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 360, height: 640 });
+  await start(page);
+  await page.evaluate(() =>
+    document.documentElement.style.setProperty('--safe-area-inset-bottom', '24px'),
+  );
+  await expect(page.locator('#content')).toHaveCSS('padding-bottom', '56px');
+  await page.getByRole('button', { name: '프로젝트 메뉴 열기', exact: true }).click();
+  await expect(page.locator('#workspaceNavigation a')).toHaveCount(11);
+  await page.locator('#workspaceNavigation [data-view="more"]').click();
+  await expect(page.locator('.project-heading h1')).toHaveText('설정 · 파일');
+  await expect(page.locator('#toast')).toBeHidden({ timeout: 10000 });
+  await page
+    .getByRole('button', { name: '이 프로젝트 삭제', exact: true })
+    .scrollIntoViewIfNeeded();
+  expect(
+    await page.getByRole('button', { name: '이 프로젝트 삭제', exact: true }).evaluate((el) => {
+      const box = el.getBoundingClientRect();
+      return document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2) === el;
+    }),
+  ).toBe(true);
+  await page.getByLabel('프로젝트 파일과 설정', { exact: true }).click();
+  await page
+    .locator('#workspaceFiles')
+    .getByRole('button', { name: '프로젝트 설정', exact: true })
+    .click();
+  await expect(page.locator('#editorTitle')).toHaveText('프로젝트 설정');
+  await page.getByRole('button', { name: '입력 취소', exact: true }).click();
+  await page.locator('#projectListLink').click();
+  await expect(page.locator('.project-card')).toHaveCount(1);
 });
