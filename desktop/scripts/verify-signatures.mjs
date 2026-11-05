@@ -1,10 +1,11 @@
 import path from 'node:path';
 import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { windowsPowerShellPath } from './windows-system.mjs';
 
 export function verifyWindowsSignature(file, run = execFileSync) {
   run(
-    'powershell.exe',
+    windowsPowerShellPath(),
     [
       '-NoProfile',
       '-NonInteractive',

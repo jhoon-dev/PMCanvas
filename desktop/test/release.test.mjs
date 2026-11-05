@@ -221,7 +221,14 @@ test('release verification checks timestamped Authenticode and both macOS signat
   assert.ok(
     calls.every(
       ([cmd, args, options]) =>
-        cmd === 'powershell.exe' &&
+        cmd ===
+          path.win32.join(
+            process.env.SystemRoot || 'C:\\Windows',
+            'System32',
+            'WindowsPowerShell',
+            'v1.0',
+            'powershell.exe',
+          ) &&
         args.at(-1).includes('TimeStamperCertificate') &&
         options.env.PM_SIGNATURE_FILE.endsWith('.exe'),
     ),
