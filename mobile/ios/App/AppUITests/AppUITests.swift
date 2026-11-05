@@ -34,11 +34,19 @@ final class AppUITests: XCTestCase {
         // keyboard (including iPad's input assistant) has no Keyboard element;
         // native typeText still verifies that a first responder accepts input.
         _ = keyboard.waitForExistence(timeout: 5)
-        // A single rapid key sequence can outrun WKWebView on shared CI hosts.
-        // Let XCTest idle between characters, then commit the keyboard input.
-        // Send keys to the application's native first responder. Re-resolving a
-        // WKWebView field for every character can lose its native focus snapshot.
-        for character in text { app.typeText(String(character)) }
+        // Address the labeled field, not whichever descendant of the app has
+        // native focus. Wait for WebKit to expose each delivered character before
+        // sending the next one; a dropped key must fail here, not pass unnoticed.
+        var entered = ""
+        for character in text {
+            field.typeText(String(character))
+            entered.append(character)
+            let delivered = XCTNSPredicateExpectation(
+                predicate: NSPredicate(format: "value == %@", entered), object: field
+            )
+            XCTAssertEqual(XCTWaiter.wait(for: [delivered], timeout: 10), .completed,
+                           "Input delivery: \(String(reflecting: field.value)); expected: \(String(reflecting: entered))\n\(app.debugDescription)")
+        }
         dismissKeyboard(app)
         let committed = XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "value == %@", text), object: field
