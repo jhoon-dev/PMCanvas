@@ -221,7 +221,7 @@ try {
       await attach();
       await page.getByRole('button', { name: new RegExp(name) }).click();
       await expect(page.locator('#activeProjectName')).toHaveText(name);
-      await page.getByRole('link', { name: '인력', exact: true }).click();
+      await openView(page, 'people');
       await page
         .locator('.page-head')
         .getByRole('button', { name: '＋ 참여인력 추가', exact: true })
@@ -239,7 +239,7 @@ try {
     },
   );
   await step('create and edit a task with a weighted checklist', async () => {
-    await page.getByRole('link', { name: '업무', exact: true }).click();
+    await openView(page, 'tasks');
     await page
       .locator('.page-head')
       .getByRole('button', { name: '＋ 업무 추가', exact: true })
@@ -259,13 +259,13 @@ try {
     ).toBeVisible();
   });
   await step('check an item, filter tasks and calculate 25 percent progress', async () => {
-    await page.getByRole('link', { name: '완료 체크', exact: true }).click();
+    await openView(page, 'daily');
     await page.getByRole('checkbox', { name: /프로젝트 저장/ }).click();
     await expect(page.locator('[data-item]')).toHaveCount(2);
     await page.getByLabel('할 일만', { exact: true }).uncheck();
     await expect(page.locator('[data-item]:checked')).toHaveCount(1);
     await screenshot('02-checklist');
-    await page.getByRole('link', { name: '업무', exact: true }).click();
+    await openView(page, 'tasks');
     await fillField(page.getByRole('searchbox', { name: '업무 검색' }), '없는 업무');
     await expect(page.locator('#workspaceResults')).toContainText('표시할 업무가 없습니다.');
     await fillField(page.getByRole('searchbox', { name: '업무 검색' }), '');
@@ -273,7 +273,7 @@ try {
     await page.getByLabel('담당자 필터').selectOption(ownerId);
     await expect(page.locator('.desktop-table tbody tr')).toHaveCount(1);
     await page.getByLabel('담당자 필터').selectOption('');
-    await page.getByRole('link', { name: '현황', exact: true }).click();
+    await openView(page, 'overview');
     await expect(page.locator('.desktop-metric:first-child > strong')).toHaveText('25%');
     assert.equal(
       await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
@@ -286,18 +286,18 @@ try {
     try {
       await openView(page, 'more');
       await page.getByRole('button', { name: '↶ 실행 취소', exact: true }).click();
-      await page.getByRole('link', { name: '현황', exact: true }).click();
+      await openView(page, 'overview');
       await expect(page.locator('.desktop-metric:first-child > strong')).toHaveText('0%');
       await openView(page, 'more');
       await page.getByRole('button', { name: '↷ 다시 실행', exact: true }).click();
-      await page.getByRole('link', { name: '현황', exact: true }).click();
+      await openView(page, 'overview');
       await expect(page.locator('.desktop-metric:first-child > strong')).toHaveText('25%');
     } finally {
       await page.context().setOffline(false);
     }
   });
   await step('Android Back cancels editing without losing the saved project', async () => {
-    await page.getByRole('link', { name: '업무', exact: true }).click();
+    await openView(page, 'tasks');
     await page.getByRole('button', { name: 'Android 주요 기능 검증', exact: true }).click();
     await fillField(page.locator('[name="name"]'), '취소할 수정');
     await back();
@@ -390,7 +390,7 @@ try {
   });
   await step('delete task, member and imported project without changing the original', async () => {
     await page.locator('.project-card').filter({ hasText: name }).first().click();
-    await page.getByRole('link', { name: '업무', exact: true }).click();
+    await openView(page, 'tasks');
     await page.getByRole('button', { name: 'Android 주요 기능 검증', exact: true }).click();
     await page.locator('#deleteItem').click();
     await page.locator('#confirmation').getByRole('button', { name: '취소', exact: true }).click();

@@ -78,6 +78,16 @@ final class AppUITests: XCTestCase {
         add(shot)
     }
 
+    private func openScreen(_ title: String, in web: XCUIElement) {
+        let menu = web.buttons["프로젝트 메뉴 열기"]
+        XCTAssertTrue(menu.wait(for: \.isHittable, toEqual: true, timeout: 10))
+        menu.tap()
+        let destination = web.links[title]
+        XCTAssertTrue(destination.wait(for: \.isHittable, toEqual: true, timeout: 10))
+        destination.tap()
+        XCTAssertTrue(web.staticTexts[title].waitForExistence(timeout: 10))
+    }
+
     func testStoreScreenshots() {
         continueAfterFailure = false
         XCUIDevice.shared.orientation = .portrait
@@ -98,7 +108,7 @@ final class AppUITests: XCTestCase {
         web.buttons["저장"].tap()
         XCTAssertTrue(web.links.matching(NSPredicate(format: "label CONTAINS %@", projectName)).firstMatch.waitForExistence(timeout: 10))
 
-        web.links["인력"].tap()
+        openScreen("참여인력", in: web)
         let addPerson = web.buttons.matching(identifier: "＋ 참여인력 추가").firstMatch
         XCTAssertTrue(addPerson.wait(for: \.isHittable, toEqual: true, timeout: 10))
         addPerson.tap()
@@ -108,7 +118,7 @@ final class AppUITests: XCTestCase {
         web.buttons["저장"].tap()
         XCTAssertTrue(web.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Alex")).firstMatch.waitForExistence(timeout: 10))
 
-        web.links["업무"].tap()
+        openScreen("업무 · 일정", in: web)
         for (task, detail) in [("UX review", "Review navigation"), ("Release build", "Prepare store package"), ("Launch checklist", "Confirm launch readiness")] {
             web.buttons.matching(NSPredicate(format: "label == %@", "＋ 업무 추가")).firstMatch.tap()
             // Track the input by its stable label while its editing state changes,
@@ -123,7 +133,7 @@ final class AppUITests: XCTestCase {
             XCTAssertTrue(web.buttons[task].waitForExistence(timeout: 10), app.debugDescription)
         }
         keepStoreScreenshot(app, "tasks")
-        web.links["완료 체크"].tap()
+        openScreen("완료 체크", in: web)
         // WKWebView exposes HTML checkboxes as native accessibility switches.
         let check = web.switches.matching(NSPredicate(format: "label CONTAINS %@", "Review navigation")).firstMatch
         XCTAssertTrue(check.waitForExistence(timeout: 10), app.debugDescription)
@@ -134,10 +144,10 @@ final class AppUITests: XCTestCase {
         )
         XCTAssertEqual(XCTWaiter.wait(for: [checked], timeout: 10), .completed, app.debugDescription)
         keepStoreScreenshot(app, "checklist")
-        web.links["현황"].tap()
+        openScreen("프로젝트 현황", in: web)
         XCTAssertTrue(web.staticTexts["33%"].waitForExistence(timeout: 10))
         keepStoreScreenshot(app, "overview")
-        web.links["인력"].tap()
+        openScreen("참여인력", in: web)
         keepStoreScreenshot(app, "people")
 
         app.terminate(); app.launch()

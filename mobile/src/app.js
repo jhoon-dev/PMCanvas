@@ -66,11 +66,6 @@ let undo = [],
 const scrollPositions = new Map();
 const mobileViews = projectNavigation('mobile').flatMap((group) => group.views);
 const titles = Object.fromEntries(mobileViews.map((id) => [id, PROJECT_SCREENS[id].title]));
-const tabs = ['overview', 'tasks', 'daily', 'people'].map((id) => [
-  id,
-  PROJECT_SCREENS[id].short,
-  PROJECT_SCREENS[id].icon,
-]);
 const projectTools = new ProjectTools({
   project: () => record?.project,
   revision: () => record?.revision,
@@ -215,7 +210,7 @@ function more(p) {
 
     <section class="settings-card"><h2>파일 가져오기 · 내보내기</h2><p>프로젝트 파일은 웹과 데스크톱에서도 가져올 수 있습니다.</p><div class="stack-actions">${button(icon('download') + ' 프로젝트 내보내기', 'export')}${button(icon('upload') + ' 프로젝트 가져오기', 'import')}</div></section>
     <section class="settings-card"><h2>업무 기준 시간대</h2><p>${esc(getBusinessTimeZone())} 기준으로 오늘과 완료일을 계산합니다.</p>${button('시간대 변경', 'timezone')}</section>
-    <p class="privacy-note">PM Canvas 0.3.0 · 기기에 자동 저장<br>계정이나 서버 연결 없이 동작합니다. 앱을 삭제하면 기기의 프로젝트도 삭제될 수 있으므로 파일을 내보내 보관하세요.</p>
+    <p class="privacy-note">PM Canvas 0.3.1 · 기기에 자동 저장<br>계정이나 서버 연결 없이 동작합니다. 앱을 삭제하면 기기의 프로젝트도 삭제될 수 있으므로 파일을 내보내 보관하세요.</p>
     <p class="privacy-note">${button('개인정보처리방침', 'privacy', 'ghost')}</p>
     <div class="delete-project">${button('이 프로젝트 삭제', 'delete-project', 'danger ghost')}</div>`;
 }
@@ -231,7 +226,6 @@ function render() {
   );
   $('#openWorkspaceMenu').hidden = !active;
   $('#workspaceFiles').hidden = !active;
-  $('#navigation').hidden = !active;
   $('#drawerProjectName').textContent = p?.name || '';
   $('#workspaceNavigation').innerHTML = active
     ? projectNavigation('mobile')
@@ -245,15 +239,6 @@ function render() {
               .join('')}</section>`,
         )
         .join('')
-    : '';
-  $('#navigation').innerHTML = active
-    ? tabs
-        .map(
-          ([key, label, glyph]) =>
-            `<a href="#${key}/${esc(p.id)}" ${key === view ? 'aria-current="page"' : ''}>${icon(glyph)}<span>${label}</span></a>`,
-        )
-        .join('') +
-      `<button type="button" data-workspace-menu ${!tabs.some(([key]) => key === view) ? 'class="is-active"' : ''} aria-label="전체 프로젝트 메뉴">${icon('more')}<span>전체</span></button>`
     : '';
   $('#workspaceFiles .menu-popover').innerHTML = active
     ? `${button('프로젝트 설정', 'settings')}${button('프로젝트 내보내기', 'export')}${button('프로젝트 가져오기', 'import')}<hr>${button('↶ 실행 취소', 'undo', '', undo.length ? '' : 'disabled')}${button('↷ 다시 실행', 'redo', '', redo.length ? '' : 'disabled')}`
@@ -585,9 +570,6 @@ $('#workspaceDrawer').addEventListener('close', () =>
 $('#workspaceDrawer').addEventListener('click', (event) => {
   if (event.target === $('#workspaceDrawer') || event.target.closest('a'))
     $('#workspaceDrawer').close();
-});
-document.addEventListener('click', (event) => {
-  if (event.target.closest('[data-workspace-menu]')) showWorkspaceMenu();
 });
 document.addEventListener('click', (event) => {
   if (event.target.closest('[data-reset-filters]') && !busy && !editing) {
