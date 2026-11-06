@@ -4,8 +4,10 @@ final class AppUITests: XCTestCase {
     private var storeApp: XCUIApplication?
 
     override func tearDown() {
-        if let app = storeApp, testRun?.hasSucceeded == false {
-            let shot = XCTAttachment(screenshot: app.screenshot())
+        // hasSucceeded isn't final during tearDown. Only recorded failures need
+        // diagnostics; successful tests must not request another screenshot/tree.
+        if let app = storeApp, (testRun?.totalFailureCount ?? 0) > 0 {
+            let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
             shot.name = "Store failure state"
             shot.lifetime = .keepAlways
             add(shot)
@@ -76,14 +78,35 @@ final class AppUITests: XCTestCase {
                       "Control did not enter the visible workspace: \(element.debugDescription)")
     }
 
-    private func keepStoreScreenshot(_ app: XCUIApplication, _ name: String) {
-        // Wait for the save toast to disappear so the actual content is unobscured.
-        let toast = app.webViews.staticTexts.matching(NSPredicate(format: "label ENDSWITH %@", "했습니다.")).firstMatch
-        if toast.exists { XCTAssertTrue(toast.waitForNonExistence(timeout: 8)) }
-        let shot = XCTAttachment(screenshot: app.screenshot())
-        shot.name = "Store " + name
-        shot.lifetime = .keepAlways
-        add(shot)
+    private func keepScreenshot(_ app: XCUIApplication, _ name: String,
+                                ready element: XCUIElement, repetitions: Int = 1) {
+        guard app.wait(for: .runningForeground, timeout: 10) else {
+            XCTFail("Screenshot requires the foreground app: \(name)")
+            return
+        }
+        guard element.waitForExistence(timeout: 10) else {
+            XCTFail("Screenshot content did not become ready: \(name)")
+            return
+        }
+        // Both Store and persistence captures wait for save feedback to disappear.
+        let toast = app.webViews.staticTexts.matching(NSPredicate(
+            format: "label ENDSWITH %@ OR label == %@", "했습니다.",
+            "새 프로젝트를 만들었습니다. 참여인력부터 추가해 보세요."
+        )).firstMatch
+        guard !toast.exists || toast.waitForNonExistence(timeout: 8) else {
+            XCTFail("Save feedback still covers the screenshot: \(name)")
+            return
+        }
+        for index in 1...repetitions {
+            XCTAssertEqual(app.state, .runningForeground)
+            XCTAssertTrue(element.exists, "Screenshot content disappeared: \(name)")
+            // Capture the device screen directly instead of an app-element crop.
+            // A capture error still fails the test; no retries or skipped assertions.
+            let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+            shot.name = index == 1 ? name : "\(name) repeat \(index)"
+            shot.lifetime = .keepAlways
+            add(shot)
+        }
     }
 
     private func openScreen(_ title: String, in web: XCUIElement) {
@@ -140,7 +163,7 @@ final class AppUITests: XCTestCase {
             web.buttons["저장"].tap()
             XCTAssertTrue(web.buttons[task].waitForExistence(timeout: 10), app.debugDescription)
         }
-        keepStoreScreenshot(app, "tasks")
+        keepScreenshot(app, "Store tasks", ready: web.staticTexts["업무 · 일정"])
         openScreen("완료 체크", in: web)
         // WKWebView exposes HTML checkboxes as native accessibility switches.
         let check = web.switches.matching(NSPredicate(format: "label CONTAINS %@", "Review navigation")).firstMatch
@@ -151,12 +174,12 @@ final class AppUITests: XCTestCase {
             predicate: NSPredicate(format: "value == %@", "1"), object: check
         )
         XCTAssertEqual(XCTWaiter.wait(for: [checked], timeout: 10), .completed, app.debugDescription)
-        keepStoreScreenshot(app, "checklist")
+        keepScreenshot(app, "Store checklist", ready: web.staticTexts["완료 체크"])
         openScreen("프로젝트 현황", in: web)
         XCTAssertTrue(web.staticTexts["33%"].waitForExistence(timeout: 10))
-        keepStoreScreenshot(app, "overview")
+        keepScreenshot(app, "Store overview", ready: web.staticTexts["프로젝트 현황"])
         openScreen("참여인력", in: web)
-        keepStoreScreenshot(app, "people")
+        keepScreenshot(app, "Store people", ready: web.staticTexts["참여인력"])
 
         app.terminate(); app.launch()
         let saved = app.webViews.buttons.matching(NSPredicate(format: "label CONTAINS %@", projectName)).firstMatch
@@ -182,12 +205,9 @@ final class AppUITests: XCTestCase {
         let name = web.textFields["프로젝트명"]
         enter("iPhone persistence check", in: name, app: app)
         web.buttons["저장"].tap()
-        XCTAssertTrue(web.links.matching(NSPredicate(format: "label CONTAINS %@", "iPhone persistence check")).firstMatch.waitForExistence(timeout: 10), app.debugDescription)
-
-        let overview = XCTAttachment(screenshot: app.screenshot())
-        overview.name = "iPhone project overview"
-        overview.lifetime = .keepAlways
-        add(overview)
+        let project = web.links.matching(NSPredicate(format: "label CONTAINS %@", "iPhone persistence check")).firstMatch
+        XCTAssertTrue(project.waitForExistence(timeout: 10), app.debugDescription)
+        keepScreenshot(app, "iPhone project overview", ready: project, repetitions: 3)
 
         app.terminate()
         app.launch()
@@ -198,10 +218,8 @@ final class AppUITests: XCTestCase {
         let savedProject = relaunchedWeb.buttons.matching(NSPredicate(format: "label CONTAINS %@", "iPhone persistence check")).firstMatch
         XCTAssertTrue(savedProject.waitForExistence(timeout: 20), "Committed project disappeared after relaunch: \(app.debugDescription)")
         savedProject.tap()
-        XCTAssertTrue(app.webViews.links.matching(NSPredicate(format: "label CONTAINS %@", "iPhone persistence check")).firstMatch.waitForExistence(timeout: 10))
-        let restored = XCTAttachment(screenshot: app.screenshot())
-        restored.name = "iPhone project restored after relaunch"
-        restored.lifetime = .keepAlways
-        add(restored)
+        let restored = app.webViews.links.matching(NSPredicate(format: "label CONTAINS %@", "iPhone persistence check")).firstMatch
+        XCTAssertTrue(restored.waitForExistence(timeout: 10))
+        keepScreenshot(app, "iPhone project restored after relaunch", ready: restored, repetitions: 3)
     }
 }
