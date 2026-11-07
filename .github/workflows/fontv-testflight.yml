@@ -1,0 +1,51 @@
+name: Font V TestFlight
+on:
+  workflow_dispatch:
+    inputs:
+      source_commit:
+        description: Exact Font V source commit in the encrypted envelope
+        required: true
+        type: string
+      build_number:
+        description: Font V iOS build number
+        required: true
+        default: '2'
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: fontv-testflight
+  cancel-in-progress: false
+jobs:
+  internal-test:
+    if: github.ref == 'refs/heads/main'
+    runs-on: macos-latest
+    timeout-minutes: 75
+    environment: desktop-mac-store
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: '3.44.2'
+          channel: stable
+      - name: Build, sign, upload and enable Font V internal testing
+        run: node .github/ci/fontv-runner.mjs
+        env:
+          EXPECTED_COMMIT: ${{ inputs.source_commit }}
+          FONTV_BUILD_NUMBER: ${{ inputs.build_number }}
+          FONTV_SOURCE_KEY: ${{ secrets.FONTV_SOURCE_KEY }}
+          MAS_CSC_LINK: ${{ secrets.MAS_CSC_LINK }}
+          MAS_CSC_KEY_PASSWORD: ${{ secrets.MAS_CSC_KEY_PASSWORD }}
+          ASC_KEY_BASE64: ${{ secrets.ASC_KEY_BASE64 }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: FontV-encrypted-result
+          path: fontv-result/
+          if-no-files-found: warn
+          retention-days: 7
