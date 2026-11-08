@@ -1,6 +1,15 @@
 import desktop from './desktop-en.js';
 // UI literals only. User-entered content never passes through this catalog.
 export default {
+  '근무일 없는 일정: ': 'No workdays in schedule: ',
+  '근무일이 포함되도록 일정이나 휴무일 설정을 확인해 주세요.':
+    'Check the schedule or holiday settings so the task includes a workday.',
+  '개 · 근무일 없는 업무 ': ' · Tasks without workdays ',
+  '완료 기록 부족 · 계획 속도와 혼합한 추정':
+    'Limited records · Estimate blends planned and observed speed',
+  '계획·실적 혼합 추정': 'Blended plan and observed estimate',
+  '관측 속도 · 계획 대비 ': 'Observed speed · Compared with plan ',
+  '예측 적용 속도 · 계획 대비 ': 'Applied forecast speed · Compared with plan ',
   '집계 기준': 'Calculation basis',
   '기간별 계획': 'Staffing periods',
   '기본 투입률로 추정': 'Estimated from default allocation',
@@ -878,8 +887,8 @@ export default {
   '최근 속도 반영 · 계획 대비': 'Recent speed · Compared with plan',
   '최근 실행 이력': 'Recent runs',
   '최근 완료 속도를 반영한 추정': 'Based on recent completion speed',
-  '최근 최대 10근무일 동안 계획 대비 완료 작업량의 비율을 구해 계획 속도를 보정합니다. 최소 3근무일이 지나고, 서로 다른 2일 이상에 완료 기록이 있어야 적용합니다. 기록이 부족하면 계획 기준으로 표시합니다. 완료한 항목의 예상 공수를 사용하므로 실제 투입시간을 측정한 값은 아닙니다.':
-    'Recent speed uses completed effort relative to planned effort over up to 10 workdays. At least 3 workdays and completions on 2 different days are required; otherwise forecasts use the plan. Estimated effort on completed items is used, not measured working time.',
+  '최근 최대 10근무일의 계획 대비 완료 작업량을 사용합니다. 최소 3근무일·서로 다른 2일의 완료 기록부터 계획 속도와 혼합하며, 관측 기간·완료 날짜 수·완료 공수가 늘수록 실적 비중을 높입니다. 10근무일·5일 이상의 완료 기록·계획 속도 기준 3일분 이상의 완료 공수가 모이면 실적 속도를 그대로 적용합니다. 기록이 적으면 혼합 추정으로 표시하며 인력 화면에서 관측 속도와 예측 적용 속도를 함께 확인할 수 있습니다. 완료 공수는 항목의 예상 시간이며 실제 투입시간이나 통계적 신뢰도를 뜻하지 않습니다.':
+    'Forecasts use completed versus planned effort over up to 10 workdays. After at least 3 workdays and completions on 2 distinct dates, recent speed is blended with planned speed. Its weight grows with the observation period, distinct completion dates and completed effort. Full weight requires 10 workdays, 5 completion dates and at least 3 planned days of completed effort. Limited records are labelled as a blended estimate. The people view shows both observed and applied speed. Effort uses item estimates, not measured time or statistical confidence.',
   추가: 'Add',
   추가됨: 'Added',
   출력: 'Export',

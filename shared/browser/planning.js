@@ -163,7 +163,7 @@ export function criticalPath(project) {
   for (const t of tasks) {
     for (const id of predecessorIds(t)) successors.get(id).push(t.id);
     const release = workdays(origin, t.kind === 'milestone' ? t.start : addDays(t.start, -1), h),
-      duration = t.kind === 'milestone' ? 0 : workdays(t.start, t.end, h);
+      duration = t.kind === 'milestone' ? 0 : Math.max(1, workdays(t.start, t.end, h));
     early[t.id] = Math.max(release, ...predecessorIds(t).map((id) => finish[id]));
     finish[t.id] = early[t.id] + duration;
   }
@@ -181,8 +181,12 @@ export function criticalPath(project) {
 export function scheduleWarnings(project) {
   const tasks = executionTasks(project),
     calendar = capacityCalendar(project),
+    holidays = projectHolidays(project),
     byId = new Map(tasks.map((t) => [t.id, t]));
-  const dependencies = tasks.filter((t) =>
+  const nonWorking = tasks.filter(
+      (t) => t.kind !== 'milestone' && !workdays(t.start, t.end, holidays),
+    ),
+    dependencies = tasks.filter((t) =>
       predecessorIds(t).some((id) =>
         t.kind === 'milestone' ? t.start < byId.get(id)?.end : t.start <= byId.get(id)?.end,
       ),
@@ -225,7 +229,7 @@ export function scheduleWarnings(project) {
       }
     }
   }
-  return { dependencies, overloads };
+  return { dependencies, overloads, nonWorking };
 }
 
 export function validatePlanning(project) {

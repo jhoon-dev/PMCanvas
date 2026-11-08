@@ -91,7 +91,7 @@ export function wbsRows(project, at, forecast, tasks = project.tasks) {
         ui(actual === 1 ? '완료' : task.end < at ? '지연' : actual > 0 ? '진행 중' : '예정'),
         f?.end || '',
         f?.end ? Math.max(0, workdays(addDays(task.end, 1), f.end, projectHolidays(project))) : '',
-        ui(methods[f?.method] || '계산 대기'),
+        ui(f?.blended ? '계획·실적 혼합 추정' : methods[f?.method] || '계산 대기'),
         predecessorIds(task)
           .map((id) => project.tasks.find((t) => t.id === id)?.name || id)
           .join(', '),

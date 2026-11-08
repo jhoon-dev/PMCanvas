@@ -296,6 +296,7 @@ export function weeklyDraft(
     '주간보고는 오늘까지의 1~7일 기간으로 발행해 주세요.',
   );
   const tasks = taskLeaves(project),
+    holidays = projectHolidays(project),
     members = new Map(project.members.map((m) => [m.id, m.name]));
   const nextFrom = addDays(from, 7),
     nextTo = addDays(from, 13);
@@ -310,28 +311,19 @@ export function weeklyDraft(
   });
   const total = tasks.reduce((n, t) => n + taskHours(t), 0),
     done = tasks.reduce((n, t) => n + earned(t, to), 0),
-    plan = tasks.reduce((n, t) => n + planned(t, to, projectHolidays(project)), 0);
+    plan = tasks.reduce((n, t) => n + planned(t, to, holidays), 0);
   const baselineParents = new Set((project.baseline?.tasks || []).map((t) => t.parentId));
-  const base = (project.baseline?.tasks || []).filter((t) => !baselineParents.has(t.id));
+  // Baselines store aggregate hours; adapt them to the common planning calculation.
+  const base = (project.baseline?.tasks || [])
+    .filter((t) => !baselineParents.has(t.id))
+    .map((t) => ({ ...t, items: [{ hours: t.hours }] }));
   const baseTotal = base.reduce((n, t) => n + t.hours, 0);
   const curve = Array.from({ length: daysBetween(from, to) + 2 }, (_, n) => {
     const date = addDays(from, n - 1);
-    const baseline = base.reduce(
-      (n, t) =>
-        n +
-        t.hours *
-          Math.min(
-            1,
-            workdays(t.start, date < t.end ? date : t.end, projectHolidays(project)) /
-              Math.max(1, workdays(t.start, t.end, projectHolidays(project))),
-          ),
-      0,
-    );
+    const baseline = base.reduce((n, t) => n + planned(t, date, holidays), 0);
     return {
       date,
-      planned: total
-        ? tasks.reduce((n, t) => n + planned(t, date, projectHolidays(project)), 0) / total
-        : 0,
+      planned: total ? tasks.reduce((n, t) => n + planned(t, date, holidays), 0) / total : 0,
       actual: total ? tasks.reduce((n, t) => n + earned(t, date), 0) / total : 0,
       baseline: baseTotal ? baseline / baseTotal : null,
     };

@@ -59,7 +59,14 @@ export function peopleView(p, s, asOf, { controls = '' } = {}) {
               num(total) +
               ui('h 완료 작업량</div><div class="pace-note">') +
               (pc.observed
-                ? ui('최근 속도 반영 · 계획 대비 ') + num(pc.ratio * 100) + '%'
+                ? ui('관측 속도 · 계획 대비 ') +
+                  num(pc.rawRatio * 100) +
+                  '%' +
+                  '<br>' +
+                  ui('예측 적용 속도 · 계획 대비 ') +
+                  num(pc.ratio * 100) +
+                  '%' +
+                  (pc.weight < 1 ? '<br>' + ui('완료 기록 부족 · 계획 속도와 혼합한 추정') : '')
                 : ui('계획 기준 추정 · 완료 기록 수집 중')) +
               '</div></article>'
             );

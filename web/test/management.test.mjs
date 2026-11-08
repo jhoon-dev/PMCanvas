@@ -204,6 +204,88 @@ test('주간보고는 발행 당시 업무·설명·이슈·기준 계획과 당
   assert.throws(() => draft(p, { to: '2026-10-24' }), /기간/);
 });
 
+test('주간보고 기준 곡선도 공휴일·수동 휴일·주말 전용 공수를 종료일에 반영', () => {
+  for (const calendar of [
+    { date: '2026-10-09', koreanHolidays: true, holidays: [] },
+    { date: '2026-10-19', koreanHolidays: false, holidays: ['2026-10-19'] },
+    { date: '2026-10-24', koreanHolidays: false, holidays: [] },
+  ]) {
+    const p = cleanProject({
+      ...fixture(),
+      ...calendar,
+      tasks: [
+        task('H', {
+          start: calendar.date,
+          end: calendar.date,
+          items: [{ id: 'h', title: 'Holiday effort', hours: 8, doneDate: null }],
+        }),
+      ],
+    });
+    p.baseline = captureBaseline(p, 'Holiday baseline');
+    const before = structuredClone(p);
+    const report = weeklyDraft(p, {
+      from: calendar.date,
+      to: calendar.date,
+      currentDate: '2026-11-08',
+    });
+    assert.deepEqual(
+      report.snapshot.curve.map(({ planned, baseline }) => ({ planned, baseline })),
+      [
+        { planned: 0, baseline: 0 },
+        { planned: 1, baseline: 1 },
+      ],
+    );
+    assert.equal(report.snapshot.metrics.plan, 8);
+    assert.deepEqual(p, before);
+  }
+});
+
+test('주간보고 기준 곡선은 혼합 일정의 공수를 가중하고 요약 중복과 마일스톤 공수를 제외', () => {
+  const p = cleanProject({
+    ...fixture(),
+    koreanHolidays: true,
+    tasks: [
+      task('S', { kind: 'summary', owner: '', start: '2026-10-08', end: '2026-10-12', items: [] }),
+      task('H', {
+        parentId: 'S',
+        start: '2026-10-09',
+        end: '2026-10-09',
+        items: [{ id: 'h', title: 'Holiday effort', hours: 8, doneDate: null }],
+      }),
+      task('W', {
+        parentId: 'S',
+        start: '2026-10-08',
+        end: '2026-10-12',
+        items: [{ id: 'w', title: 'Working effort', hours: 16, doneDate: null }],
+      }),
+      task('M', {
+        parentId: 'S',
+        kind: 'milestone',
+        start: '2026-10-09',
+        end: '2026-10-09',
+        items: [],
+        doneDate: null,
+      }),
+    ],
+  });
+  p.baseline = captureBaseline(p, 'Mixed baseline');
+  const before = structuredClone(p);
+  const report = weeklyDraft(p, {
+    from: '2026-10-08',
+    to: '2026-10-12',
+    currentDate: '2026-11-08',
+  });
+  assert.deepEqual(
+    report.snapshot.curve.map((point) => point.baseline),
+    [0, 1 / 3, 2 / 3, 2 / 3, 2 / 3, 1],
+  );
+  assert.deepEqual(
+    report.snapshot.curve.map((point) => point.baseline),
+    report.snapshot.curve.map((point) => point.planned),
+  );
+  assert.deepEqual(p, before);
+});
+
 test('발행 보고서의 변경·삭제는 거부하고 정정 발행은 새 ID로 추가', () => {
   const p = fixture();
   p.weeklyReports = [draft(p)];

@@ -2,6 +2,13 @@ import { ui, locale } from './i18n.js';
 import { escapeHtml as esc } from './html.js';
 import { today, progress } from './engine.js';
 import { getBusinessTimeZone } from './business-clock.js';
+export function forecastNote(forecast) {
+  return forecast.observed
+    ? forecast.limitedEvidence
+      ? ui('완료 기록 부족 · 계획 속도와 혼합한 추정')
+      : ui('최근 완료 속도를 반영한 추정')
+    : ui('완료 기록이 적어 계획 기준으로 추정');
+}
 const palette = ['#416be8', '#27a498', '#ae7ad8', '#df9a40', '#de718c', '#66849e'];
 const icons = {
   settings: 'M4 6h6 M14 6h6 M4 12h10 M18 12h2 M4 18h2 M10 18h10 M10 3v6 M14 9v6 M6 15v6',

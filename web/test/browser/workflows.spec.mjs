@@ -138,6 +138,77 @@ async function selectProject(page, p, view = 'tasks') {
   else await page.locator('[data-view="' + view + '"]').click();
 }
 
+test('소량 완료 기록은 혼합 예측·관측 속도로 표시하고 공휴일 전용 업무는 경고 후 수정·저장', async ({
+  page,
+}) => {
+  await page.clock.setFixedTime(new Date('2026-10-30T03:00:00Z'));
+  const session = await login(page),
+    source = largeProject();
+  const p = await createProject(page, session, {
+    name: '예측 안정화 검증',
+    holidays: [],
+    koreanHolidays: true,
+    members: [{ ...source.members[0], id: 'forecast-member', hours: 8, allocation: 100 }],
+    tasks: [
+      {
+        ...source.tasks[0],
+        id: 'forecast-task',
+        parentId: '',
+        predecessor: '',
+        predecessors: [],
+        owner: 'forecast-member',
+        start: '2026-10-19',
+        end: '2026-10-30',
+        items: [
+          { id: 'one', title: '작은 완료 1', hours: 0.5, doneDate: '2026-10-19' },
+          { id: 'two', title: '작은 완료 2', hours: 0.5, doneDate: '2026-10-20' },
+          { id: 'left', title: '남은 작업', hours: 79, doneDate: null },
+        ],
+      },
+    ],
+  });
+  await selectProject(page, p, 'overview');
+  await expect(page.locator('.metric').nth(1)).toContainText('11.16');
+  await expect(page.locator('.metric').nth(1)).toContainText('완료 기록 부족');
+  await page.locator('[data-action=method]').click();
+  await expect(page.locator('#infoDialog')).toContainText('계획 속도와 혼합');
+  await page.locator('#closeInfo').click();
+  await page.locator('[data-view=people]').click();
+  await expect(page.locator('.pace-note')).toContainText('관측 속도 · 계획 대비 1.3%');
+  await expect(page.locator('.pace-note')).toContainText('예측 적용 속도 · 계획 대비 95.9%');
+  const holidayOnly = { ...p, tasks: [{ ...p.tasks[0], start: '2026-10-09', end: '2026-10-09' }] };
+  const response = await page.request.post(api + 'projects', {
+    headers: { Origin: origin, 'X-CSRF-Token': session.csrf },
+    data: { project: { ...holidayOnly, id: randomUUID() } },
+  });
+  expect(response.status()).toBe(201);
+  const existing = (await response.json()).project;
+  await selectProject(page, existing, 'tasks');
+  await page.locator('[data-panel=review] > summary').click();
+  const warning = page.locator('[data-nonworking-task=forecast-task]');
+  await expect(warning).toContainText('근무일 없는 일정:');
+  await expect(warning).toContainText('2026-10-09 ~ 2026-10-09');
+  await page.locator('[data-cell=end]').first().fill('2026-10-12');
+  await page.locator('[data-cell=end]').first().press('Tab');
+  await page.locator('[data-cell=start]').first().fill('2026-10-12');
+  await page.locator('[data-cell=start]').first().press('Tab');
+  const saving = page.waitForResponse(
+    (r) => r.url().endsWith('/api/projects/' + existing.id) && r.request().method() === 'PUT',
+  );
+  await page.locator('[data-wbs-action=save]').click();
+  expect((await saving).status()).toBe(200);
+  await expect(warning).toHaveCount(0);
+  await selectProject(page, existing, 'tasks');
+  await expect(page.locator('[data-cell=start]').first()).toHaveValue('2026-10-12');
+  await selectProject(page, p, 'overview');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.locator('.metric').nth(1)).toContainText('완료 기록 부족');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(
+    true,
+  );
+  await page.screenshot({ path: 'test-results/forecast-review-mobile.png', fullPage: true });
+});
+
 test('계층 WBS 위로 이동은 하위 묶음과 함께 표시 순서를 바꾸고 서버에 보존', async ({ page }) => {
   const session = await login(page),
     source = largeProject(),

@@ -1,5 +1,15 @@
 # PM Canvas
 
+업무·일정·완료 기록을 모아 프로젝트 진척과 예상 완료일을 확인하는 도구입니다.
+
+팀은 설치형 웹에서 공유하고, 개인은 Windows·macOS·iPhone·Android에서 오프라인으로 관리합니다.
+
+WBS·간트·인력 투입·주간보고를 연결하며 Excel과 프로젝트 파일로 가져오고 내보낼 수 있습니다.
+
+![PM Canvas 웹 프로젝트 현황 — 가상 프로젝트 예시](docs/manuals/web/0.21.9/images/overview.png)
+
+[제품 선택과 기능 범위](docs/product-scope.md) · [English](README.en.md)
+
 [버전별 사용 매뉴얼](docs/manuals/README.md)
 
 프로젝트 관리 기능은 세 환경에서 공통으로 제공합니다. 진척 그래프·WBS와 기준 계획·일정 점검·마일스톤·참여인력과 투입 계획·이슈/리스크·주간보고·Excel/CSV·프로젝트 파일은 공통 모델과 계산을 사용합니다. 화면 배치는 플랫폼에 맞추고 로그인·팀 공유·서버 관리 기능은 웹에서 제공합니다.

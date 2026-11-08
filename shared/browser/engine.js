@@ -130,7 +130,13 @@ export const progress = (t, at) =>
       : 0;
 export function planned(t, at, h = []) {
   const d = workdays(t.start, t.end, h);
-  return d ? taskHours(t) * Math.min(1, workdays(t.start, at < t.end ? at : t.end, h) / d) : 0;
+  // Calendar changes must not erase planned effort from existing schedules.
+  // A zero-workday schedule is warned about separately; its effort is due at its end.
+  return d
+    ? taskHours(t) * Math.min(1, workdays(t.start, at < t.end ? at : t.end, h) / d)
+    : at >= t.end
+      ? taskHours(t)
+      : 0;
 }
 export function orderTasks(tasks) {
   const map = new Map(tasks.map((t) => [t.id, t])),
@@ -193,10 +199,20 @@ export function forecast(project, at) {
     for (const t of owned)
       expected += Math.max(0, planned(t, at, h) - planned(t, addDays(from, -1), h));
     const observed = span >= 3 && actualDays.size >= 2 && expected > 0 && done > 0;
+    // Completion checks are samples of estimated effort, not time tracking.
+    // Grow their influence with the window, distinct dates and completed effort.
+    // Full influence needs 10 workdays, 5 completion dates and 3 planned days of effort.
+    const rawRatio = observed ? done / expected : 1,
+      weight = observed
+        ? Math.min(1, span / 10) * Math.min(1, actualDays.size / 5, done / ((expected / span) * 3))
+        : 0;
     pace[member.id] = {
       observed,
-      ratio: observed ? done / expected : 1,
+      rawRatio,
+      weight,
+      ratio: weight * rawRatio + (1 - weight),
       completedHours: done,
+      completionDays: actualDays.size,
       windowDays: span,
       capacity: calendar.hours(member.id, at),
     };
@@ -292,6 +308,7 @@ export function forecast(project, at) {
       start: first || (calendar.hasPlan(member.id) ? null : start),
       end: left > 0.00001 ? null : finish,
       method: p.observed ? 'velocity' : 'plan',
+      blended: p.observed && p.weight < 1,
       remaining,
       reason:
         left > 0.00001
@@ -335,6 +352,7 @@ export function forecast(project, at) {
     pace,
     end: values.length && values.every((x) => x.end) ? ends.at(-1) : null,
     observed: values.some((x) => x.method === 'velocity'),
+    limitedEvidence: values.some((x) => x.method === 'plan' || x.blended),
   };
 }
 export function summary(project, at) {
@@ -428,7 +446,6 @@ export function validateProject(p) {
       !validDate(t.end) ||
       t.end < t.start ||
       daysBetween(t.start, t.end) > (summaries.has(t.id) ? 36525 : 3652) ||
-      (t.kind !== 'milestone' && !workdays(t.start, t.end, p.holidays)) ||
       !Array.isArray(t.items) ||
       (!t.items.length && !summaries.has(t.id) && t.kind !== 'milestone') ||
       (t.kind === 'milestone' &&

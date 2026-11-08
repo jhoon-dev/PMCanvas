@@ -773,8 +773,25 @@ export class WbsWorkspace {
       changed = diff.rows.filter(
         (r) => r.added || r.start || r.end || r.hours || r.renamed || r.reparented,
       ),
-      count = warnings.dependencies.length + warnings.overloads.length;
+      count = warnings.dependencies.length + warnings.overloads.length + warnings.nonWorking.length;
     const issues =
+      warnings.nonWorking
+        .map(
+          (t) =>
+            '<p data-nonworking-task="' +
+            esc(t.id) +
+            '">' +
+            ui('근무일 없는 일정: ') +
+            esc(t.name) +
+            ' · ' +
+            t.start +
+            ' ~ ' +
+            t.end +
+            '<br>' +
+            ui('근무일이 포함되도록 일정이나 휴무일 설정을 확인해 주세요.') +
+            '</p>',
+        )
+        .join('') +
       warnings.dependencies.map((t) => ui('<p>선행 일정 확인: ') + esc(t.name) + '</p>').join('') +
       warnings.overloads
         .slice(0, 100)

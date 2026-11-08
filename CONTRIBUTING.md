@@ -5,5 +5,6 @@
 - 데스크톱 실행·패키징·검증은 [desktop/README.md](desktop/README.md)를 따릅니다.
 - 모바일 실행·네이티브 빌드·검증은 [mobile/README.md](mobile/README.md)를 따릅니다.
 - 공통 코드는 제품 폴더를 import하지 않습니다. 제품 간 직접 import는 개발 검증 도구 외에는 사용하지 않습니다.
+- 기능 확장과 배포 경로 추가는 [제품 범위와 우선순위](docs/product-scope.md)를 기준으로 실제 사용 사례와 유지보수·검증 영향을 먼저 정리합니다.
 - 루트에서 `npm run format:check`, `npm run public:check`, 제품별 테스트를 실행합니다.
 - 환경설정·키·메일 정보·DB 덤프·설치본·생성된 앱 파일은 커밋하지 않습니다.

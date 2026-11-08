@@ -16,6 +16,8 @@ import { projectWorkbook } from '../server/excel.mjs';
 import { parseWorkbook, readWorkbook } from '../server/excel-import.mjs';
 import { suggestMapping, previewImport } from '../public/wbs-import.js';
 import ExcelJS from 'exceljs';
+import { setKoreanHolidayUpdates } from '../../shared/browser/korean-holidays.js';
+import { setLanguage } from '../public/i18n.js';
 const task = (id, hours = 8, start = '2026-10-19', end = '2026-10-19') => ({
   id,
   name: id,
@@ -36,6 +38,77 @@ const project = () => ({
   holidays: [],
   members: [{ id: 'm', name: '개발자', hours: 8, allocation: 100, role: '개발', grade: '중급' }],
   tasks: [task('a'), task('b', 16), task('c')],
+});
+
+test('근무일 없는 실제 업무는 자동·수동·주말 달력 경고, 요약과 마일스톤은 제외', () => {
+  const p = project();
+  p.koreanHolidays = true;
+  p.holidays = ['2026-10-20'];
+  p.tasks = [
+    task('holiday', 8, '2026-10-09', '2026-10-09'),
+    task('manual', 8, '2026-10-20', '2026-10-20'),
+    task('weekend', 8, '2026-10-24', '2026-10-25'),
+    task('working'),
+    { ...task('milestone', 0, '2026-10-09', '2026-10-09'), kind: 'milestone', items: [] },
+    { ...task('summary', 0, '2026-10-09', '2026-10-09'), kind: 'summary', items: [] },
+  ];
+  const before = structuredClone(p);
+  assert.deepEqual(
+    scheduleWarnings(p).nonWorking.map((t) => t.id),
+    ['holiday', 'manual', 'weekend'],
+  );
+  assert.deepEqual(cleanProject(p).tasks, cleanProject(before).tasks);
+  assert.deepEqual(p, before);
+  p.koreanHolidays = false;
+  assert.deepEqual(
+    scheduleWarnings(p).nonWorking.map((t) => t.id),
+    ['manual', 'weekend'],
+  );
+});
+
+test('일정 점검에 업무명·날짜·수정 안내를 이스케이프하고 수정하면 경고 제거', () => {
+  const p = project();
+  p.koreanHolidays = true;
+  p.tasks = [task('holiday', 8, '2026-10-09', '2026-10-09')];
+  p.tasks[0].name = '<img src=x onerror=alert(1)>';
+  const w = new WbsWorkspace({});
+  w.ensure(p, '2026-10-09');
+  for (const language of ['ko', 'en']) {
+    setLanguage(language);
+    try {
+      const html = w.planningPanel();
+      assert.ok(
+        html.includes(language === 'ko' ? '근무일 없는 일정:' : 'No workdays in schedule:'),
+      );
+      assert.ok(html.includes('2026-10-09 ~ 2026-10-09'));
+      assert.ok(html.includes('&lt;img'));
+      assert.ok(!html.includes('<img'));
+      assert.ok(!html.includes(language === 'ko' ? '특이사항 없음' : 'No issues'));
+    } finally {
+      setLanguage('ko');
+    }
+  }
+  w.draft.tasks[0].start = w.draft.tasks[0].end = '2026-10-12';
+  assert.deepEqual(scheduleWarnings(w.draft).nonWorking, []);
+  assert.ok(!w.planningPanel().includes('data-nonworking-task'));
+});
+
+test('공휴일 갱신 후 저장된 프로젝트도 검증 가능하고 다음 계산에서 경고 반영', (t) => {
+  t.after(() => setKoreanHolidayUpdates([]));
+  const p = project();
+  p.koreanHolidays = true;
+  p.tasks = [task('new-holiday', 8, '2026-11-05', '2026-11-05')];
+  const original = cleanProject(p);
+  assert.deepEqual(scheduleWarnings(original).nonWorking, []);
+  setKoreanHolidayUpdates([{ date: '2026-11-05', name: '임시공휴일' }]);
+  assert.deepEqual(cleanProject(original), original);
+  assert.deepEqual(
+    scheduleWarnings(original).nonWorking.map((t) => t.id),
+    ['new-holiday'],
+  );
+  assert.equal(criticalPath(original).duration, 1);
+  setKoreanHolidayUpdates([]);
+  assert.deepEqual(scheduleWarnings(original).nonWorking, []);
 });
 test('WBS 들여쓰기·번호·가중 집계·내어쓰기와 계층 순환 거절', () => {
   let p = setParent(project(), ['b', 'c'], 1);

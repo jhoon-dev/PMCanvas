@@ -1,8 +1,12 @@
-# PM Canvas 0.21.8
+# PM Canvas 0.21.9
 
 English · [한국어](README.md)
 
 A self-hosted team workspace for tasks, WBS, Gantt schedules and completion records. Node.js 22.18+, PostgreSQL 18 and Docker Compose are required. The frontend uses native JavaScript modules without a build step.
+
+![Web project overview — fictional project, Korean interface](../docs/manuals/web/0.21.9/images/overview.png)
+
+Use the web app for shared team data. Desktop and mobile are independent offline apps and do not synchronize with the server. See [product scope and priorities](../docs/product-scope.md).
 
 ## Install
 

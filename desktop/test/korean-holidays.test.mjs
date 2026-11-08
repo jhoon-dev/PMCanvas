@@ -113,6 +113,11 @@ test('desktop enables automatic holidays, preserves opt-out, and uses the calend
   assert.equal(summary(opted, '2027-05-03').planned, 2 / 3);
   const legacy = { ...p, tasks: [{ ...p.tasks[0], start: '2027-05-03', end: '2027-05-03' }] };
   assert.doesNotThrow(() => validateProject(legacy));
+  assert.deepEqual(
+    scheduleWarnings(legacy).nonWorking.map((task) => task.id),
+    ['t'],
+  );
+  assert.doesNotThrow(() => validateProject({ ...legacy, koreanHolidays: false }));
   assert.deepEqual(scheduleWarnings(legacy).overloads, []);
   assert.throws(() => normalizeProject({ ...p, koreanHolidays: 'yes' }), /공휴일/);
 });

@@ -18,6 +18,8 @@ import { DesktopDocument, parseDocument, serializeDocument, MAX_BYTES } from '..
 import { assetPath } from '../assets.mjs';
 import { normalizeTaskModel } from '../app/shared/task-model.js';
 import { summary } from '../app/shared/engine.js';
+import { scheduleWarnings } from '../app/shared/planning.js';
+import { planningView } from '../app/planning-ui.js';
 import { legacyProject, assertUpgradedProject, assertMigratedRecovery } from './legacy-project.mjs';
 import { createHash } from 'node:crypto';
 
@@ -93,6 +95,40 @@ function temporary(t) {
   t.after(() => rmSync(root, { recursive: true, force: true }));
   return root;
 }
+
+test('holiday-only legacy files open unchanged, retain dirty recovery and can be repaired and saved', (t) => {
+  const root = temporary(t),
+    file = path.join(root, 'Holiday.pmcanvas'),
+    recovery = path.join(root, 'recovery.json');
+  const p = { ...fixture(), koreanHolidays: true };
+  p.tasks[0].start = p.tasks[0].end = '2026-10-09';
+  const bytes = JSON.stringify({ format: 'pm-canvas-project', version: 3, project: p });
+  writeFileSync(file, bytes);
+  const doc = new DesktopDocument(recovery);
+  doc.open(file);
+  assert.equal(readFileSync(file, 'utf8'), bytes);
+  assert.deepEqual(
+    scheduleWarnings(doc.project).nonWorking.map((t) => t.id),
+    ['t'],
+  );
+  const html = planningView(doc.project, { at: '2026-10-09' });
+  assert.ok(html.includes('data-nonworking-task="t"'));
+  assert.ok(html.includes('근무일 없는 일정:'));
+  assert.ok(html.includes('2026-10-09 ~ 2026-10-09'));
+  assert.ok(!html.includes('계획 일정 충돌과 담당자 과부하가 없습니다.'));
+  doc.replace({ ...doc.project, description: 'Keep the original dates' }, doc.revision);
+  const restored = new DesktopDocument(recovery);
+  restored.restore(restored.recovery());
+  assert.equal(restored.dirty, true);
+  assert.equal(restored.project.description, 'Keep the original dates');
+  assert.equal(restored.project.tasks[0].start, '2026-10-09');
+  assert.deepEqual(restored.project.tasks[0].items, p.tasks[0].items);
+  const repaired = structuredClone(restored.project);
+  repaired.tasks[0].start = repaired.tasks[0].end = '2026-10-12';
+  restored.replace(repaired, restored.revision);
+  restored.save(file);
+  assert.deepEqual(scheduleWarnings(parseDocument(readFileSync(file))).nonWorking, []);
+});
 
 test('closing clears the session and recovery without modifying project files or restoring on restart', (t) => {
   const root = temporary(t);

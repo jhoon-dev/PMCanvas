@@ -16,6 +16,118 @@ import { workspaceRequest } from '../server/workspace-sync.mjs';
 import { workspaceKnowledge } from '../public/workspace-cache.js';
 import http from 'node:http';
 import { createApplication } from '../server/http.mjs';
+import { scheduleWarnings } from '../public/planning.js';
+
+test(
+  '실제 PostgreSQL: 휴일 전용 기존 업무의 before 재검증·날짜 수정·일반 편집·재조회',
+  { skip: process.env.RUN_POSTGRES_TESTS !== '1' },
+  async () => {
+    if (!/_test$/.test(process.env.PGDATABASE || ''))
+      throw Error('Dedicated _test database required.');
+    const pool = await createPool(),
+      repo = new PgRepository(pool),
+      id = randomUUID();
+    let user, server;
+    try {
+      await migrate(pool);
+      const passwordHash = await hashPassword('holiday-compatibility-fixture');
+      user = await repo.createUser({
+        email: randomUUID() + '@example.com',
+        name: 'Holiday fixture',
+        passwordHash,
+      });
+      const seed = cleanProject({
+        name: 'Existing schedule',
+        description: '',
+        holidays: [],
+        koreanHolidays: true,
+        members: [{ id: 'm', name: 'Member', role: '', grade: '', hours: 8, allocation: 100 }],
+        tasks: [
+          {
+            id: 't',
+            name: 'Holiday work',
+            owner: 'm',
+            start: '2026-10-08',
+            end: '2026-10-08',
+            predecessor: '',
+            items: [{ id: 'i', title: 'Preserve effort', hours: 8, doneDate: null }],
+          },
+        ],
+      });
+      await repo.createProject(user.id, id, seed);
+      // Emulate an existing persisted schedule, bypassing the current input normalizer.
+      await pool.query('UPDATE pm_tasks SET start_date=$2,end_date=$2 WHERE project_id=$1', [
+        id,
+        '2026-10-09',
+      ]);
+      const before = await repo.getProject(user.id, id);
+      assert.equal(before.tasks[0].start, '2026-10-09');
+      const cookie = token(),
+        csrf = token();
+      await repo.createSession({
+        hash: digest(cookie),
+        userId: user.id,
+        csrf,
+        expires: new Date(Date.now() + 60000),
+        passwordHash,
+      });
+      server = createApplication({ repo, origin: 'http://localhost' });
+      await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+      const url = `http://127.0.0.1:${server.address().port}/api/projects/${id}`;
+      const save = (project, revision) =>
+        fetch(url, {
+          method: 'PUT',
+          headers: {
+            Origin: 'http://localhost',
+            'Content-Type': 'application/json',
+            Cookie: 'pmcanvas_session=' + cookie,
+            'X-CSRF-Token': csrf,
+          },
+          body: JSON.stringify({ project, revision }),
+        });
+      const fixed = structuredClone(before);
+      fixed.tasks[0].start = fixed.tasks[0].end = '2026-10-12';
+      // The incoming project is valid even under the former strict rule; only before fails it.
+      let response = await save(fixed, before._revision);
+      assert.equal(response.status, 200, await response.text());
+      let saved = await repo.getProject(user.id, id);
+      assert.equal(saved.tasks[0].start, '2026-10-12');
+      assert.deepEqual(saved.tasks[0].items, before.tasks[0].items);
+      assert.equal(saved._revision, before._revision + 1);
+      assert.deepEqual(scheduleWarnings(saved).nonWorking, []);
+      await pool.query('UPDATE pm_tasks SET start_date=$2,end_date=$2 WHERE project_id=$1', [
+        id,
+        '2026-10-09',
+      ]);
+      saved = await repo.getProject(user.id, id);
+      response = await save(
+        { ...saved, description: 'Unrelated edit with holiday dates intact' },
+        saved._revision,
+      );
+      assert.equal(response.status, 200, await response.text());
+      saved = await repo.getProject(user.id, id);
+      assert.equal(saved.description, 'Unrelated edit with holiday dates intact');
+      assert.equal(saved.tasks[0].start, '2026-10-09');
+      assert.deepEqual(
+        scheduleWarnings(saved).nonWorking.map((t) => t.id),
+        ['t'],
+      );
+      const invalid = structuredClone(saved);
+      invalid.tasks[0].end = '2026-02-30';
+      response = await save(invalid, saved._revision);
+      assert.equal(response.status, 400);
+      assert.equal((await repo.getProject(user.id, id))._revision, saved._revision);
+    } finally {
+      if (server) {
+        server.closeAllConnections();
+        await new Promise((resolve) => server.close(resolve));
+      }
+      await pool.query('DELETE FROM pm_projects WHERE id=$1', [id]);
+      if (user) await pool.query('DELETE FROM pm_users WHERE id=$1', [user.id]);
+      await pool.end();
+    }
+  },
+);
 
 test(
   '실제 PostgreSQL: 본문 수신 중 비활성화·로그아웃·비밀번호 변경 시 저장 거절',
