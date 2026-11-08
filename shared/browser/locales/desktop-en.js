@@ -414,8 +414,8 @@ export default {
   '달력 일수입니다. +는 뒤로, −는 앞으로 이동합니다.':
     'Calendar days. + moves later; − moves earlier.',
   '연결된 후속 업무도 필요한 만큼 뒤로 조정': 'Move linked successors later when needed',
-  '완료 기록·공수·기준 계획은 보존합니다. 이동 후 근무일이 없는 일정은 적용할 수 없습니다. 후속 일정은 달력상 기간을 유지하며 뒤로 조정합니다.':
-    'Completion records, effort and baseline are preserved. Every schedule needs a workday. Successors keep their calendar duration when moved later.',
+  '완료 기록·공수·기준 계획은 보존합니다. 이동 후 근무일이 없는 일정은 일정 점검에 경고로 표시합니다. 후속 일정은 달력상 기간을 유지하며 뒤로 조정합니다.':
+    'Completion records, effort and baseline are preserved. Schedules without workdays appear as warnings in schedule checks. Successors keep their calendar duration when moved later.',
   '조정할 업무를 선택해 주세요.': 'Select a task to reschedule.',
   '이동 일수를 입력해 주세요.': 'Enter the number of days to move.',
   '변경할 일정 ': 'Schedule changes: ',

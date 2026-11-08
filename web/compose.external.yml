@@ -47,7 +47,7 @@ services:
     profiles: [backups]
     build:
       context: ..
-      dockerfile: web/Dockerfile.backup
+      dockerfile: web/backup-worker.Dockerfile
     restart: unless-stopped
     init: true
     read_only: true

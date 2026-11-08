@@ -1,11 +1,12 @@
 import { openView } from './navigation.mjs';
 import { test, expect } from '@playwright/test';
 import { createRequire } from 'node:module';
-import { today, addDays } from '../../../shared/browser/engine.js';
+import { today, addDays, nextWorkday } from '../../../shared/browser/engine.js';
+import { projectHolidays } from '../../../shared/browser/korean-holidays.js';
 import { PROJECT_SCREENS } from '../../../shared/browser/project-navigation.js';
 const require = createRequire(import.meta.url),
   ExcelJS = require('exceljs');
-async function start(page) {
+async function start(page, overrides = {}) {
   page.setDefaultTimeout(15000);
   await page.goto('/');
   await page.locator('#importFile').setInputFiles({
@@ -34,11 +35,47 @@ async function start(page) {
             items: [{ id: 'i', title: '완료 검증', hours: 8, doneDate: today() }],
           },
         ],
+        ...overrides,
       }),
     ),
   });
   await expect(page.locator('#activeProjectName')).toHaveText('공통 기능 검증');
 }
+
+test('holiday-only project imports, warns and saves corrected dates without blocking navigation', async ({
+  page,
+}) => {
+  await start(page, {
+    tasks: [
+      {
+        id: 'holiday',
+        name: '휴일 업무',
+        owner: 'm',
+        phase: '',
+        start: '2026-10-09',
+        end: '2026-10-09',
+        predecessor: '',
+        memo: '',
+        items: [{ id: 'holiday-item', title: '보존할 작업', hours: 8, doneDate: null }],
+      },
+    ],
+  });
+  await move(page, 'planning');
+  await page.locator('[data-panel=review] > summary').click();
+  const warning = page.locator('[data-nonworking-task=holiday]');
+  await expect(warning).toContainText('휴일 업무');
+  await expect(warning).toContainText('2026-10-09 ~ 2026-10-09');
+  await page.locator('[data-cell=end]').first().fill('2026-10-12');
+  await page.locator('[data-cell=end]').first().press('Tab');
+  await page.locator('[data-cell=start]').first().fill('2026-10-12');
+  await page.locator('[data-cell=start]').first().press('Tab');
+  await page.locator('[data-wbs-action=save]').click();
+  await expect(warning).toHaveCount(0);
+  await expect.poll(async () => (await stored(page)).tasks[0].start).toBe('2026-10-12');
+  await page.reload();
+  await expect(page.locator('[data-cell=start]').first()).toHaveValue('2026-10-12');
+  expect((await stored(page)).tasks[0].items[0].hours).toBe(8);
+});
 async function move(page, view) {
   await openView(page, view);
   await expect(page.locator('#content')).toHaveAttribute('aria-busy', 'false');
@@ -175,10 +212,11 @@ test('mobile WBS editing, guarded navigation, baseline, Excel export and safe Ex
   const done = page.waitForEvent('download');
   await page.getByRole('button', { name: '완료 기록 Excel', exact: true }).click();
   expect((await done).suggestedFilename()).toContain('완료기록');
-  const input = new ExcelJS.Workbook();
+  const input = new ExcelJS.Workbook(),
+    importDay = nextWorkday(today(), projectHolidays(await stored(page)));
   input.addWorksheet('WBS').addRows([
     ['업무명', '시작일', '종료일', '공수(h)'],
-    ['Excel 추가 업무', today(), today(), 4],
+    ['Excel 추가 업무', importDay, importDay, 4],
   ]);
   await page.getByRole('button', { name: 'Excel 가져오기', exact: true }).click();
   await expect(page.locator('.excel-import-dialog')).toBeVisible();

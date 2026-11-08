@@ -72,6 +72,19 @@ test('icon documentation recognizes ICO filenames without treating them as priva
   assert.deepEqual(inspect('desktop/build/ICONS.md', '`build/icon.ico` is the Windows icon.'), []);
 });
 
+test('backup worker Dockerfile references are filenames while actual URLs still require allowed hosts', () => {
+  assert.deepEqual(inspect('compose.yml', 'dockerfile: web/backup-worker.Dockerfile'), []);
+  assert.deepEqual(
+    inspect('docs/deploy.md', '`web/backup-worker.Dockerfile` builds the backup worker.'),
+    [],
+  );
+  assert.ok(
+    inspect('docs/deploy.md', 'https://private.dockerfile/').some(
+      (finding) => finding.rule === 'NON_EXAMPLE_HOST',
+    ),
+  );
+});
+
 test('review evidence filenames are not domains but actual service URLs still require allowed hosts', () => {
   assert.deepEqual(
     inspect(

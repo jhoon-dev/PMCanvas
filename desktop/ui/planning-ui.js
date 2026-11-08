@@ -42,7 +42,7 @@ export function scheduleForm(project, id = '') {
         '<label class="desktop-schedule-cascade"><input name="scheduleCascade" type="checkbox"> 연결된 후속 업무도 필요한 만큼 뒤로 조정</label>',
       ) +
       ui(
-        '<p class="form-hint">완료 기록·공수·기준 계획은 보존합니다. 이동 후 근무일이 없는 일정은 적용할 수 없습니다. 후속 일정은 달력상 기간을 유지하며 뒤로 조정합니다.</p>',
+        '<p class="form-hint">완료 기록·공수·기준 계획은 보존합니다. 이동 후 근무일이 없는 일정은 일정 점검에 경고로 표시합니다. 후속 일정은 달력상 기간을 유지하며 뒤로 조정합니다.</p>',
       ) +
       ui(
         '<button class="button" type="button" id="previewSchedule">일정 변경 미리보기</button><p id="scheduleApplyHint" class="form-hint" role="status">일정 변경을 미리 본 뒤 적용할 수 있습니다.</p><div id="schedulePreview" aria-live="polite"></div>',
@@ -121,12 +121,34 @@ function scheduleReview(project, cp) {
     warnings.dependencies.length +
     ui('개 · 과부하 구간 ') +
     warnings.overloads.length +
+    ui('개 · 근무일 없는 업무 ') +
+    warnings.nonWorking.length +
     ui('개 · 임계 업무 ') +
     cp.ids.size +
     ui('개 · CPM 기간 ') +
     cp.duration +
     ui('근무일</p>') +
     '<div class="desktop-schedule-issues">' +
+    warnings.nonWorking
+      .map(
+        (task) =>
+          '<p data-nonworking-task="' +
+          esc(task.id) +
+          '">' +
+          ui('근무일 없는 일정: ') +
+          '<button class="task-name" data-edit-task="' +
+          esc(task.id) +
+          '">' +
+          esc(task.name) +
+          '</button> · ' +
+          task.start +
+          ' ~ ' +
+          task.end +
+          '<br>' +
+          ui('근무일이 포함되도록 일정이나 휴무일 설정을 확인해 주세요.') +
+          '</p>',
+      )
+      .join('') +
     warnings.dependencies
       .map(
         (task) =>
@@ -157,7 +179,7 @@ function scheduleReview(project, cp) {
       )
       .join('') +
     (warnings.overloads.length > 100 ? ui('<p>과부하 구간은 앞의 100개를 표시합니다.</p>') : '') +
-    (!warnings.dependencies.length && !warnings.overloads.length
+    (!warnings.dependencies.length && !warnings.overloads.length && !warnings.nonWorking.length
       ? ui('<p>계획 일정 충돌과 담당자 과부하가 없습니다.</p>')
       : '') +
     ui(

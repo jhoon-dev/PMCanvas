@@ -16,9 +16,61 @@ import {
   koreanHolidays,
 } from '../app/shared/korean-holidays.js';
 import { forecast } from '../app/shared/engine.js';
+import { scheduleWarnings } from '../app/shared/planning.js';
+import { parseDocument } from '../document.mjs';
 import { DesktopWorkspace } from '../workspace.mjs';
 
 import { holidayFeed } from './holiday-feed-fixture.mjs';
+
+test('a downloaded holiday preserves single-day files and clean/dirty workspace recovery for later editing', (t) => {
+  const { root } = fixture(t),
+    workspaceFile = path.join(root, 'workspace.json'),
+    file = path.join(root, 'Single.pmcanvas');
+  t.after(() => setKoreanHolidayUpdates([]));
+  const w = new DesktopWorkspace(workspaceFile);
+  w.create({
+    name: 'New holiday',
+    description: '',
+    holidays: [],
+    koreanHolidays: true,
+    members: [{ id: 'm', name: 'Member', role: '', grade: '', hours: 8, allocation: 100 }],
+    tasks: [
+      {
+        id: 't',
+        name: 'Work',
+        owner: 'm',
+        start: '2026-11-05',
+        end: '2026-11-05',
+        predecessor: '',
+        items: [{ id: 'i', title: 'Work', hours: 8, doneDate: null }],
+      },
+    ],
+  });
+  w.save(file);
+  const bytes = readFileSync(file);
+  setKoreanHolidayUpdates([{ date: '2026-11-05', name: '임시공휴일' }]);
+  assert.deepEqual(
+    scheduleWarnings(parseDocument(bytes)).nonWorking.map((t) => t.id),
+    ['t'],
+  );
+  const clean = new DesktopWorkspace(workspaceFile);
+  const restored = clean.restore(clean.recovery());
+  assert.equal(restored.missing, false);
+  assert.equal(clean.dirty, false);
+  assert.equal(clean.file, file);
+  assert.deepEqual(readFileSync(file), bytes);
+  clean.replace({ ...clean.project, description: 'Recover this edit' }, clean.revision);
+  const dirty = new DesktopWorkspace(workspaceFile);
+  dirty.restore(dirty.recovery());
+  assert.equal(dirty.dirty, true);
+  assert.equal(dirty.project.description, 'Recover this edit');
+  const repaired = structuredClone(dirty.project);
+  repaired.tasks[0].start = repaired.tasks[0].end = '2026-11-06';
+  dirty.replace(repaired, dirty.revision);
+  dirty.save(file);
+  assert.deepEqual(scheduleWarnings(dirty.project).nonWorking, []);
+  assert.equal(parseDocument(readFileSync(file)).tasks[0].start, '2026-11-06');
+});
 
 test('automatic startup and periodic checks run without manual interaction and stop on shutdown', async (t) => {
   const { file } = fixture(t);

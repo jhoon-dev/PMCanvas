@@ -18,8 +18,10 @@ import {
   dateToolbar,
   empty,
   projectStart,
+  forecastNote,
 } from './view-ui.js';
 function methodLabel(f) {
+  if (f?.blended) return ui('계획·실적 혼합 추정');
   return (
     {
       summary: ui('하위 업무 집계'),
@@ -36,7 +38,7 @@ export function dashboardView(p, s, asOf) {
     forecast = s.forecast,
     late =
       s.end && forecast.end
-        ? Math.max(0, workdays(addDays(s.end, 1), forecast.end, p.holidays))
+        ? Math.max(0, workdays(addDays(s.end, 1), forecast.end, projectHolidays(p)))
         : 0;
   const completedToday = p.tasks.reduce(
       (n, t) => n + t.items.filter((i) => i.doneDate === asOf).length,
@@ -111,9 +113,7 @@ export function dashboardView(p, s, asOf) {
         '</span>'
       : ui('계산할 업무가 없어요')) +
     '</div><div class="subtle">' +
-    (forecast.observed
-      ? ui('최근 완료 속도를 반영한 추정')
-      : ui('완료 기록이 적어 계획 기준으로 추정')) +
+    forecastNote(forecast) +
     '</div></article>' +
     ui('<article class="metric"><div class="metric-label">완료한 업무 <span class="metric-icon">') +
     icon('check') +
@@ -172,9 +172,7 @@ export function dashboardView(p, s, asOf) {
     '</p><div class="outlook-note">' +
     icon('clock') +
     '<span>' +
-    (forecast.observed
-      ? ui('최근 10근무일의 완료 기록을 반영')
-      : ui('실적이 쌓이면 최근 완료 속도를 반영')) +
+    forecastNote(forecast) +
     '</span></div>' +
     btn(ui('계산 근거 보기 ↗'), 'method', 'link') +
     '</article></section>' +

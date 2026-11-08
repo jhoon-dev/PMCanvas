@@ -75,6 +75,7 @@ const fileExtensions = new Set([
   'ico',
   'jpg',
   'backup',
+  'dockerfile',
   'env',
   'd',
   'x',

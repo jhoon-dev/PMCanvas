@@ -63,7 +63,7 @@ services:
     user: "${PM_RUN_UID:-1000}:${PM_RUN_GID:-1000}"
     build:
       context: ..
-      dockerfile: web/Dockerfile.backup
+      dockerfile: web/backup-worker.Dockerfile
     restart: unless-stopped
     init: true
     read_only: true

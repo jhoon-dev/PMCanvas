@@ -5,6 +5,8 @@ Developer **jhoon-dev** · Brand **Toolmoa** · App ID **`app.toolmoa.pmcanvas`*
 
 iPhone과 Android에서 사용하는 오프라인 프로젝트 관리 앱입니다. Capacitor 8의 네이티브 프로젝트와 휴대폰 전용 화면을 포함합니다. 공통 계산·검증·편집 코드는 `shared/`에서 가져오며 웹 서버나 Electron에 의존하지 않습니다.
 
+개인의 독립적인 계획과 완료 기록 관리에 사용합니다. 가져온 파일은 별도 사본이며 팀 서버의 업무를 갱신하지 않습니다. 팀의 같은 데이터를 여러 기기에서 수정하려면 웹을 사용하세요. [제품 선택과 기능 범위](../docs/product-scope.md)
+
 [개인정보처리방침 / Privacy policy](PRIVACY.md)은 프로젝트 목록과 설정 · 파일 화면에서 오프라인으로도 확인할 수 있습니다.
 
 ## 기능

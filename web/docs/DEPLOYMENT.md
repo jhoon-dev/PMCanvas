@@ -4,6 +4,8 @@
 
 `npm run setup -- --email admin@example.com`은 비공개 .env·MFA 키와 인증 설정을 만들고 비밀번호를 무작위 생성합니다. 기존 .env는 덮어쓰지 않습니다. `npm run service:up`은 폴더 권한과 이전 키 사본을 확인한 뒤 앱·PostgreSQL 18·백업 작업 서비스를 기동합니다.
 
+`web/backup-worker.Dockerfile`은 백업 작업 서비스의 이미지 정의입니다. 이전 이름 `Dockerfile.backup`은 보관용 사본이 아니었으며 Compose·CI·배포 패키지가 새 이름을 참조합니다. 사용자 지정 빌드 명령에서 이전 파일명을 사용했다면 새 이름으로 바꾸세요. 앱·백업 이미지의 빌드 컨텍스트는 모두 저장소 루트입니다.
+
 Linux에서는 호스트 실행 계정의 UID/GID를 감지해 앱과 백업 서비스에 동일하게 적용합니다. 직접 Compose를 실행하려면 PM_RUN_UID와 PM_RUN_GID를 `id -u`와 `id -g` 값으로 지정하세요. root 계정에서 운영 명령을 실행하면 기본 런타임은 1000:1000으로 두고 알려진 전용 폴더의 소유권을 준비합니다. 사용자 지정 ID는 0 이외의 숫자여야 합니다. 새로 만든 디렉터리는 0700, 비밀 파일은 0600이며 심볼릭 링크를 따라 권한을 바꾸지 않습니다. 사용자 지정 인증 비밀 파일도 해당 런타임 계정이 읽을 수 있도록 운영자가 권한을 맞추세요.
 
 Windows Docker Desktop에서는 별도 UID 조정 없이 기본값을 사용합니다. Windows 파일 접근 권한은 운영 계정으로 제한하세요. `.env`, `config`, `backups`, `recovery-keys`는 Git과 설치 ZIP에 포함하지 않습니다.

@@ -5,7 +5,18 @@ import { taskHours, progress, daysBetween } from './engine.js';
 import { escapeHtml as esc } from './html.js';
 import { ui } from './i18n.js';
 import { dashboardVisuals } from './dashboard-view.js';
-import { person, num, pct, meter, badge, pageHead, btn, empty, projectStart } from './view-ui.js';
+import {
+  person,
+  num,
+  pct,
+  meter,
+  badge,
+  pageHead,
+  btn,
+  empty,
+  projectStart,
+  forecastNote,
+} from './view-ui.js';
 
 export function workspaceTaskTable(p, s, { asOf, tasks = p.tasks }) {
   const index = taskIndex(p);
@@ -109,7 +120,7 @@ export function workspaceOverview(p, s, { asOf, controls = '' }) {
     ) +
     (s.forecast.end || ui('계산 대기')) +
     '</strong><p>' +
-    (s.forecast.observed ? ui('최근 완료 속도 반영') : ui('계획 · 가용시간 기준 추정')) +
+    forecastNote(s.forecast) +
     '</p></article>' +
     ui('<article class="desktop-metric"><small>완료한 업무</small><strong>') +
     s.completed +
