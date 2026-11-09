@@ -52,7 +52,7 @@ base64는 암호화가 아닙니다. `gh secret set NAME --env desktop-mac-store
 
 ## 내부 TestFlight 배포
 
-서명 PKG 업로드 후 `Apple TestFlight distribution` 워크플로(`ios-testflight.yml`)를 main에서 실행합니다. `platform=macos`, `build_number`는 업로드한 `Mac App Store` 실행의 번호를 사용합니다. Apple 처리 완료와 정확한 macOS 버전·빌드 번호를 확인한 뒤 기존 `PM Canvas Release QA` 내부 그룹에만 연결합니다. 테스터·외부 그룹·App Review 제출 상태는 변경하지 않습니다. iOS는 같은 워크플로에서 `platform=ios`와 iOS 업로드의 `run.attempt` 빌드 번호를 사용합니다.
+서명 PKG 업로드 후 `Apple TestFlight distribution` 워크플로(`ios-testflight.yml`)를 main에서 실행합니다. `platform=macos`, `build_number`는 업로드한 `Mac App Store` 실행의 번호를 사용합니다. Apple 처리 완료와 정확한 macOS 버전·빌드 번호를 확인한 뒤 기존 `PM Canvas Release QA` 내부 그룹에만 연결합니다. 테스터·외부 그룹·App Review 제출 상태는 변경하지 않습니다. iOS는 같은 워크플로에서 `platform=ios`와 iOS 업로드의 실행 번호와 재시도 번호를 점으로 연결한 빌드 번호를 사용합니다.
 
 ## 샌드박스 실행과 심사
 
