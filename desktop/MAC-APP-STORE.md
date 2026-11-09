@@ -11,7 +11,7 @@ App Store Connect의 신규 앱 등록이 **계약 업데이트** 안내로 차�
 개발자는 **jhoon-dev**, 브랜드는 **Toolmoa**, 표시 이름은 **PM Canvas**, Bundle ID는 **`app.toolmoa.pmcanvas`**로 통일합니다. [공통 표기 규칙](../README.md#제품-식별표기-규칙)을 따릅니다. Apple 계정의 법적 판매자명·팀 정보는 실제 등록 정보를 사용하며, 표시 이름에 개발자명·브랜드·플랫폼 접미사를 붙이지 않습니다. 빌드 산출물 내부의 앱 번들은 `PM Canvas.app`입니다.
 
 1. [Certificates, Identifiers & Profiles](https://developer.apple.com/account/resources/identifiers/list)에서 명시적 App ID **`app.toolmoa.pmcanvas`**, 설명 **PM Canvas**를 사용합니다. 데스크톱 패키지 설정의 `build.appId`·`build.mac.appId`, 모바일 `appId`, iOS Bundle Identifier, Android application ID도 같은 값입니다.
-2. [App Store Connect의 PM Canvas](https://appstoreconnect.apple.com/apps/6829387538/distribution/info)를 사용합니다. Apple ID는 **6829387538**, Bundle ID는 **`app.toolmoa.pmcanvas`**입니다. 현재 데스크톱 소스 버전은 **1.9.0**입니다. Mac App Store 배포에는 이 버전으로 서명·업로드·실기기 검증을 별도로 완료해야 합니다.
+2. [App Store Connect의 PM Canvas](https://appstoreconnect.apple.com/apps/6829387538/distribution/info)를 사용합니다. Apple ID는 **6829387538**, Bundle ID는 **`app.toolmoa.pmcanvas`**입니다. 현재 데스크톱 소스 버전은 **1.9.1**입니다. Mac App Store 배포에는 이 버전으로 서명·업로드·실기기 검증을 별도로 완료해야 합니다.
 
 3. **Apple Distribution**(또는 Mac App Distribution) 앱 서명 인증서와 **Mac Installer Distribution / 3rd Party Mac Developer Installer** 설치 패키지 인증서를 발급합니다. 개인 키를 포함한 P12를 각각 내보냅니다. Developer ID Application·Installer 인증서는 이 Store 경로에 사용하지 않습니다.
 4. 위 App ID와 앱 서명 인증서에 연결한 **Mac App Store Connect 배포 프로비저닝 프로파일**을 발급합니다. 개발·Developer ID 프로파일을 사용하지 않습니다.
@@ -50,9 +50,13 @@ base64는 암호화가 아닙니다. `gh secret set NAME --env desktop-mac-store
 
 로컬 macOS에서는 `.env.mas`에 위 값들을 `CSC_LINK`, `CSC_KEY_PASSWORD`, `CSC_INSTALLER_LINK`, `CSC_INSTALLER_KEY_PASSWORD`, `PM_MAS_TEAM_ID`, `PM_MAS_BUILD_NUMBER`, `PM_MAS_PROFILE`(절대 경로) 이름으로 설정합니다. `npm run release:check:mas`, `npm run dist:mas`를 `desktop/`에서 실행합니다. 빌드는 깨끗한 커밋의 원본만 사용합니다. `npm run verify:mas`는 서명 자료 없이 패키지 구조만 검증합니다.
 
+## 내부 TestFlight 배포
+
+서명 PKG 업로드 후 `Apple TestFlight distribution` 워크플로(`ios-testflight.yml`)를 main에서 실행합니다. `platform=macos`, `build_number`는 업로드한 `Mac App Store` 실행의 번호를 사용합니다. Apple 처리 완료와 정확한 macOS 버전·빌드 번호를 확인한 뒤 기존 `PM Canvas Release QA` 내부 그룹에만 연결합니다. 테스터·외부 그룹·App Review 제출 상태는 변경하지 않습니다. iOS는 같은 워크플로에서 `platform=ios`와 iOS 업로드의 `run.attempt` 빌드 번호를 사용합니다.
+
 ## 샌드박스 실행과 심사
 
-현재 데스크톱 [1.9.0 매뉴얼](../docs/manuals/desktop/1.9.0/README.ko.md)을 기준으로 소개·스크린샷·심사 메모를 준비합니다. 처리된 현재 버전의 TestFlight 빌드에서 실제 샌드박스 실행을 검증한 뒤 App Review에 제출합니다. Windows Store 제출 성공은 Mac App Store 업로드·심사·출시 완료를 뜻하지 않습니다.
+현재 데스크톱 [1.9.1 매뉴얼](../docs/manuals/desktop/1.9.1/README.ko.md)을 기준으로 소개·스크린샷·심사 메모를 준비합니다. 처리된 현재 버전의 TestFlight 빌드에서 실제 샌드박스 실행을 검증한 뒤 App Review에 제출합니다. Windows Store 제출 성공은 Mac App Store 업로드·심사·출시 완료를 뜻하지 않습니다.
 
 MAS는 GitHub 설치 파일을 내려받지 않고 Mac App Store 업데이트 화면을 엽니다. 프로젝트를 다시 열기 위한 보안 범위 북마크는 앱 컨테이너의 `file-access.json`에 보관합니다. 파일을 임시 파일로 쓴 뒤 교체하는 안전한 저장을 유지하기 위해, 첫 저장 때 사용자가 대상 파일의 **상위 폴더**를 직접 선택해야 합니다. 다른 폴더 선택이나 취소로는 저장하지 않습니다. 내보내기의 일시 권한은 완료·실패 후 해제합니다.
 
@@ -63,7 +67,7 @@ MAS는 GitHub 설치 파일을 내려받지 않고 Mac App Store 업데이트 �
 - Excel 가져오기·작업 프로세스·템플릿·Excel/CSV/JSON 내보내기.
 - 한국어·영어, 개인정보처리방침 링크, Mac App Store 업데이트 이동.
 
-App Store Connect에서 현재 데스크톱 버전 **1.9.0**, 생산성 카테고리, 연령 등급, 실제 개인정보 처리 내역, 지원 URL, 개인정보처리방침 URL, macOS 스크린샷, 가격·지역·심사 연락처·심사 메모를 작성하고 처리된 빌드를 선택합니다. 가격·지역·법적 선언·연락처는 소유자가 확정합니다. 앱은 오프라인·계정 없이 사용하며 프로젝트를 개발자 서버로 수집하지 않습니다. 개인정보 표시의 최종 답변은 Apple 질문과 [실제 방침](PRIVACY.md)을 대조합니다. App Review 승인과 출시 설정이 완료되어야 실제 게시됩니다.
+App Store Connect에서 현재 데스크톱 버전 **1.9.1**, 생산성 카테고리, 연령 등급, 실제 개인정보 처리 내역, 지원 URL, 개인정보처리방침 URL, macOS 스크린샷, 가격·지역·심사 연락처·심사 메모를 작성하고 처리된 빌드를 선택합니다. 가격·지역·법적 선언·연락처는 소유자가 확정합니다. 앱은 오프라인·계정 없이 사용하며 프로젝트를 개발자 서버로 수집하지 않습니다. 개인정보 표시의 최종 답변은 Apple 질문과 [실제 방침](PRIVACY.md)을 대조합니다. App Review 승인과 출시 설정이 완료되어야 실제 게시됩니다.
 
 ## 근거
 
