@@ -6,6 +6,7 @@ import {
   distributeTestFlight,
   existingInternalGroup,
   matchingBuild,
+  testFlightInputs,
   groupName,
 } from '../scripts/testflight.mjs';
 
@@ -40,6 +41,53 @@ test('TestFlight selects both the marketing version and build and requires the e
     /internal group/,
   );
   assert.throws(() => existingInternalGroup([group(), group()]), /existing/);
+});
+
+test('macOS build selection cannot select an iOS build with the same version and build number', () => {
+  const mac = { ...expected, platform: 'MAC_OS' };
+  assert.equal(matchingBuild(buildResponse(), mac), undefined);
+  const response = buildResponse();
+  response.included[0].attributes.platform = 'MAC_OS';
+  assert.equal(matchingBuild(response, mac).id, 'build-1');
+  assert.equal(matchingBuild(response, expected), undefined);
+  assert.throws(() => matchingBuild(response, { ...mac, platform: 'TV_OS' }), /Unsupported/);
+});
+
+test('TestFlight inputs use the selected package version and reject wrong refs or build formats', () => {
+  const mobile = { version: '0.3.2' };
+  const desktop = { version: '1.9.1', build: { appId: expected.bundleId } };
+  const config = { appId: expected.bundleId };
+  const env = {
+    GITHUB_REF: 'refs/heads/main',
+    GITHUB_REPOSITORY: 'jhoon-dev/PMCanvas',
+    PM_MAS_TEAM_ID: 'ABCDE12345',
+    PM_TESTFLIGHT_BUILD_NUMBER: '42',
+    PM_TESTFLIGHT_PLATFORM: 'macos',
+  };
+  assert.deepEqual(testFlightInputs(mobile, desktop, config, env), {
+    bundleId: expected.bundleId,
+    version: '1.9.1',
+    team: env.PM_MAS_TEAM_ID,
+    buildNumber: '42',
+    platform: 'MAC_OS',
+  });
+  for (const change of [
+    { GITHUB_REF: 'refs/heads/other' },
+    { GITHUB_REPOSITORY: 'other/repo' },
+    { PM_TESTFLIGHT_BUILD_NUMBER: '42.1' },
+    { PM_TESTFLIGHT_PLATFORM: 'tvos' },
+  ])
+    assert.throws(() => testFlightInputs(mobile, desktop, config, { ...env, ...change }));
+  assert.throws(() =>
+    testFlightInputs(mobile, { ...desktop, build: { appId: 'other.app' } }, config, env),
+  );
+  const ios = testFlightInputs(mobile, desktop, config, {
+    ...env,
+    PM_TESTFLIGHT_PLATFORM: 'ios',
+    PM_TESTFLIGHT_BUILD_NUMBER: '42.1',
+  });
+  assert.equal(ios.version, '0.3.2');
+  assert.equal(ios.platform, 'IOS');
 });
 
 function fixture(states = ['VALID'], linked = false) {

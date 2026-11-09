@@ -1,9 +1,14 @@
-name: iOS TestFlight distribution
+name: Apple TestFlight distribution
 on:
   workflow_dispatch:
     inputs:
+      platform:
+        description: Existing uploaded Apple platform
+        type: choice
+        options: [ios, macos]
+        default: ios
       build_number:
-        description: Existing uploaded iOS build number (run.attempt)
+        description: Existing uploaded build number (iOS run.attempt or macOS run)
         type: string
         required: true
 permissions:
@@ -28,8 +33,9 @@ jobs:
       - name: Verify Apple processing and distribute to the existing internal group
         run: node scripts/testflight.mjs
         env:
-          PM_IOS_TEAM_ID: ${{ vars.PM_MAS_TEAM_ID }}
-          PM_IOS_BUILD_NUMBER: ${{ inputs.build_number }}
+          PM_MAS_TEAM_ID: ${{ vars.PM_MAS_TEAM_ID }}
+          PM_TESTFLIGHT_PLATFORM: ${{ inputs.platform }}
+          PM_TESTFLIGHT_BUILD_NUMBER: ${{ inputs.build_number }}
           ASC_KEY_BASE64: ${{ secrets.ASC_KEY_BASE64 }}
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}

@@ -2,13 +2,48 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createPrivateKey, sign } from 'node:crypto';
-import { requirePrivateRuntime } from '../../desktop/scripts/mac-signing-core.mjs';
+import { requirePrivateRuntime, REPOSITORY } from '../../desktop/scripts/mac-signing-core.mjs';
 import { iosStoreInputs } from './ios-store-policy.mjs';
 
 const origin = 'https://api.appstoreconnect.apple.com';
 export const groupName = 'PM Canvas Release QA';
 
+export function testFlightInputs(mobilePackage, desktopPackage, config, env) {
+  const platform = env.PM_TESTFLIGHT_PLATFORM || 'ios';
+  const buildNumber = env.PM_TESTFLIGHT_BUILD_NUMBER || env.PM_IOS_BUILD_NUMBER;
+  const team = env.PM_MAS_TEAM_ID || env.PM_IOS_TEAM_ID;
+  if (platform === 'ios')
+    return {
+      ...iosStoreInputs(mobilePackage, config, {
+        ...env,
+        PM_IOS_BUILD_NUMBER: buildNumber,
+        PM_IOS_TEAM_ID: team,
+      }),
+      platform: 'IOS',
+    };
+  if (platform !== 'macos') throw Error('Choose ios or macos for TestFlight distribution.');
+  const bundleId = desktopPackage.build?.mac?.appId || desktopPackage.build?.appId;
+  if (
+    env.GITHUB_REF !== 'refs/heads/main' ||
+    env.GITHUB_REPOSITORY !== REPOSITORY ||
+    bundleId !== 'app.toolmoa.pmcanvas' ||
+    config.appId !== bundleId ||
+    !/^\d+\.\d+\.\d+$/.test(desktopPackage.version) ||
+    !/^[A-Z0-9]{10}$/.test(team || '') ||
+    !/^[1-9]\d{0,3}$/.test(buildNumber || '')
+  )
+    throw Error('Use the current main macOS release and its unique MAS build number.');
+  return { bundleId, version: desktopPackage.version, team, buildNumber, platform: 'MAC_OS' };
+}
+
+function buildPlatform(expected) {
+  const platform = expected.platform || 'IOS';
+  if (!['IOS', 'MAC_OS'].includes(platform)) throw Error('Unsupported TestFlight platform.');
+  return platform;
+}
+
 export function matchingBuild(response, expected) {
+  const platform = buildPlatform(expected);
   const releases = new Map(
     (response.included || [])
       .filter((item) => item.type === 'preReleaseVersions')
@@ -19,10 +54,10 @@ export function matchingBuild(response, expected) {
     return (
       build.attributes.version === expected.buildNumber &&
       release?.version === expected.version &&
-      release.platform === 'IOS'
+      release.platform === platform
     );
   });
-  if (matches.length > 1) throw Error('Ambiguous iOS TestFlight build.');
+  if (matches.length > 1) throw Error('Ambiguous ' + platform + ' TestFlight build.');
   return matches[0];
 }
 
@@ -38,6 +73,7 @@ export async function distributeTestFlight(
   expected,
   { pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), attempts = 40 } = {},
 ) {
+  const platform = buildPlatform(expected);
   async function all(url) {
     const data = [];
     while (url) {
@@ -51,7 +87,7 @@ export async function distributeTestFlight(
     '/v1/apps?' + new URLSearchParams({ 'filter[bundleId]': expected.bundleId }),
   );
   if (apps.length !== 1 || apps[0].attributes.bundleId !== expected.bundleId)
-    throw Error('Expected exactly one existing PM Canvas iOS app.');
+    throw Error('Expected exactly one existing PM Canvas app.');
   const app = apps[0];
   const group = existingInternalGroup(
     await all(`/v1/apps/${encodeURIComponent(app.id)}/betaGroups?limit=200`),
@@ -89,6 +125,7 @@ export async function distributeTestFlight(
       if (linked && ['READY_FOR_BETA_TESTING', 'IN_BETA_TESTING'].includes(state))
         return {
           bundleId: expected.bundleId,
+          platform,
           version: expected.version,
           buildNumber: expected.buildNumber,
           appId: app.id,
@@ -128,8 +165,9 @@ export function appleToken(key, id, issuer, now = Math.floor(Date.now() / 1000))
 async function main() {
   requirePrivateRuntime();
   const mobile = fileURLToPath(new URL('../', import.meta.url));
-  const expected = iosStoreInputs(
+  const expected = testFlightInputs(
     JSON.parse(fs.readFileSync(path.join(mobile, 'package.json'))),
+    JSON.parse(fs.readFileSync(path.join(mobile, '../desktop/package.json'))),
     JSON.parse(fs.readFileSync(path.join(mobile, 'capacitor.config.json'))),
     process.env,
   );
@@ -174,7 +212,7 @@ async function main() {
     JSON.stringify(result, null, 2) + '\n',
   );
   console.log(
-    `PASS: iOS ${result.version} (${result.buildNumber}) available in ${result.group}: ${result.internalBuildState}`,
+    `PASS: ${result.platform} ${result.version} (${result.buildNumber}) available in ${result.group}: ${result.internalBuildState}`,
   );
 }
 
