@@ -7,7 +7,11 @@ import { windowsStoreProfile } from '../windows-profile.mjs';
 
 function fixture(t) {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pmcanvas-profile-'));
-  t.after(() => fs.rmSync(home, { recursive: true, force: true }));
+  t.after(() => {
+    assert.equal(path.dirname(home), path.resolve(os.tmpdir()));
+    assert.ok(path.basename(home).startsWith('pmcanvas-profile-'));
+    fs.rmSync(home, { recursive: true, force: true });
+  });
   const appData = path.join(home, 'AppData', 'Roaming');
   const legacy = path.join(appData, 'pmcanvas-desktop');
   fs.mkdirSync(legacy, { recursive: true });

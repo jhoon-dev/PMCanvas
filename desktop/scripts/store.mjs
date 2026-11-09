@@ -2,18 +2,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { createRequire } from 'node:module';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { releaseSource } from './release-policy.mjs';
 import { storeConfiguration, storeManifest, storeVersion } from './store-policy.mjs';
 import { preparePackage, sourceBytes } from './package-source.mjs';
+import { prepareStoreTools } from './store-tools.mjs';
 import { verifyPackage } from '../test/package-safety.mjs';
 import { checkPublicRepository, requirePublicSafety } from '../../web/scripts/public-safety.mjs';
 
-const require = createRequire(import.meta.url);
-const { getWindowsKitsBundle } = require('app-builder-lib/out/toolsets/windows.js');
-const { Arch } = require('builder-util');
 const desktop = fileURLToPath(new URL('../', import.meta.url)),
   root = path.dirname(desktop);
 const args = process.argv.slice(2),
@@ -61,6 +58,9 @@ const run = (command, argv, extra = {}) =>
   execFileSync(command, argv, { cwd: desktop, stdio: 'inherit', env, windowsHide: true, ...extra });
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 try {
+  const tools = await prepareStoreTools(stage);
+  env.ELECTRON_BUILDER_RCEDIT_PATH = tools.rcedit;
+  env.ELECTRON_BUILDER_WINDOWS_KITS_PATH = tools.kit;
   preparePackage(
     root,
     build,
@@ -105,10 +105,9 @@ try {
   const manifest = storeManifest(config, pkg.version, buildNumber);
   fs.writeFileSync(path.join(payload, 'AppxManifest.xml'), manifest);
   // The pinned builder ships checksums for this Windows SDK bundle; no beta MSIX builder target needed.
-  const { kit } = await getWindowsKitsBundle({ winCodeSign: '1.1.0', arch: Arch.x64 });
   // Keep the SDK tools and their private assembly manifests together at a short path.
   const sdk = path.join(stage, 'sdk');
-  fs.cpSync(kit, sdk, { recursive: true });
+  fs.cpSync(tools.kit, sdk, { recursive: true });
   const makeappx = path.join(sdk, 'makeappx.exe');
   const name = `PMCanvas-Desktop-${pkg.version}-Windows-x64${ciTest ? '-CI-TEST-ONLY' : '-Store'}.msix`;
   const file = path.join(output, name),

@@ -49,6 +49,11 @@ export function windowsStoreProfile({ home, appData }) {
     return profile;
   } finally {
     // Only our unpublished staging directory; never remove either profile.
+    if (
+      path.dirname(stage) !== path.dirname(profile) ||
+      !path.basename(stage).startsWith('.profile-migration-')
+    )
+      throw Error('Unsafe profile migration staging path.');
     fs.rmSync(stage, { recursive: true, force: true });
   }
 }
