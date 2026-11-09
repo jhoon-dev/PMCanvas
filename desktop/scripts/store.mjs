@@ -74,6 +74,28 @@ try {
   );
   fs.symlinkSync(path.join(desktop, 'node_modules'), path.join(build, 'node_modules'), 'junction');
   fs.mkdirSync(output, { recursive: true });
+  const electronModule = path.join(desktop, 'node_modules/electron');
+  const electronVersion = JSON.parse(
+    fs.readFileSync(path.join(electronModule, 'package.json')),
+  ).version;
+  if (electronVersion !== pkg.devDependencies.electron)
+    throw Error('Installed Electron must match the pinned release dependency.');
+  // The lockfile-verified Electron npm package already supplies the release hashes.
+  // Keep verification enabled without the failing remote SHASUMS256.txt request.
+  const builderConfig = path.join(stage, 'store-builder.json');
+  fs.writeFileSync(
+    builderConfig,
+    JSON.stringify({
+      ...pkg.build,
+      electronDownload: {
+        checksums: JSON.parse(fs.readFileSync(path.join(electronModule, 'checksums.json'))),
+      },
+      toolsets: { winCodeSign: '1.1.0' },
+      win: { ...pkg.build.win, signAndEditExecutable: true },
+      forceCodeSigning: false,
+      directories: { ...pkg.build.directories, output: path.join(stage, 'pack') },
+    }),
+  );
   run(process.execPath, [
     path.join(desktop, 'node_modules/electron-builder/cli.js'),
     '--win',
@@ -81,10 +103,7 @@ try {
     '--x64',
     '--projectDir',
     build,
-    '--config.toolsets.winCodeSign=1.1.0',
-    '--config.win.signAndEditExecutable=true',
-    '--config.forceCodeSigning=false',
-    '--config.directories.output=' + path.join(stage, 'pack'),
+    '--config=' + builderConfig,
     '--publish',
     'never',
   ]);
