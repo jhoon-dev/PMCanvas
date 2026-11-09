@@ -49,21 +49,14 @@ export function storeManifest(config, version, buildNumber = 0) {
   return `<?xml version="1.0" encoding="utf-8"?>
 <Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
- xmlns:desktop6="http://schemas.microsoft.com/appx/manifest/desktop/windows10/6"
- xmlns:virtualization="http://schemas.microsoft.com/appx/manifest/virtualization/windows10"
  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
- IgnorableNamespaces="uap desktop6 virtualization rescap">
+ IgnorableNamespaces="uap rescap">
  <Identity Name="${xml(config.identityName)}" Publisher="${xml(config.publisher)}" Version="${storeVersion(version, buildNumber)}" ProcessorArchitecture="x64"/>
  <Properties>
   <DisplayName>${xml(config.displayName || 'PM Canvas')}</DisplayName>
   <PublisherDisplayName>${xml(config.publisherDisplayName)}</PublisherDisplayName>
   <Description>Offline project planning, WBS, Gantt and Excel reports</Description>
   <Logo>assets\\StoreLogo.png</Logo>
-  <desktop6:FileSystemWriteVirtualization>disabled</desktop6:FileSystemWriteVirtualization>
-  <virtualization:FileSystemWriteVirtualization><virtualization:ExcludedDirectories>
-   <virtualization:ExcludedDirectory>$(KnownFolder:RoamingAppData)\\pmcanvas-desktop</virtualization:ExcludedDirectory>
-   <virtualization:ExcludedDirectory>$(KnownFolder:RoamingAppData)\\PM Canvas Desktop</virtualization:ExcludedDirectory>
-  </virtualization:ExcludedDirectories></virtualization:FileSystemWriteVirtualization>
  </Properties>
  <Resources><Resource Language="ko-KR"/><Resource Language="en-US"/></Resources>
  <Dependencies><TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.19041.0" MaxVersionTested="10.0.26100.0"/></Dependencies>
@@ -71,7 +64,7 @@ export function storeManifest(config, version, buildNumber = 0) {
   <uap:VisualElements DisplayName="${xml(config.displayName || 'PM Canvas')}" Description="Offline project planning" BackgroundColor="${xml(iconBackground)}"
    Square150x150Logo="assets\\Square150x150Logo.png" Square44x44Logo="assets\\Square44x44Logo.png"/>
  </Application></Applications>
- <Capabilities><rescap:Capability Name="runFullTrust"/><rescap:Capability Name="unvirtualizedResources"/></Capabilities>
+ <Capabilities><rescap:Capability Name="runFullTrust"/></Capabilities>
 </Package>
 `;
 }

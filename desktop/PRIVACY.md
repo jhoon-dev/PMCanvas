@@ -1,6 +1,6 @@
 # PM Canvas 앱 개인정보처리방침 / Privacy policy
 
-시행일 / Effective date: 2026-11-03
+시행일 / Effective date: 2026-11-09
 
 개발자 / Developer: jhoon-dev
 
@@ -19,6 +19,8 @@ The policy below covers PM Canvas for Windows and macOS. For PM Canvas on iPhone
 앱은 사용자가 입력하거나 파일에서 가져온 프로젝트명, 참여인력 이름·역할, 업무·일정·메모, 예상 공수와 완료 기록을 처리합니다. 이 정보는 계획·진척률·예상 일정 계산, 화면 표시, 프로젝트 저장·복구와 보고서 생성에 사용됩니다. 참여인력 이름이나 메모에는 개인정보가 포함될 수 있습니다. 앱은 별도 사용자 계정, 연락처 목록, 위치, 카메라 또는 마이크를 요구하지 않습니다.
 
 ### 저장과 외부 전송
+
+Windows Store 1.9.1부터 설정·언어·자동 복구 프로필은 `%USERPROFILE%\PM Canvas\Profile`에 저장하며 앱 제거 후에도 유지됩니다. 최초 실행 시 기존 AppData의 EXE 프로필을 원본 그대로 남기고 복사합니다. 이 로컬 복사에 외부 전송은 없습니다. 전체 삭제를 원하면 앱 종료 후 이 프로필과 기존 EXE 프로필, 직접 저장한 프로젝트를 함께 확인하세요.
 
 Mac App Store 설치본은 GitHub 업데이트 API를 조회하거나 설치 파일을 내려받지 않고 Mac App Store 업데이트 화면을 엽니다. Apple의 설치·업데이트·진단 처리는 [Apple 개인정보 처리방침](https://www.apple.com/legal/privacy/)을 따릅니다. 사용자가 선택한 프로젝트의 파일 접근 권한을 다시 사용하기 위한 보안 북마크는 앱의 로컬 컨테이너에 보관합니다. 아래 GitHub 업데이트 설명은 Store 외부 배포본에만 적용됩니다.
 
@@ -48,6 +50,8 @@ This policy covers **PM Canvas** for Windows and macOS. It does not cover indepe
 The app processes project names, team members' names and roles, tasks, schedules, notes, estimated hours and completion records entered by the user or imported from files. It uses this information for planning, progress and forecast calculations, display, saving and recovery, and report generation. Names and notes may contain personal information. The app does not require its own user account, contacts, location, camera or microphone.
 
 ### Storage and third parties
+
+Starting with Windows Store 1.9.1, preferences, language and automatic recovery are stored in `%USERPROFILE%\PM Canvas\Profile` and retained after uninstall. On first launch, an existing EXE profile in AppData is copied locally without modifying the original or transmitting it. To remove all data, close the app and review this profile, the original EXE profile and your saved projects.
 
 Mac App Store installations open the Mac App Store updates page without querying GitHub update APIs or downloading installers. Apple's installation, update and diagnostic processing follows the [Apple Privacy Policy](https://www.apple.com/legal/privacy/). Security-scoped bookmarks used to restore access to the selected project are stored locally in the app container. The GitHub update description below applies only to builds distributed outside the Store.
 

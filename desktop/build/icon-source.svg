@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <rect width="1024" height="1024" fill="#2c2e3a"/>
+  <!-- A canvas frame and a P made from a project spine and schedule bars. -->
+  <rect x="208" y="208" width="608" height="608" rx="120" fill="#38475b"/>
+  <path d="M344 696V328H556C636 328 680 372 680 440S636 552 556 552H416V696Z" fill="#b9f3ef"/>
+  <rect x="416" y="400" width="180" height="80" rx="24" fill="#2c2e3a"/>
+  <rect x="472" y="600" width="208" height="40" rx="20" fill="#66d9cf"/>
+  <rect x="536" y="672" width="144" height="40" rx="20" fill="#66d9cf"/>
+</svg>

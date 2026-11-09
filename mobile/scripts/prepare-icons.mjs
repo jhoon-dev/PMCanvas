@@ -1,12 +1,27 @@
 import { chromium } from '@playwright/test';
-import { readFile, writeFile, mkdir, copyFile } from 'node:fs/promises';
+import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
-// Keep the opaque master separate from generated files so reruns never resample their output.
-const original = await readFile(path.join(root, '../desktop/build/icon-source.png'));
+// Render the PM Canvas vector master; never resample a previously generated icon.
+const vector = await readFile(path.join(root, '../desktop/build/icon-source.svg'), 'utf8');
+const renderer = await chromium.launch();
+let original;
+try {
+  const page = await renderer.newPage({
+    viewport: { width: 1024, height: 1024 },
+    deviceScaleFactor: 1,
+  });
+  await page.setContent(
+    `<style>html,body{margin:0;width:100%;height:100%}svg{display:block}</style>${vector}`,
+  );
+  original = await page.screenshot({ omitBackground: false });
+  await writeFile(path.join(root, '../desktop/build/icon-source.png'), original);
+} finally {
+  await renderer.close();
+}
 assert.ok(original.subarray(1, 4).toString() === 'PNG');
 const { background } = JSON.parse(
   await readFile(path.join(root, '../desktop/build/icon-settings.json'), 'utf8'),
@@ -17,14 +32,6 @@ const image = `data:image/png;base64,${original.toString('base64')}`;
 const artwork = (inset = 0) =>
   `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024"><image href="${image}" x="${inset}" y="${inset}" width="${1024 - inset * 2}" height="${1024 - inset * 2}"/></svg>`;
 const svg = artwork();
-const iconNotes = await readFile(path.join(root, '../desktop/build/ICONS.md'), 'utf8');
-const license = iconNotes.slice(iconNotes.indexOf('Copyright (c)'));
-await mkdir(path.join(root, 'public'), { recursive: true });
-await writeFile(path.join(root, 'public/LICENSE.electron.txt'), license);
-await copyFile(
-  path.join(root, 'public/LICENSE.electron.txt'),
-  path.join(root, '../web/public/LICENSE.electron.txt'),
-);
 const browser = await chromium.launch();
 try {
   const page = await browser.newPage({ deviceScaleFactor: 1 });
