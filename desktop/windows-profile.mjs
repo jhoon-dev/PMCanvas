@@ -22,10 +22,13 @@ export function windowsStoreProfile({ home, appData }) {
       ),
     ) || candidates.find((folder) => fs.existsSync(folder));
   const stage = fs.mkdtempSync(path.join(path.dirname(profile), '.profile-migration-'));
+  // Newer bundled Node versions reject copying into an existing directory when
+  // errorOnExist is enabled. Publish a fresh child inside the staging container.
+  const candidate = path.join(stage, 'Profile');
   try {
     if (source) {
       trace('copying existing profile');
-      fs.cpSync(source, stage, {
+      fs.cpSync(source, candidate, {
         recursive: true,
         force: false,
         errorOnExist: true,
@@ -46,9 +49,9 @@ export function windowsStoreProfile({ home, appData }) {
         },
       });
       trace('existing profile copied');
-    }
+    } else fs.mkdirSync(candidate);
     try {
-      fs.renameSync(stage, profile);
+      fs.renameSync(candidate, profile);
     } catch (error) {
       // Another first launch may have completed the same atomic migration.
       if (!fs.existsSync(profile)) throw error;
