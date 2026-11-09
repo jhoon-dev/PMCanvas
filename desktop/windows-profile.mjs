@@ -1,0 +1,54 @@
+import fs from 'node:fs';
+import path from 'node:path';
+
+// AppData is virtualized by MSIX and its private writes disappear on uninstall.
+// Keep the user's recovery/profile beside their own files, without exemptions.
+export function windowsStoreProfile({ home, appData }) {
+  const profile = path.join(home, 'PM Canvas', 'Profile');
+  if (fs.existsSync(profile)) return profile;
+  fs.mkdirSync(path.dirname(profile), { recursive: true });
+  const candidates = ['pmcanvas-desktop', 'PM Canvas Desktop'].map((name) =>
+    path.join(appData, name),
+  );
+  const source =
+    candidates.find((folder) =>
+      ['workspace.json', 'recovery.json', 'preferences.json'].some((file) =>
+        fs.existsSync(path.join(folder, file)),
+      ),
+    ) || candidates.find((folder) => fs.existsSync(folder));
+  const stage = fs.mkdtempSync(path.join(path.dirname(profile), '.profile-migration-'));
+  try {
+    if (source) {
+      fs.cpSync(source, stage, {
+        recursive: true,
+        force: false,
+        errorOnExist: true,
+        filter: (file) => {
+          const relative = path.relative(source, file);
+          if (!relative) return true;
+          if (
+            /^(Cache|Code Cache|GPUCache|DawnGraphiteCache|DawnWebGPUCache|Crashpad|Crash Reports|updates)([\\/]|$)/.test(
+              relative,
+            ) ||
+            /^Singleton|^lockfile$/.test(relative)
+          )
+            return false;
+          // Never follow a link outside the source profile.
+          if (fs.lstatSync(file).isSymbolicLink())
+            throw Error('Close the old app and remove profile links before migration: ' + file);
+          return true;
+        },
+      });
+    }
+    try {
+      fs.renameSync(stage, profile);
+    } catch (error) {
+      // Another first launch may have completed the same atomic migration.
+      if (!fs.existsSync(profile)) throw error;
+    }
+    return profile;
+  } finally {
+    // Only our unpublished staging directory; never remove either profile.
+    fs.rmSync(stage, { recursive: true, force: true });
+  }
+}

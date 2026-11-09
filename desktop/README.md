@@ -1,6 +1,6 @@
-# PM Canvas 1.9.0 — Windows·macOS
+# PM Canvas 1.9.1 — Windows·macOS
 
-[버전별 사용 매뉴얼](../docs/manuals/desktop/1.9.0/README.ko.md)
+[버전별 사용 매뉴얼 및 데이터 보존 안내](../docs/manuals/desktop/1.9.1/README.ko.md)
 Developer **jhoon-dev** · Brand **Toolmoa** · App ID **`app.toolmoa.pmcanvas`** · Display Name **PM Canvas**. [제품 식별·표기 규칙](../README.md#제품-식별표기-규칙)을 따릅니다.
 
 [개인정보처리방침 / Privacy policy](PRIVACY.md). 앱의 **파일 옵션 → 개인정보처리방침** 또는 네이티브 **파일** 메뉴에서도 확인할 수 있습니다.
@@ -13,7 +13,7 @@ macOS의 App Store 배포는 [Mac App Store 설정·빌드·제출 안내](MAC-A
 
 빈 프로젝트는 참여인력 → 첫 업무 → 완료 기록 순서로 시작을 안내합니다. 업무 입력창은 이름·담당자·일정·체크리스트를 먼저 보여주며, **분류 · 선행 업무 · 메모**를 펼치면 상위 업무와 추가 설정을 수정할 수 있습니다. 기존 상위·선행 업무나 메모가 있으면 자동으로 펼쳐집니다. 검색 중에는 **필터 초기화**로 전체 업무로 돌아올 수 있으며 입력·완료 기록은 유지됩니다. 상단 실행 취소·다시 실행은 작은 화살표로 표시하며 키보드 단축키도 사용할 수 있습니다.
 
-Windows의 새 배포 경로는 [Microsoft Store 제출용 MSIX](WINDOWS-STORE.md)입니다. Partner Center 앱 예약 후 제품 ID를 설정하면 CI에서 제출 파일을 만들 수 있습니다. 현재 새 Store 제품을 심사 중이며 기존 무서명 EXE의 공개 배포는 종료했습니다. Mac의 [인증서 발급 → 공증 → GitHub Secrets 등록 순서](MAC-SETUP.md)도 단계별로 안내합니다.
+Windows의 새 배포 경로는 [Microsoft Store 제출용 MSIX](WINDOWS-STORE.md)입니다. Partner Center 앱 예약 후 제품 ID를 설정하면 CI에서 제출 파일을 만들 수 있습니다. 1.9.0 반려 사유를 수정한 1.9.1 재제출을 준비하며 기존 무서명 EXE의 공개 배포는 종료했습니다. Mac의 [인증서 발급 → 공증 → GitHub Secrets 등록 순서](MAC-SETUP.md)도 단계별로 안내합니다.
 
 Mac이 없어도 Windows에서 `npm --prefix desktop run signing:setup`으로 개인 키·CSR 생성, Apple 발급 안내, P12 변환·검증, GitHub Secrets 등록을 이어서 진행할 수 있습니다. 개인 키는 Git 밖에 암호화해 보관하며 입력한 암호를 파일이나 로그에 남기지 않습니다. 자세한 사용법은 [Mac 설정 가이드](MAC-SETUP.md)를 참고하세요.
 
@@ -30,6 +30,8 @@ Mac이 없어도 Windows에서 `npm --prefix desktop run signing:setup`으로 �
 설정 JSON이나 시간대가 손상되면 원본을 `preferences.json.invalid-<SHA256>` 사본에 보관하고 기본값으로 실행합니다. 보존할 수 없는 원본은 덮어쓰지 않습니다. 앱 설정에서 복구 안내와 시간대·자동 확인 값을 확인할 수 있습니다.
 
 복구 파일을 읽지 못한 경우에도 원본을 `recovery.json.invalid-<SHA256>`으로 보존합니다. 새 프로젝트를 만들거나 다른 파일을 열어도 이 사본은 유지됩니다. 사본을 안전하게 만들 수 없으면 복구 원본 교체를 거절합니다. 프로젝트 저장 시에는 Windows 대소문자·경로 별칭·하드 링크로 같은 파일을 가리키는 경우에도 외부 변경 충돌을 검사합니다.
+
+Windows Store 1.9.1부터 프로필은 `%USERPROFILE%\PM Canvas\Profile`에 보관합니다. 최초 실행 시 기존 EXE 프로필을 원본 보존 후 복사하고, 이후 업데이트·제거·재설치에서 같은 새 프로필을 사용합니다. 자세한 경로와 전환 주의사항은 [Store 안내](WINDOWS-STORE.md)를 확인하세요.
 
 프로젝트·계정·파일 경로는 업데이트 서버에 보내지 않습니다. 프로젝트 파일과 PC 설정은 기존 위치에 보존하며, 오프라인에서도 편집과 저장을 계속 사용할 수 있습니다. Windows Store 버전은 GitHub 설치 파일을 사용하지 않습니다.
 
@@ -143,7 +145,7 @@ $nsisCompiler = Get-ChildItem "$env:LOCALAPPDATA\electron-builder\Cache\nsis" -R
 
 ## 설치 파일 빌드
 
-Windows는 **Microsoft Store MSIX만 배포**합니다. 현재 데스크톱 안내는 **1.9.0**을 기준으로 하며, 사용자 다운로드에는 EXE·무서명 DMG/ZIP을 제공하지 않습니다. CI의 데이터 보존 검증 설치본은 일회용 환경에서 생성합니다.
+Windows는 **Microsoft Store MSIX만 배포**합니다. 현재 데스크톱 안내는 **1.9.1**을 기준으로 하며, 사용자 다운로드에는 EXE·무서명 DMG/ZIP을 제공하지 않습니다. CI의 데이터 보존 검증 설치본은 일회용 환경에서 생성합니다.
 
 제거 중 작업 경로가 설치 폴더를 잠그지 않도록 `build/installer.nsh`에서 임시 폴더로 변경합니다. 등록 정보와 바로가기 정리는 electron-builder의 표준 제거 프로그램이 수행하며, 프로젝트·복구 데이터 삭제는 비활성화했습니다. 검사 환경의 차이를 등록 정리 결함으로 오인해 추가했던 별도 정리 도우미는 제거했습니다.
 

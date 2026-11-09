@@ -1,6 +1,6 @@
 {
   "name": "pmcanvas-desktop",
-  "version": "1.9.0",
+  "version": "1.9.1",
   "private": true,
   "description": "Offline project planning for Windows and macOS",
   "author": "jhoon-dev",
@@ -110,7 +110,8 @@
       "app/shared/korean-holidays-data.js",
       "holiday-sync.mjs",
       "app/holiday-ui.js",
-      "app/navigation.js"
+      "app/navigation.js",
+      "windows-profile.mjs"
     ],
     "asar": true,
     "win": {

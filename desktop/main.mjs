@@ -31,6 +31,7 @@ import { DesktopPreferences } from './preferences.mjs';
 import { AppDialogs } from './dialogs.mjs';
 import { UpdateManager } from './update-manager.mjs';
 import { cleanupUpdateCache } from './update-cache.mjs';
+import { windowsStoreProfile } from './windows-profile.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const metadata = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'));
@@ -41,9 +42,12 @@ if (!app.commandLine.hasSwitch('user-data-dir')) {
   const userData =
     !app.isPackaged && process.env.PMCANVAS_DESKTOP_DATA
       ? path.resolve(process.env.PMCANVAS_DESKTOP_DATA)
-      : path.join(app.getPath('appData'), metadata.name);
+      : process.windowsStore === true
+        ? windowsStoreProfile({ home: app.getPath('home'), appData: app.getPath('appData') })
+        : path.join(app.getPath('appData'), metadata.name);
   mkdirSync(userData, { recursive: true });
   app.setPath('userData', userData);
+  app.setPath('sessionData', userData);
 }
 protocol.registerSchemesAsPrivileged([
   {

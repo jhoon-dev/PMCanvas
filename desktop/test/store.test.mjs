@@ -44,7 +44,7 @@ test('Store package versions match the application and reserve a zero fourth fie
   ])
     assert.throws(() => storeVersion(v));
 });
-test('MSIX manifest preserves external AppData, escapes identities and uses full-trust desktop activation', () => {
+test('MSIX manifest uses default virtualization, escapes identities and uses full-trust desktop activation', () => {
   const xml = storeManifest(storeConfiguration(env), '1.9.0');
   const doc = new DOMParser().parseFromString(xml, 'application/xml');
   const element = (name) => doc.getElementsByTagName(name)[0];
@@ -53,9 +53,11 @@ test('MSIX manifest preserves external AppData, escapes identities and uses full
   assert.equal(element('PublisherDisplayName').textContent, 'Example & Company');
   assert.equal(element('Application').getAttribute('Executable'), 'app\\PM Canvas.exe');
   assert.equal(element('uap:VisualElements').getAttribute('BackgroundColor'), '#2c2e3a');
-  assert.equal(element('desktop6:FileSystemWriteVirtualization').textContent, 'disabled');
-  assert.equal(doc.getElementsByTagName('virtualization:ExcludedDirectory').length, 2);
-  assert.match(xml, /Name="unvirtualizedResources"/);
+  assert.doesNotMatch(
+    xml,
+    /unvirtualizedResources|WriteVirtualization|ExcludedDirectory|xmlns:desktop6|xmlns:virtualization/,
+  );
+  assert.equal(doc.getElementsByTagName('rescap:Capability').length, 1);
   assert.match(xml, /Name="runFullTrust"/);
   assert.doesNotMatch(xml, /RegistryWriteVirtualization|runFullTrust.*runFullTrust/s);
 });

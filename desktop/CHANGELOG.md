@@ -1,5 +1,12 @@
 # 변경 이력
 
+## 1.9.1
+
+- Microsoft Store 반려 사유인 Electron 기본 아이콘을 PM Canvas 전용 P·일정 막대 아이콘으로 교체했습니다. 공유 아이콘 원본과 각 플랫폼의 파생 이미지도 통일했습니다.
+- `unvirtualizedResources`와 파일 시스템 가상화 예외를 제거하고 `runFullTrust`만 유지합니다.
+- Store 프로필을 `%USERPROFILE%\PM Canvas\Profile`에 보관하여 업데이트·제거·재설치 시 유지합니다. 기존 EXE 프로필은 최초 실행 때 원본을 보존하며 복사하고, 기존 Store 프로필을 덮어쓰지 않습니다.
+- 앱 버전 1.9.1과 MSIX **1.9.1.0**으로 재제출합니다.
+
 ## 1.9.0
 
 - 앱 표시 버전과 Microsoft Store 버전을 1.9.0으로 통일했습니다. 패키지는 예약 필드만 덧붙인 MSIX **1.9.0.0**이며 CI 빌드 번호로 버전을 바꾸지 않습니다.

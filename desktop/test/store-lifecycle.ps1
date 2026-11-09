@@ -8,6 +8,7 @@ $evidence = Get-Content -LiteralPath (Join-Path $output 'store-manifest.json') -
 $identity = 'PMCanvas.CITest.' + $env:GITHUB_RUN_ID
 if ($evidence.intendedFor -ne 'ci-test-only' -or $evidence.identity.identityName -ne $identity) { throw 'Only CI fixture packages may be installed.' }
 if (Get-AppxPackage -Name $identity) { throw 'Preserve an existing package.' }
+if (Test-Path -LiteralPath (Join-Path $env:USERPROFILE 'PM Canvas\Profile')) { throw 'Preserve an existing Store profile.' }
 foreach ($name in @('pmcanvas-desktop', 'PM Canvas Desktop')) {
   if (Test-Path -LiteralPath (Join-Path $env:APPDATA $name)) { throw 'Preserve pre-existing user data.' }
 }
@@ -92,17 +93,17 @@ try {
   Check-Preserved
   $installed = Get-AppxPackage -Name $identity
   Run-App (Join-Path $installed.InstallLocation 'app\PM Canvas.exe') 'check' $package.version $true
-  $checks.Add('Migrated the NSIS profile to a registered MSIX and verified Store identity, data and Excel export.')
+  $checks.Add('Copied the NSIS profile outside AppData without changing originals; verified real MSIX identity, language, recovery, data and Excel export. Saved a new Store time zone.')
   Write-Output 'Store lifecycle: update MSIX'
   Add-AppxPackage -Path $new
   Check-Preserved
   $installed = Get-AppxPackage -Name $identity
   Run-App (Join-Path $installed.InstallLocation 'app\PM Canvas.exe') 'check' $package.version $true
-  $checks.Add('Updated MSIX package version while preserving external project, recovery, preferences and language.')
+  $checks.Add('Updated MSIX with default virtualization while preserving external project, recovery, new Store preferences and language.')
   Write-Output 'Store lifecycle: remove MSIX'
   Get-AppxPackage -Name $identity | Remove-AppxPackage
   Check-Preserved
-  $checks.Add('Removed MSIX without deleting legacy profile or external projects.')
+  $checks.Add('Removed MSIX without deleting original EXE data, new Store profile or external projects; verified every retained file hash.')
   Write-Output 'Store lifecycle: reinstall MSIX'
   Add-AppxPackage -Path $new
   Check-Preserved
