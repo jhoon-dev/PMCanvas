@@ -46,14 +46,17 @@ final class AppUITests: XCTestCase {
             let delivered = XCTNSPredicateExpectation(
                 predicate: NSPredicate(format: "value == %@", entered), object: field
             )
-            XCTAssertEqual(XCTWaiter.wait(for: [delivered], timeout: 10), .completed,
+            // A hosted iPad simulator can spend more than ten seconds resolving
+            // an accessibility snapshot even when WebKit accepted the key. Keep
+            // the exact value check, allowing the native snapshot to catch up.
+            XCTAssertEqual(XCTWaiter.wait(for: [delivered], timeout: 30), .completed,
                            "Input delivery: \(String(reflecting: field.value)); expected: \(String(reflecting: entered))\n\(app.debugDescription)")
         }
         dismissKeyboard(app)
         let committed = XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "value == %@", text), object: field
         )
-        XCTAssertEqual(XCTWaiter.wait(for: [committed], timeout: 10), .completed,
+        XCTAssertEqual(XCTWaiter.wait(for: [committed], timeout: 30), .completed,
                        "Input value: \(String(reflecting: field.value)); expected: \(String(reflecting: text))\n\(app.debugDescription)")
     }
 
