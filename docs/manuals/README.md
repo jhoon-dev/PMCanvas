@@ -3,8 +3,8 @@
 | 제품                   | 최신 매뉴얼                         | 이전 버전                                                                                                    |
 | ---------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------ |
 | Windows·macOS 데스크톱 | [1.9.1](desktop/1.9.1/README.ko.md) | —                                                                                                            |
-| 웹                     | [0.21.9](web/0.21.9/README.ko.md)   | [0.21.8](web/0.21.8/README.ko.md)                                                                            |
-| iPhone·Android 모바일  | [0.3.1](mobile/0.3.1/README.ko.md)  | [0.3.0](mobile/0.3.0/README.ko.md) · [0.2.0](mobile/0.2.0/README.ko.md) · [0.1.0](mobile/0.1.0/README.ko.md) |
+| 웹                     | [0.21.10](web/0.21.10/README.ko.md) | [0.21.8](web/0.21.8/README.ko.md)                                                                            |
+| iPhone·Android 모바일  | [0.3.2](mobile/0.3.2/README.ko.md)  | [0.3.0](mobile/0.3.0/README.ko.md) · [0.2.0](mobile/0.2.0/README.ko.md) · [0.1.0](mobile/0.1.0/README.ko.md) |
 
 버전 번호는 각 제품의 앱 버전입니다. Windows 앱 표시 버전과 Store 패키지의 앞 세 숫자는 같습니다. 예를 들어 앱 1.9.0은 Windows 패키지 MSIX **1.9.0.0**으로 제출합니다. 마지막 0은 Store가 요구하는 예약 필드입니다. Windows 1.9.1은 이번 Store 재제출 대상이며, 심사·게시 상태는 [Windows 배포 기록](../../desktop/WINDOWS-STORE.md)에서 확인합니다. 모바일의 실제 배포 상태는 해당 버전 매뉴얼의 배포 안내를 확인합니다.
 
