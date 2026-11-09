@@ -21,7 +21,7 @@ const paths = [
   'README.md',
   'README.en.md',
   'docs/product-scope.md',
-  'docs/manuals/web/0.21.9/images/overview.png',
+  'docs/manuals/web',
   'shared',
   'web/.env.example',
   'web/.prettierignore',
