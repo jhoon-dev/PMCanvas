@@ -76,6 +76,10 @@ try {
   } else {
     const expected = JSON.parse(fs.readFileSync(request.expected));
     const firstMigration = !expected.storeProfile;
+    if (expected.storeDraft) {
+      await page.locator('#messageDialog[open]').waitFor();
+      await page.locator('#messageDialog [data-response="0"]').click();
+    }
     assert.equal(runtime.profile, path.join(runtime.home, 'PM Canvas', 'Profile'));
     assert.equal(runtime.sessionData, runtime.profile);
     assert.notEqual(runtime.profile, expected.profile, 'Store must migrate out of AppData.');
@@ -148,7 +152,11 @@ try {
       assert.deepEqual(draft.project, expected.storeDraft);
     }
     await page.evaluate((id) => window.desktop.activateTab(id), originalTab);
-    await app.close();
+    // Simulate an interrupted session so the unsaved recovery is retained.
+    // A normal quit deliberately asks to save or discard dirty project tabs.
+    const stopped = app.waitForEvent('close');
+    await app.evaluate(({ app }) => app.exit(0));
+    await stopped;
     app = null;
     // Tab migration retains the original single-document recovery and writes a
     // separate workspace. Verify both, then preserve both through servicing.
