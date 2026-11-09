@@ -4,15 +4,19 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { createRequire } from 'node:module';
 import assert from 'node:assert/strict';
 import { preparePackage, sourceBytes } from '../scripts/package-source.mjs';
 import { verifyPackage } from './package-safety.mjs';
 
 export const LEGACY_SOURCE = '7c57c3d10129a761b61dfc5ae06f55e8103570b0';
+const { parseChecksumFile } = createRequire(import.meta.url)(
+  'app-builder-lib/out/util/electronGet.js',
+);
 const desktop = fileURLToPath(new URL('../', import.meta.url));
 const root = path.dirname(desktop);
 
-export function buildLegacyFixture() {
+export async function buildLegacyFixture() {
   if (
     process.env.CI !== 'true' ||
     process.env.GITHUB_ACTIONS !== 'true' ||
@@ -72,24 +76,50 @@ export function buildLegacyFixture() {
   if (!npmCli) throw Error('Use Node with its bundled npm to build the CI fixture.');
   run(process.execPath, [npmCli, 'ci', '--omit=dev', '--ignore-scripts'], { cwd: source, env });
   const win = process.platform === 'win32';
+  // Keep the retired runtime exact, but avoid the failing release-page checksum URL.
+  assert.equal(pkg.devDependencies.electron, '45.0.0');
+  const sums = await fetch(
+    'https://api.github.com/repos/electron/electron/releases/assets/661448854',
+    {
+      headers: { Accept: 'application/octet-stream' },
+      signal: AbortSignal.timeout(60000),
+    },
+  );
+  if (!sums.ok) throw Error('Legacy Electron checksum download failed: ' + sums.status);
+  const checksums = parseChecksumFile(await sums.text());
+  assert.match(
+    checksums['electron-v45.0.0-' + (win ? 'win32-x64' : 'darwin-' + process.arch) + '.zip'] || '',
+    /^[a-f0-9]{64}$/,
+  );
+  const builderConfig = path.join(work, 'legacy-builder.json');
+  fs.writeFileSync(
+    builderConfig,
+    JSON.stringify({
+      ...pkg.build,
+      electronDownload: { checksums },
+      forceCodeSigning: false,
+      directories: { ...pkg.build.directories, output },
+      win: {
+        ...pkg.build.win,
+        signAndEditExecutable: false,
+        artifactName: 'CI-ONLY-Legacy-0.7.1-${arch}.${ext}',
+      },
+      mac: {
+        ...pkg.build.mac,
+        identity: '-',
+        hardenedRuntime: false,
+        artifactName: 'CI-ONLY-Legacy-0.7.1-${arch}.${ext}',
+      },
+    }),
+  );
   run(
     process.execPath,
     [
       path.join(desktop, 'node_modules/electron-builder/cli.js'),
-      ...(win
-        ? ['--win', 'nsis', '--x64', '--config.win.signAndEditExecutable=false']
-        : [
-            '--mac',
-            'dmg',
-            '--' + process.arch,
-            '--config.mac.identity=-',
-            '--config.mac.hardenedRuntime=false',
-          ]),
+      ...(win ? ['--win', 'nsis', '--x64'] : ['--mac', 'dmg', '--' + process.arch]),
       '--projectDir',
       source,
-      '--config.forceCodeSigning=false',
-      '--config.' + (win ? 'win' : 'mac') + '.artifactName=CI-ONLY-Legacy-0.7.1-${arch}.${ext}',
-      '--config.directories.output=' + output,
+      '--config=' + builderConfig,
       '--publish',
       'never',
     ],
@@ -126,5 +156,5 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     !target.endsWith('.json')
   )
     throw Error('Write fixture evidence only beneath RUNNER_TEMP.');
-  fs.writeFileSync(target, JSON.stringify(buildLegacyFixture(), null, 2) + '\n');
+  fs.writeFileSync(target, JSON.stringify(await buildLegacyFixture(), null, 2) + '\n');
 }

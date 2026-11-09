@@ -77,7 +77,7 @@ function absentInstallation() {
   }
 }
 async function prepareBaseline() {
-  const fixture = buildLegacyFixture();
+  const fixture = await buildLegacyFixture();
   assert.equal(hash(fixture.installer), fixture.sha256);
   return fixture;
 }
