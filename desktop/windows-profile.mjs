@@ -4,6 +4,11 @@ import path from 'node:path';
 // AppData is virtualized by MSIX and its private writes disappear on uninstall.
 // Keep the user's recovery/profile beside their own files, without exemptions.
 export function windowsStoreProfile({ home, appData }) {
+  const trace = (message) => {
+    if (process.env.CI === 'true' && process.env.RUNNER_ENVIRONMENT === 'github-hosted')
+      console.log('Store profile: ' + message);
+  };
+  trace('selecting persistent profile');
   const profile = path.join(home, 'PM Canvas', 'Profile');
   if (fs.existsSync(profile)) return profile;
   fs.mkdirSync(path.dirname(profile), { recursive: true });
@@ -19,6 +24,7 @@ export function windowsStoreProfile({ home, appData }) {
   const stage = fs.mkdtempSync(path.join(path.dirname(profile), '.profile-migration-'));
   try {
     if (source) {
+      trace('copying existing profile');
       fs.cpSync(source, stage, {
         recursive: true,
         force: false,
@@ -39,6 +45,7 @@ export function windowsStoreProfile({ home, appData }) {
           return true;
         },
       });
+      trace('existing profile copied');
     }
     try {
       fs.renameSync(stage, profile);
@@ -46,7 +53,12 @@ export function windowsStoreProfile({ home, appData }) {
       // Another first launch may have completed the same atomic migration.
       if (!fs.existsSync(profile)) throw error;
     }
+    trace('persistent profile ready');
     return profile;
+  } catch (error) {
+    // Electron's early startup error dialog otherwise hides the cause from CI.
+    if (process.windowsStore === true) console.error('Store profile migration failed:', error);
+    throw error;
   } finally {
     // Only our unpublished staging directory; never remove either profile.
     if (
