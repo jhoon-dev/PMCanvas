@@ -41,6 +41,7 @@ import {
 import { shareFile } from './platform.js';
 import { uid } from './id.mjs';
 import { privacyContent } from './privacy.js';
+import { version } from '../package.json';
 
 setLanguage('ko');
 try {
@@ -210,7 +211,7 @@ function more(p) {
 
     <section class="settings-card"><h2>파일 가져오기 · 내보내기</h2><p>프로젝트 파일은 웹과 데스크톱에서도 가져올 수 있습니다.</p><div class="stack-actions">${button(icon('download') + ' 프로젝트 내보내기', 'export')}${button(icon('upload') + ' 프로젝트 가져오기', 'import')}</div></section>
     <section class="settings-card"><h2>업무 기준 시간대</h2><p>${esc(getBusinessTimeZone())} 기준으로 오늘과 완료일을 계산합니다.</p>${button('시간대 변경', 'timezone')}</section>
-    <p class="privacy-note">PM Canvas 0.3.1 · 기기에 자동 저장<br>계정이나 서버 연결 없이 동작합니다. 앱을 삭제하면 기기의 프로젝트도 삭제될 수 있으므로 파일을 내보내 보관하세요.</p>
+    <p class="privacy-note">PM Canvas ${esc(version)} · 기기에 자동 저장<br>계정이나 서버 연결 없이 동작합니다. 앱을 삭제하면 기기의 프로젝트도 삭제될 수 있으므로 파일을 내보내 보관하세요.</p>
     <p class="privacy-note">${button('개인정보처리방침', 'privacy', 'ghost')}</p>
     <div class="delete-project">${button('이 프로젝트 삭제', 'delete-project', 'danger ghost')}</div>`;
 }
