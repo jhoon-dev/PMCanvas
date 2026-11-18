@@ -1,7 +1,14 @@
 name: iOS App Store
 on:
   pull_request:
-    paths: ['mobile/**', 'shared/**', '.github/workflows/ios-app-store.yml']
+    paths:
+      [
+        'mobile/**',
+        'shared/**',
+        'vendor/picomatch/**',
+        'scripts/test-picomatch.mjs',
+        '.github/workflows/ios-app-store.yml',
+      ]
   workflow_dispatch:
     inputs:
       upload:
@@ -31,6 +38,7 @@ jobs:
           node-version: '24'
       - run: npm ci --ignore-scripts
       - run: npm run format:check
+      - run: node ../scripts/test-picomatch.mjs mobile
       - run: npm audit --audit-level=moderate
       - run: npm test
       - run: node scripts/ios-signature.mjs --self-test

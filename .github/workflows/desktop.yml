@@ -5,6 +5,8 @@ on:
       [
         'desktop/**',
         'shared/**',
+        'vendor/picomatch/**',
+        'scripts/test-picomatch.mjs',
         'web/package*.json',
         'package.json',
         '.prettier*',
@@ -74,6 +76,7 @@ jobs:
         working-directory: desktop
       - run: npm run format:check
       - run: npm run public:check
+      - run: node scripts/test-picomatch.mjs desktop
       - run: npm audit --audit-level=moderate
         working-directory: desktop
       - run: npm test
