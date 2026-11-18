@@ -89,7 +89,6 @@ if (process.platform !== 'win32') {
       hasApiKey: true,
       revision: 1,
     });
-    await page.screenshot({ path: path.join(output, 'settings.png') });
     checkpoint('first-close');
     await application.close();
     application = null;
@@ -153,7 +152,6 @@ if (process.platform !== 'win32') {
     assert.equal(requests[1].context.projectName, 'Desktop AI test');
     assert.equal(requests[1].context.description, undefined);
     assert.equal(requests[1].store, false);
-    await page.screenshot({ path: path.join(output, 'draft.png') });
     await page.getByRole('button', { name: '입력 취소', exact: true }).click();
     checkpoint('delete-key');
     await appSection(page, 'ai', application);
@@ -162,6 +160,21 @@ if (process.platform !== 'win32') {
     await expect(page.locator('#aiSettingsStatus')).toContainText('저장했습니다');
     assert.equal((await page.evaluate(() => window.desktop.aiSettings())).hasApiKey, false);
     assert.ok(!readFileSync(path.join(temporary, 'AI.pmcanvas'), 'utf8').includes(key));
+    writeFileSync(
+      path.join(output, 'result.json'),
+      JSON.stringify(
+        {
+          encryptedKey: true,
+          survivesRestart: true,
+          failurePreservesInput: true,
+          draftGenerated: true,
+          keyDeleted: true,
+          projectPreserved: true,
+        },
+        null,
+        2,
+      ),
+    );
     completed = true;
     console.log(
       'PASS: native encrypted AI settings, restart, draft generation, failure preserves input, key deletion and no project mutation.',
@@ -176,7 +189,12 @@ if (process.platform !== 'win32') {
         application.evaluate(({ app }) => app.exit(0)).catch(() => {}),
         new Promise((resolve) => setTimeout(resolve, 3000)),
       ]);
-      if (application.process().exitCode === null) application.process().kill('SIGKILL');
+      const child = application.process();
+      if (child.exitCode === null) {
+        const exited = new Promise((resolve) => child.once('exit', resolve));
+        child.kill('SIGKILL');
+        await Promise.race([exited, new Promise((resolve) => setTimeout(resolve, 2000))]);
+      }
     }
     if (completed) await application?.close();
     clearTimeout(watchdog);
@@ -185,6 +203,10 @@ if (process.platform !== 'win32') {
       !path.basename(temporary).startsWith('pmcanvas-ai-native-')
     )
       throw Error('Unsafe AI fixture cleanup path');
-    rmSync(temporary, { recursive: true, force: true, maxRetries: 5, retryDelay: 300 });
+    try {
+      rmSync(temporary, { recursive: true, force: true, maxRetries: 5, retryDelay: 300 });
+    } catch {
+      console.warn('Temporary AI test profile remains locked; original test result preserved.');
+    }
   }
 }
