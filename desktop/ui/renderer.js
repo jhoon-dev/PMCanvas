@@ -7,7 +7,8 @@ import {
 import { SETTINGS_SECTIONS, PROJECT_VIEWS, PROJECT_COMMANDS } from './navigation.js';
 import { PROJECT_SCREENS, projectNavigation } from './shared/project-navigation.js';
 import { detachManagementLinks } from './shared/management.js';
-import { managementView, installManagementUi } from './shared/management-ui.js';
+import { managementView, installManagementUi, weeklyAiControls } from './shared/management-ui.js';
+import { createAiUI } from './ai-ui.js';
 import { taskView, summaryIds, taskLeaves, predecessorIds } from './shared/task-model.js';
 import { today, validDate, summary, progress, addDays } from './shared/engine.js';
 import { escapeHtml as esc } from './shared/html.js';
@@ -62,6 +63,8 @@ const applicationInfo = (await api.info?.()) || {
 const initialHolidayState = await api.holidayState?.();
 if (initialHolidayState) setKoreanHolidayUpdates(initialHolidayState.holidays);
 let holidayUI = null;
+let aiUI = null,
+  aiConfigured = false;
 setBusinessTimeZone(appSettings.timeZone || 'Asia/Seoul');
 const $ = (selector) => document.querySelector(selector);
 const reportClock = new ReportClock();
@@ -579,7 +582,11 @@ function render() {
     view === 'management'
       ? managementView(p, reportDate, { section: 'issues', page: managementPage })
       : view === 'weekly'
-        ? managementView(p, reportDate, { section: 'weekly', page: managementPage })
+        ? managementView(p, reportDate, {
+            section: 'weekly',
+            page: managementPage,
+            weeklyAi: { enabled: aiConfigured, canConfigure: true, settingsCommand: 'settings:ai' },
+          })
         : view === 'milestones'
           ? managementView(p, reportDate, { section: 'milestones', page: managementPage })
           : view === 'resources'
@@ -725,6 +732,10 @@ async function commit(project) {
 }
 async function command(name, tabId) {
   if (messageUI.open) return;
+  if (aiUI?.dirty() || aiUI?.pending()) {
+    toast(ui('AI 설정 입력을 먼저 저장하거나 취소해 주세요.'));
+    return;
+  }
   if (name === 'projects' && view !== 'settings') return;
   if (busy) {
     toast(ui('처리 중입니다. 잠시만 기다려 주세요.'));
@@ -923,6 +934,10 @@ document.addEventListener('click', async (event) => {
   }
   if (target.dataset.appSection) {
     await command('settings:' + target.dataset.appSection);
+    return;
+  }
+  if (target.dataset.command === 'settings:ai') {
+    await command('settings:ai');
     return;
   }
   if (target.dataset.managementPane) {
@@ -1288,7 +1303,13 @@ const updateUI = createUpdateUI({
 });
 function syncSettingsControls() {
   holidayUI?.paint();
-  const locked = busy || Boolean(editor) || importing || (state.anyDirty ?? state.dirty);
+  const locked =
+    busy ||
+    Boolean(editor) ||
+    importing ||
+    (state.anyDirty ?? state.dirty) ||
+    aiUI?.dirty() ||
+    aiUI?.pending();
   $('#settingsProjectHint').hidden =
     settingsSection !== 'general' || !(state.anyDirty ?? state.dirty);
   for (const id of ['languageSelect', 'timeZoneInput', 'applyTimeZone', 'cancelTimeZone'])
@@ -1355,6 +1376,19 @@ $('#aboutVersion').textContent = applicationInfo.version || '—';
 $('#aboutDeveloper').textContent = applicationInfo.developer || '—';
 
 const managementUi = installManagementUi({
+  generateWeeklyDraft: async (fields) => {
+    const revision = state.revision,
+      tabId = state.tabId;
+    const result = await api.generateWeeklyDraft({
+      ...fields,
+      revision,
+      tabId,
+      language: getLanguage(),
+    });
+    if (result.revision !== state.revision || result.tabId !== state.tabId)
+      throw Error(ui('내용이 변경되었습니다. AI 초안을 다시 생성해 주세요.'));
+    return result;
+  },
   confirmDiscard: (message) =>
     messageUI.confirm({
       title: ui('입력 취소'),
@@ -1385,6 +1419,25 @@ const managementUi = installManagementUi({
     }
   },
 });
+aiUI = createAiUI({
+  api,
+  ui,
+  onState: (value) => {
+    aiConfigured = value.hasApiKey;
+    document.querySelectorAll('#pmManagement .pm-weekly-ai').forEach((host) => {
+      host.outerHTML = weeklyAiControls({
+        enabled: aiConfigured,
+        canConfigure: true,
+        settingsCommand: 'settings:ai',
+      });
+    });
+  },
+  onEditing: (value) => {
+    void api.editing(value || managementUi.dirty());
+    syncSettingsControls();
+  },
+});
+await aiUI.load();
 function canPaintHolidays() {
   return (
     !busy &&

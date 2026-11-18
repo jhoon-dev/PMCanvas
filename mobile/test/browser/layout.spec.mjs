@@ -32,6 +32,21 @@ async function layoutFits(page) {
       if (box.width && (box.left < -1 || box.right > innerWidth + 1))
         problems.push(el.className || el.id);
     }
+    for (const el of document.querySelectorAll(
+      '.field > input, .field > select, .field > textarea, .report-date input, .item-editor > input',
+    )) {
+      if (el.closest('#wbsWorkspace')) continue;
+      const box = el.getBoundingClientRect(),
+        parent = el.parentElement.getBoundingClientRect();
+      if (
+        box.width &&
+        (box.left < parent.left - 1 ||
+          box.right > parent.right + 1 ||
+          box.left < -1 ||
+          box.right > innerWidth + 1)
+      )
+        problems.push('input outside field: ' + (el.name || el.id));
+    }
     return problems;
   });
   expect(issues).toEqual([]);

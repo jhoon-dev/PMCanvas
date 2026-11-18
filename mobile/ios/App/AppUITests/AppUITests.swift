@@ -122,6 +122,19 @@ final class AppUITests: XCTestCase {
         XCTAssertTrue(web.staticTexts[title].waitForExistence(timeout: 10))
     }
 
+    private func assertTaskInputWidths(_ web: XCUIElement, app: XCUIApplication) {
+        XCTAssertTrue(web.textFields["업무명"].waitForExistence(timeout: 10))
+        let bounds = app.frame
+        let inputs = web.textFields.allElementsBoundByIndex + web.textViews.allElementsBoundByIndex
+        let dates = ["예상 시작일", "예상 종료일"].flatMap { label in
+            web.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", label)).allElementsBoundByIndex
+        }
+        for field in inputs + dates where field.exists && field.frame.width > 0 {
+            XCTAssertGreaterThanOrEqual(field.frame.minX, bounds.minX - 1, "Input extends beyond the left edge: \(field.label)")
+            XCTAssertLessThanOrEqual(field.frame.maxX, bounds.maxX + 1, "Input extends beyond the right edge: \(field.label)")
+        }
+    }
+
     func testStoreScreenshots() {
         continueAfterFailure = false
         XCUIDevice.shared.orientation = .portrait
@@ -155,6 +168,7 @@ final class AppUITests: XCTestCase {
         openScreen("업무 · 일정", in: web)
         for (task, detail) in [("UX review", "Review navigation"), ("Release build", "Prepare store package"), ("Launch checklist", "Confirm launch readiness")] {
             web.buttons.matching(NSPredicate(format: "label == %@", "＋ 업무 추가")).firstMatch.tap()
+            assertTaskInputWidths(web, app: app)
             // Track the input by its stable label while its editing state changes,
             // rather than re-resolving a placeholder predicate after typing.
             let title = web.textFields["업무명"]
