@@ -133,7 +133,12 @@ try {
       ),
     )
     .toBe(true);
-  assert.equal(await page.locator('#settingsNavigation [data-app-section]').count(), 4);
+  assert.deepEqual(
+    await page
+      .locator('#settingsNavigation [data-app-section]')
+      .evaluateAll((items) => items.map((item) => item.dataset.appSection)),
+    ['general', 'holidays', 'ai', 'updates', 'about'],
+  );
   assert.equal(await page.locator('.desktop-sidebar #languageSelect').count(), 0);
   await page.locator('#languageSelect').selectOption('en');
   await page.locator('#settingsTitle').filter({ hasText: 'General settings' }).waitFor();

@@ -278,7 +278,11 @@ export function weeklyAiControls(option) {
     esc(ui('AI 초안 생성')) +
     '</button>' +
     (!option.enabled && option.canConfigure
-      ? '<button type="button" class="button" data-action="ai-settings">' +
+      ? '<button type="button" class="button" ' +
+        (option.settingsCommand
+          ? 'data-command="' + esc(option.settingsCommand) + '"'
+          : 'data-action="ai-settings"') +
+        '>' +
         esc(ui('AI 연결 설정')) +
         '</button>'
       : '') +

@@ -5,6 +5,10 @@ export const SETTINGS_SECTIONS = {
     title: '공휴일 갱신',
     description: '모든 프로젝트에서 사용하는 공휴일 데이터를 관리합니다.',
   },
+  ai: {
+    title: 'AI 연결 설정',
+    description: 'API 키를 등록하면 주간보고 AI 초안을 생성할 수 있습니다.',
+  },
   updates: { title: '업데이트', description: '앱의 새 버전 확인과 설치를 관리합니다.' },
   about: { title: '앱 정보', description: '앱 버전과 제작자, 개인정보처리방침을 확인합니다.' },
 };

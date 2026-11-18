@@ -10,6 +10,7 @@ import {
   utilityProcess,
   shell,
   powerMonitor,
+  safeStorage,
 } from 'electron';
 import path from 'node:path';
 import { readFileSync, mkdirSync } from 'node:fs';
@@ -32,6 +33,8 @@ import { AppDialogs } from './dialogs.mjs';
 import { UpdateManager } from './update-manager.mjs';
 import { cleanupUpdateCache } from './update-cache.mjs';
 import { windowsStoreProfile } from './windows-profile.mjs';
+import { DesktopAiSettings } from './ai-settings.mjs';
+import { DesktopWeeklyAi } from './weekly-ai.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const metadata = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'));
@@ -189,7 +192,13 @@ else {
           flushHolidayCalendar();
         }
       } catch (error) {
-        if (document && window && !window.isDestroyed()) publish();
+        if (
+          !['weeklyAiDraft', 'aiSettings', 'saveAiSettings'].includes(name) &&
+          document &&
+          window &&
+          !window.isDestroyed()
+        )
+          publish();
         return { ok: false, error: error.message || ui('요청을 처리하지 못했습니다.') };
       }
     });
@@ -305,6 +314,15 @@ else {
         );
       process.env.PM_TIME_ZONE = getBusinessTimeZone();
       document = new DesktopWorkspace(path.join(app.getPath('userData'), 'workspace.json'));
+      const aiSettings = new DesktopAiSettings({
+        file: path.join(app.getPath('userData'), 'ai-settings.json'),
+        storage: safeStorage,
+      });
+      const weeklyAi = new DesktopWeeklyAi({
+        workspace: document,
+        settings: aiSettings,
+        fetchImpl: (...args) => globalThis.fetch(...args),
+      });
       holidaySync = new HolidaySync({
         file: path.join(app.getPath('userData'), 'public-holidays.json'),
         enabled: preferences.value.syncPublicHolidays,
@@ -613,6 +631,17 @@ else {
         false,
       );
       handle('snapshot', () => document.snapshot(), false);
+      handle('aiSettings', () => aiSettings.public(), false);
+      handle('saveAiSettings', (body) => aiSettings.save(body));
+      handle(
+        'weeklyAiDraft',
+        (body) => {
+          if (busy || excelImport.current || appDialogs.pending)
+            throw Error(ui('처리 중입니다. 잠시만 기다려 주세요.'));
+          return weeklyAi.generate(body);
+        },
+        false,
+      );
       handle(
         'navigationContext',
         (next) => {

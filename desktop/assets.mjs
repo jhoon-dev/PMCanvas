@@ -3,6 +3,7 @@ const allowed = new Set([
   'renderer.js',
   'navigation.js',
   'update-ui.js',
+  'ai-ui.js',
   'dialog-ui.js',
   'holiday-picker.js',
   'holiday-ui.js',

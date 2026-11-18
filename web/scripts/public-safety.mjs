@@ -24,6 +24,7 @@ const documentationHosts = new Set([
   'prettier.io',
   'www.electron.build',
   'www.electronjs.org',
+  'developers.openai.com',
   'developer.apple.com',
   'support.apple.com',
   'account.apple.com',

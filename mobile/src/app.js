@@ -439,6 +439,7 @@ function updateEditorViewport() {
   );
 }
 window.visualViewport?.addEventListener('resize', updateEditorViewport);
+window.visualViewport?.addEventListener('scroll', updateEditorViewport);
 updateEditorViewport();
 if (Capacitor.getPlatform() === 'android') {
   // Keep the IME open until the button action. Blurring on pointer-down can

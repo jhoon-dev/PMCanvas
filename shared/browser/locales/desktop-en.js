@@ -1,5 +1,26 @@
 // Authored interface text only; project names, notes and imported values are never translated.
 export default {
+  '주간보고 AI': 'Weekly report AI',
+  'API 키를 등록하면 주간보고 AI 초안을 생성할 수 있습니다.':
+    'Register an API key to generate weekly report drafts.',
+  'OpenAI API 키를 등록하면 주간보고의 금주·차주 설명 초안을 작성할 수 있습니다. API 사용 요금은 등록한 OpenAI 계정에 청구됩니다.':
+    'Register an OpenAI API key to draft this week’s summary and next week’s plan. API usage is charged to the registered OpenAI account.',
+  'API 키는 이 PC의 운영체제 보안 저장소로 암호화하며 프로젝트 파일과 보고서에는 포함하지 않습니다.':
+    'The API key is encrypted using this computer’s operating system secure storage and is excluded from project files and reports.',
+  'AI 설정 입력을 먼저 저장하거나 취소해 주세요.': 'Save or cancel the AI settings input first.',
+  'AI 설정 파일을 읽지 못했습니다. 프로필 백업에서 복원해 주세요.':
+    'Could not read the AI settings file. Restore it from your profile backup.',
+  '운영체제의 보안 저장소를 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.':
+    'Operating system secure storage is unavailable. Try again later.',
+  'AI 설정이 변경되었습니다. 설정을 다시 열어 확인해 주세요.':
+    'AI settings changed. Reopen settings and try again.',
+  'API 키를 안전하게 저장하지 못했습니다. 다시 시도해 주세요.':
+    'Could not securely save the API key. Try again.',
+  'API 키를 읽지 못했습니다. AI 설정에서 키를 다시 등록해 주세요.':
+    'Could not read the API key. Register it again in AI settings.',
+  'AI 초안을 생성 중입니다. 잠시 기다려 주세요.': 'An AI draft is being generated. Please wait.',
+  'AI 연결 설정에서 API 키를 먼저 등록해 주세요.':
+    'Register an API key in AI connection settings first.',
   '기준일별 업무 현황과 기간별 완료 기록을 확인하세요.':
     'Review task status by date and completion records by period.',
   '보고 기준일까지의 업무와 진척률을 파일로 저장합니다.':

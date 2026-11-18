@@ -19,6 +19,8 @@ html {
   scroll-padding-bottom: calc(24px + var(--inset-bottom));
 }
 body.mobile-app {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
   margin: 0;
   min-width: 0;
   color: #26384d;
@@ -57,7 +59,21 @@ input[type='checkbox'] {
   accent-color: var(--blue);
 }
 input[type='date'] {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
   min-width: 0;
+  -webkit-appearance: none;
+  appearance: none;
+}
+input[type='date']::-webkit-date-and-time-value {
+  min-width: 0;
+  text-align: left;
+}
+input[type='date']::-webkit-datetime-edit {
+  min-width: 0;
+  padding: 0;
 }
 button:focus-visible,
 a:focus-visible,

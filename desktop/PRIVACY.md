@@ -1,6 +1,6 @@
 # PM Canvas 앱 개인정보처리방침 / Privacy policy
 
-시행일 / Effective date: 2026-11-09
+시행일 / Effective date: 2026-11-18
 
 개발자 / Developer: jhoon-dev
 
@@ -33,6 +33,8 @@ Mac App Store 설치본은 GitHub 업데이트 API를 조회하거나 설치 파
 
 ### 보관, 삭제와 보안
 
+**선택 기능인 주간보고 AI:** 앱 설정에서 본인의 OpenAI API 키를 등록한 뒤 **AI 초안 생성**을 누른 경우에만 선택한 보고 기간의 프로젝트명, 업무·담당자·진척·일정·완료 기록, 현재 이슈와 입력한 설명을 OpenAI Responses API로 전송합니다. 전체 프로젝트 파일·파일 경로와 관계없는 메모는 보내지 않습니다. API 키는 운영체제 보안 저장소로 암호화해 이 PC의 앱 프로필에 저장하고 프로젝트 파일·보고서에 포함하지 않습니다. 설정에서 삭제할 수 있으며 요금은 해당 OpenAI 계정에 청구됩니다. 요청은 `store: false`로 보내며 [OpenAI의 API 데이터 처리 방침](https://developers.openai.com/api/docs/guides/your-data)이 적용됩니다. 생성 결과는 로컬 초안이며 사용자가 검토해 발행하기 전에는 보고서로 확정되지 않습니다.
+
 프로젝트 파일과 복구·설정 사본은 자동으로 서버에 보관하지 않습니다. PC에 있는 파일의 보관 기간은 사용자가 관리합니다. 앱 제거가 프로젝트나 모든 복구·설정 사본을 삭제하는 것은 아닙니다. 삭제하려면 앱을 종료한 뒤 본인이 저장한 파일, 앱 사용자 데이터 및 별도로 만든 내보내기·동기화·백업 사본을 함께 확인하세요. GitHub 설치 파일 업데이트 캐시는 기본적으로 7일, 완료된 다운로드 2개와 총 1GiB 한도 내에서 정리하며 진행 중이거나 현재 사용하는 파일을 보호합니다.
 
 프로젝트·복구 JSON과 내보낸 파일에는 앱 자체의 암호화나 비밀번호 보호가 없습니다. PC 계정 권한, 디스크 보호와 저장·공유 위치의 접근 권한을 관리하세요. 개발자에게 원격 삭제를 요청하더라도 개발자는 사용자의 로컬 프로젝트에 접근해 삭제할 수 없습니다.
@@ -50,6 +52,8 @@ This policy covers **PM Canvas** for Windows and macOS. It does not cover indepe
 The app processes project names, team members' names and roles, tasks, schedules, notes, estimated hours and completion records entered by the user or imported from files. It uses this information for planning, progress and forecast calculations, display, saving and recovery, and report generation. Names and notes may contain personal information. The app does not require its own user account, contacts, location, camera or microphone.
 
 ### Storage and third parties
+
+**Optional weekly report AI:** Only after you register your own OpenAI API key and choose **Generate AI draft**, the app sends the selected report period’s project name, tasks, assignees, progress, schedules, completion records, current issues and author notes to the OpenAI Responses API. It excludes the full project file, file paths and unrelated notes. The key is encrypted using operating system secure storage in the local app profile and excluded from project files and reports. You can delete it in settings; API usage is charged to your OpenAI account. Requests use `store: false` and [OpenAI API data handling terms](https://developers.openai.com/api/docs/guides/your-data) apply. Generated text remains a local draft until you review and publish it.
 
 Starting with Windows Store 1.9.1, preferences, language and automatic recovery are stored in `%USERPROFILE%\PM Canvas\Profile` and retained after uninstall. On first launch, an existing EXE profile in AppData is copied locally without modifying the original or transmitting it. To remove all data, close the app and review this profile, the original EXE profile and your saved projects.
 
