@@ -1,6 +1,6 @@
 {
   "name": "picomatch",
-  "version": "4.0.7-pmcanvas.1",
+  "version": "4.0.7-pmcanvas.2",
   "description": "PM Canvas vendored picomatch 4.0.7 with a repeated-extglob ReDoS guard",
   "main": "index.js",
   "license": "MIT",

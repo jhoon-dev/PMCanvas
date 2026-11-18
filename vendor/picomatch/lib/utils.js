@@ -3,7 +3,6 @@
 
 const {
   REGEX_BACKSLASH,
-  REGEX_REMOVE_BACKSLASH,
   REGEX_SPECIAL_CHARS,
   REGEX_SPECIAL_CHARS_GLOBAL
 } = require('./constants');
@@ -28,9 +27,36 @@ exports.isWindows = () => {
 };
 
 exports.removeBackslashes = str => {
-  return str.replace(REGEX_REMOVE_BACKSLASH, match => {
-    return match === '\\' ? '' : match;
-  });
+  // Locate bracket spans once. Retrying a lazy bracket regex at every '['
+  // makes an unterminated sequence quadratic in the input length.
+  const ends = new Int32Array(str.length);
+  ends.fill(-1);
+  let closest = -1;
+  let following = -1;
+  let lineBreak = str.length;
+  const isLineBreak = ch => ch === '\n' || ch === '\r' || ch === '\u2028' || ch === '\u2029';
+  for (let i = str.length - 1; i >= 0; i--) {
+    if (str[i] === '[') {
+      // The old expression requires at least one character inside the span.
+      const end = closest === i + 1 ? following : closest;
+      if (end >= i + 2 && lineBreak >= end - 1) ends[i] = end;
+    }
+    if (str[i] === ']' && str[i - 1] !== '\\') {
+      following = closest;
+      closest = i;
+    }
+    if (isLineBreak(str[i])) lineBreak = i;
+  }
+  const chunks = [];
+  for (let i = 0; i < str.length; i++) {
+    if (ends[i] !== -1) {
+      chunks.push(str.slice(i, ends[i] + 1));
+      i = ends[i];
+    } else if (str[i] !== '\\' || i + 1 === str.length || isLineBreak(str[i + 1])) {
+      chunks.push(str[i]);
+    }
+  }
+  return chunks.join('');
 };
 
 exports.escapeLast = (input, char, lastIdx) => {
