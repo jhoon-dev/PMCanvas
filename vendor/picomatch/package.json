@@ -1,0 +1,9 @@
+{
+  "name": "picomatch",
+  "version": "4.0.7-pmcanvas.2",
+  "description": "PM Canvas vendored picomatch 4.0.7 with a repeated-extglob ReDoS guard",
+  "main": "index.js",
+  "license": "MIT",
+  "engines": { "node": ">=12" },
+  "files": ["index.js", "posix.js", "lib", "LICENSE", "README.md"]
+}

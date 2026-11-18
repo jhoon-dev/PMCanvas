@@ -269,7 +269,29 @@ export function weeklyHtml(report) {
     '</body></html>'
   );
 }
-export function managementView(p, at = today(), { section = 'all', page = null } = {}) {
+function weeklyAiControls(option) {
+  if (!option) return '';
+  return (
+    '<div class="pm-weekly-ai"><button type="button" class="button" data-pm-ai-draft ' +
+    (option.enabled ? '' : 'disabled') +
+    '>' +
+    esc(ui('AI 초안 생성')) +
+    '</button><p class="muted">' +
+    esc(
+      ui(
+        option.enabled
+          ? '선택한 기간의 업무·담당자·진척·현재 이슈와 입력한 설명을 OpenAI에 보내 초안을 만듭니다. 두 설명란을 새 초안으로 채우며, 검토 후 미리보기·발행하세요.'
+          : 'AI 초안 생성은 관리자의 AI 연결 설정 후 사용할 수 있습니다.',
+      ),
+    ) +
+    '</p><p data-pm-ai-status role="status" aria-live="polite"></p></div>'
+  );
+}
+export function managementView(
+  p,
+  at = today(),
+  { section = 'all', page = null, weeklyAi = null } = {},
+) {
   const showMilestones = ['all', 'planning', 'milestones'].includes(section),
     showStaffing = ['all', 'planning', 'staffing'].includes(section),
     showIssues = ['all', 'reports', 'issues'].includes(section),
@@ -284,7 +306,7 @@ export function managementView(p, at = today(), { section = 'all', page = null }
     all: ['프로젝트 관리', '마일스톤·이슈·주간보고·월별 투입 계획'],
   }[section];
   if (page && ['issues', 'milestones', 'weekly', 'staffing'].includes(section))
-    return managementPageView(p, at, section, page, heading);
+    return managementPageView(p, at, section, page, heading, weeklyAi);
   const range = weekRange(at),
     plan = showStaffing ? monthlyPlan(p, at.slice(0, 7)) : null,
     readOnly = p._role === 'viewer';
@@ -376,6 +398,7 @@ export function managementView(p, at = today(), { section = 'all', page = null }
         '</div>' +
         area('금주 설명', 'notes') +
         area('차주 설명', 'nextNotes') +
+        (readOnly ? '' : weeklyAiControls(weeklyAi)) +
         submit('주간보고 미리보기') +
         '</form><div id="pmWeeklyPreview"></div></fieldset>' +
         [...(p.weeklyReports || [])]
@@ -477,7 +500,7 @@ export function managementView(p, at = today(), { section = 'all', page = null }
     '</section>'
   );
 }
-function managementPageView(p, at, section, page, heading) {
+function managementPageView(p, at, section, page, heading, weeklyAi) {
   const readOnly = p._role === 'viewer';
   const records =
     section === 'issues'
@@ -640,6 +663,7 @@ function managementPageView(p, at, section, page, heading) {
         '</div>' +
         area('금주 설명', 'notes') +
         area('차주 설명', 'nextNotes') +
+        weeklyAiControls(weeklyAi) +
         submit('주간보고 미리보기') +
         '</form><div id="pmWeeklyPreview"></div>';
     }
@@ -799,6 +823,7 @@ export function installManagementUi({
   onDirtyChange = () => {},
   confirmDiscard = (message) => globalThis.confirm(message),
   exportReport = null,
+  generateWeeklyDraft = null,
   savedMessage = '저장했습니다.',
   publishedMessage = '주간보고를 발행했습니다.',
 }) {
@@ -915,6 +940,55 @@ export function installManagementUi({
     });
   });
   document.addEventListener('click', (event) => {
+    const aiButton = event.target.closest('[data-pm-ai-draft]');
+    if (aiButton) {
+      if (!generateWeeklyDraft || aiButton.disabled) return;
+      const form = aiButton.closest('#pmManagement form[data-pm-form="weekly"]');
+      if (!form || !form.reportValidity()) return;
+      void change(async () => {
+        const originalProject = JSON.stringify(project()),
+          fields = Object.fromEntries(new FormData(form)),
+          originalFields = JSON.stringify(fields),
+          status = form.querySelector('[data-pm-ai-status]');
+        aiButton.disabled = true;
+        aiButton.textContent = ui('AI 초안 생성 중…');
+        if (status) status.textContent = ui('AI가 금주·차주 설명을 작성하고 있습니다.');
+        try {
+          const draft = await generateWeeklyDraft(fields);
+          if (
+            !form.isConnected ||
+            JSON.stringify(project()) !== originalProject ||
+            JSON.stringify(Object.fromEntries(new FormData(form))) !== originalFields
+          )
+            throw Error('내용이 변경되었습니다. AI 초안을 다시 생성해 주세요.');
+          if (
+            !['notes', 'nextNotes'].every(
+              (key) =>
+                typeof draft?.[key] === 'string' && draft[key].trim() && draft[key].length <= 4000,
+            )
+          )
+            throw Error('AI 초안 형식을 확인하지 못했습니다. 다시 시도해 주세요.');
+          for (const key of ['notes', 'nextNotes']) form.elements.namedItem(key).value = draft[key];
+          form.dataset.pmDirty = 'true';
+          preview = null;
+          const host = document.querySelector('#pmWeeklyPreview');
+          if (host) host.innerHTML = '';
+          const error = document.querySelector('#pmManagement .pm-error');
+          if (error) error.textContent = '';
+          if (status)
+            status.textContent = ui('AI 초안을 채웠습니다. 내용을 검토한 뒤 미리보기 해 주세요.');
+          toast(ui('AI 초안을 채웠습니다. 내용을 검토한 뒤 미리보기 해 주세요.'));
+          onDirtyChange(true);
+        } catch (error) {
+          if (status) status.textContent = '';
+          throw error;
+        } finally {
+          aiButton.disabled = false;
+          aiButton.textContent = ui('AI 초안 생성');
+        }
+      });
+      return;
+    }
     const publish = event.target.closest('[data-pm-publish]'),
       remove = event.target.closest('[data-pm-remove-assignment]'),
       exportButton = event.target.closest('[data-pm-export]');

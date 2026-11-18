@@ -50,6 +50,35 @@ const fixture = () =>
       task('B', { start: '2026-10-26', end: '2026-10-30', predecessor: 'M' }),
     ],
   });
+
+test('주간보고 AI controls are web opt-in, disabled without configuration, hidden from viewers and translated', () => {
+  const p = fixture(),
+    options = { section: 'weekly', page: { pane: 'add' } };
+  assert.ok(!managementView(p, '2026-10-23', options).includes('data-pm-ai-draft'));
+  const enabled = managementView(p, '2026-10-23', { ...options, weeklyAi: { enabled: true } });
+  assert.match(enabled, /data-pm-ai-draft >/);
+  assert.match(enabled, /OpenAI/);
+  assert.match(enabled, /aria-live="polite"/);
+  assert.match(
+    managementView(p, '2026-10-23', { ...options, weeklyAi: { enabled: false } }),
+    /data-pm-ai-draft disabled/,
+  );
+  assert.ok(
+    !managementView({ ...p, _role: 'viewer' }, '2026-10-23', {
+      ...options,
+      weeklyAi: { enabled: true },
+    }).includes('data-pm-ai-draft'),
+  );
+  const previous = getLanguage();
+  try {
+    setLanguage('en');
+    const english = managementView(p, '2026-10-23', { ...options, weeklyAi: { enabled: true } });
+    assert.match(english, /Generate AI draft/);
+    assert.ok(!/[가-힣]/.test(english));
+  } finally {
+    setLanguage(previous);
+  }
+});
 test('management screens separate reporting from planning without changing project data', () => {
   const project = fixture();
   const original = structuredClone(project);
