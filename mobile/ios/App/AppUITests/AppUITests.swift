@@ -129,9 +129,11 @@ final class AppUITests: XCTestCase {
         let dates = ["예상 시작일", "예상 종료일"].flatMap { label in
             web.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", label)).allElementsBoundByIndex
         }
-        for field in inputs + dates where field.exists && field.frame.width > 0 {
-            XCTAssertGreaterThanOrEqual(field.frame.minX, bounds.minX - 1, "Input extends beyond the left edge: \(field.label)")
-            XCTAssertLessThanOrEqual(field.frame.maxX, bounds.maxX + 1, "Input extends beyond the right edge: \(field.label)")
+        for field in inputs + dates {
+            let frame = field.frame
+            if frame.width == 0 { continue }
+            XCTAssertGreaterThanOrEqual(frame.minX, bounds.minX - 1, "Input extends beyond the left edge: \(frame)")
+            XCTAssertLessThanOrEqual(frame.maxX, bounds.maxX + 1, "Input extends beyond the right edge: \(frame)")
         }
     }
 
