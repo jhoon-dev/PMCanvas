@@ -762,6 +762,7 @@ async function command(name, tabId) {
       if (!SETTINGS_SECTIONS[section]) return;
       settingsSection = section;
     }
+    if (settingsSection === 'ai') await aiUI.load();
     view = 'settings';
     render();
     $('#settingsPage').focus();

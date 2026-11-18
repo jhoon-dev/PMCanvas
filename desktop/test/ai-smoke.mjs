@@ -62,6 +62,9 @@ if (process.platform !== 'win32') {
     await form.locator('[type=submit]').click();
     await expect(page.locator('#aiSettingsStatus')).toContainText('저장했습니다');
     await expect(form.locator('[name=apiKey]')).toHaveValue('');
+    await appSection(page, 'general', application);
+    await expect(page.locator('#languageSelect')).toBeEnabled();
+    await appSection(page, 'ai', application);
     assert.ok(!readFileSync(path.join(temporary, 'ai-settings.json'), 'utf8').includes(key));
     assert.deepEqual(await page.evaluate(() => window.desktop.aiSettings()), {
       model: 'gpt-4.1-mini',
