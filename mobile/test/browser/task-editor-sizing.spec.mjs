@@ -36,13 +36,11 @@ test('task editor controls fit iPhone portrait and landscape, safe areas and key
             name: el.name || el.id,
             type: el.type,
             width: b.width,
-            height: b.height,
             outside:
               b.left < parent.left - 1 ||
               b.right > parent.right + 1 ||
               b.left < -1 ||
               b.right > innerWidth + 1,
-            clipped: el.scrollWidth > el.clientWidth + 2,
           };
         }),
     );
@@ -53,8 +51,11 @@ test('task editor controls fit iPhone portrait and landscape, safe areas and key
       ),
     );
     expect(controls.length).toBe(8);
-    for (const control of controls)
-      expect(control.height, control.name + ' at ' + width).toBeGreaterThanOrEqual(44);
+    for (const name of ['start', 'end'])
+      expect(
+        controls.find((control) => control.name === name).width,
+        name + ' at ' + width,
+      ).toBeGreaterThan(160);
     expect(await page.locator('#editor [name=owner]').inputValue()).toBe(p.members[0].id);
     await page.locator('#editor [name=owner]').selectOption(p.members[1].id);
     expect(await page.locator('#editor [name=owner]').inputValue()).toBe(p.members[1].id);

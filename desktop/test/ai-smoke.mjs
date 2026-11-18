@@ -52,6 +52,9 @@ if (process.platform !== 'win32') {
     const page = await application.firstWindow();
     page.setDefaultTimeout(15000);
     await page.locator('[data-project-tab]').first().waitFor();
+    await page.evaluate(() => localStorage.setItem('pmcanvas.language', 'ko'));
+    await page.reload();
+    await page.locator('[data-project-tab]').first().waitFor();
     return page;
   };
   try {
