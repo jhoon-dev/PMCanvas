@@ -7,6 +7,8 @@ import { createPool, migrate, PgRepository } from '../../server/postgres.mjs';
 import { smtpFixture, verificationLink, mailText } from './smtp-fixture.mjs';
 import { createMailer } from '../../server/mailer.mjs';
 import { MailSettings } from '../../server/mail-settings.mjs';
+import { AiSettings } from '../../server/ai-settings.mjs';
+import { WeeklyReportAi } from '../../server/weekly-report-ai.mjs';
 import { RegistrationEmail } from '../../server/registration.mjs';
 import { PasswordReset } from '../../server/password-reset.mjs';
 import { AdminMfa } from '../../server/admin-mfa.mjs';
@@ -135,6 +137,7 @@ if (process.env.RUN_REGISTRATION_REVIEW_PREVIEW === '1')
   });
 const registrationEmail = new RegistrationEmail({ repo, mailer: mailSettings, origin, basePath });
 registrationEmail.start();
+const aiSettings = new AiSettings({ repo, key });
 const app = createApplication({
     repo,
     origin,
@@ -142,6 +145,31 @@ const app = createApplication({
     passwordReset,
     registrationEmail,
     mailSettings,
+    aiSettings,
+    weeklyReportAi: new WeeklyReportAi({
+      settings: aiSettings,
+      fetchImpl: async () =>
+        new Response(
+          JSON.stringify({
+            status: 'completed',
+            output: [
+              {
+                type: 'message',
+                role: 'assistant',
+                content: [
+                  {
+                    type: 'output_text',
+                    text: JSON.stringify({
+                      notes: '설정한 키로 생성한 금주 초안',
+                      nextNotes: '설정한 키로 생성한 차주 초안',
+                    }),
+                  },
+                ],
+              },
+            ],
+          }),
+        ),
+    }),
     adminMfa: new AdminMfa(repo, key),
   }),
   mailbox = http.createServer((req, res) => {

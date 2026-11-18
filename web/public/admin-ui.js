@@ -5,6 +5,7 @@ import { accountRows } from './account-ui.js';
 import { DraftStore } from './draft-store.js';
 import { workspaceOperations } from './operations-ui.js';
 import { createMailSettingsUi } from './mail-settings-ui.js';
+import { createAiSettingsUi } from './ai-settings-ui.js';
 import { createSharingUi } from './sharing-ui.js';
 import { createSecurityUi } from './security-ui.js';
 export function createAdminUi({
@@ -23,6 +24,7 @@ export function createAdminUi({
   reload,
   openTask,
   onMailEnabled,
+  onAiConfigured,
   document = globalThis.document,
   location = globalThis.location,
   confirm = globalThis.confirm,
@@ -310,6 +312,15 @@ export function createAdminUi({
     projects,
     refreshUsers,
     openMail: openMailSettings,
+    openAi: createAiSettingsUi({
+      api,
+      field,
+      openInfo,
+      user,
+      onConfigured: onAiConfigured,
+      showAuth,
+      registerGuard: dialog.registerGuard,
+    }),
     openConnections,
     openAudit: openSecurityAudit,
     canChange,
@@ -336,6 +347,7 @@ export function createAdminUi({
     audit: security.projectAudit,
     securityAudit: openSecurityAudit,
     mail: openMailSettings,
+    ai: () => ops.admin('ai'),
     logout,
   };
 }

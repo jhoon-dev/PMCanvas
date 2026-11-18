@@ -1231,6 +1231,50 @@ test('투입 계획을 저장·재조회하면 대시보드·인력·M/M에 반�
   await expect(page.locator('.date-number')).toContainText('11.06');
 });
 
+test('AI settings: register and retain a key, immediately enable drafting without losing notes, then delete', async ({
+  page,
+}) => {
+  const session = await login(page, 'admin@example.com'),
+    p = await createProject(page, session, { name: 'AI 설정 검증' });
+  await selectProject(page, p, 'weekly');
+  const host = page.locator('#pmManagement');
+  await host.locator('[data-management-pane=add]').click();
+  const weekly = host.locator('[data-pm-form=weekly]');
+  await weekly.locator('[name=notes]').fill('설정 중에도 보존할 설명');
+  await host.locator('[data-action=ai-settings]').click();
+  const form = page.locator('#aiSettingsForm');
+  await expect(form.locator('[name=apiKey]')).toHaveAttribute('type', 'password');
+  await expect(form.locator('[name=model]')).toHaveValue('gpt-4.1-mini');
+  await form.locator('[name=apiKey]').fill('test-only-browser-api-key');
+  await form.locator('button[type=submit]').click();
+  await expect(form.locator('[role=status]')).toContainText('저장했습니다');
+  await expect(form.locator('[name=apiKey]')).toHaveValue('');
+  await page.locator('#closeInfo').click();
+  await expect(weekly.locator('[name=notes]')).toHaveValue('설정 중에도 보존할 설명');
+  await expect(weekly.locator('[data-pm-ai-draft]')).toBeEnabled();
+  await weekly.locator('[data-pm-ai-draft]').click();
+  await expect(weekly.locator('[name=nextNotes]')).toHaveValue('설정한 키로 생성한 차주 초안');
+  await page.locator('#accountButton').click();
+  await page.locator('[data-action=admin]').click();
+  await page.locator('[data-admin-tab=ai]').click();
+  await expect(form.locator('[name=apiKey]')).toHaveValue('');
+  await expect(form.locator('#aiKeyHint')).toContainText('등록되어');
+  await form.locator('[name=model]').fill('gpt-4.1');
+  await form.locator('button[type=submit]').click();
+  await expect(form.locator('[role=status]')).toContainText('저장했습니다');
+  const read = await (await page.request.get(api + 'admin/ai-settings')).json();
+  expect(read.settings).toMatchObject({ hasApiKey: true, model: 'gpt-4.1' });
+  expect(JSON.stringify(read)).not.toContain('test-only-browser-api-key');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: test.info().outputPath('ai-settings-mobile.png'), fullPage: true });
+  await form.locator('[name=clearApiKey]').check();
+  await form.locator('button[type=submit]').click();
+  await expect(form.locator('[role=status]')).toContainText('저장했습니다');
+  await page.locator('#closeInfo').click();
+  await expect(weekly.locator('[data-pm-ai-draft]')).toBeDisabled();
+  await expect(weekly.locator('[name=nextNotes]')).toHaveValue('설정한 키로 생성한 차주 초안');
+});
+
 test('주간보고 AI: 설정 안내·오류 보존·생성 중 중복 방지·초안 편집 후 발행', async ({ page }) => {
   const session = await login(page),
     p = await createProject(page, session, { name: 'AI 주간보고 검증' });

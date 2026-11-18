@@ -3,6 +3,7 @@ import { managementChange, monthlyPlan, weeklyDraft } from '../public/management
 import { AdminMfa, totp } from '../server/admin-mfa.mjs';
 import { BackupWorker } from '../server/backup-worker.mjs';
 import { MailSettings } from '../server/mail-settings.mjs';
+import { AiSettings } from '../server/ai-settings.mjs';
 import { captureBaseline, setParent } from '../public/planning.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -17,6 +18,57 @@ import { workspaceKnowledge } from '../public/workspace-cache.js';
 import http from 'node:http';
 import { createApplication } from '../server/http.mjs';
 import { scheduleWarnings } from '../public/planning.js';
+
+test(
+  '실제 PostgreSQL: AI 키 암호화·재시작 복구·관리자 권한·원자적 revision 충돌',
+  { skip: process.env.RUN_POSTGRES_TESTS !== '1' },
+  async () => {
+    if (!/_test$/.test(process.env.PGDATABASE || ''))
+      throw Error('Use a dedicated _test database.');
+    const pool = await createPool(),
+      repo = new PgRepository(pool),
+      ids = [];
+    try {
+      await migrate(pool);
+      const admin = await repo.createUser({
+        email: randomUUID() + '@example.com',
+        name: 'AI admin',
+        passwordHash: 'fixture',
+        isAdmin: true,
+      });
+      const member = await repo.createUser({
+        email: randomUUID() + '@example.com',
+        name: 'AI member',
+        passwordHash: 'fixture',
+      });
+      ids.push(admin.id, member.id);
+      const key = Buffer.alloc(32, 21),
+        service = new AiSettings({ repo, key });
+      const body = {
+        model: 'gpt-4.1-mini',
+        apiKey: 'test-only-pg-ai-key',
+        clearApiKey: false,
+        revision: 0,
+      };
+      await assert.rejects(service.save(member.id, body), (e) => e.status === 403);
+      await service.save(admin.id, body);
+      assert.equal(JSON.stringify(await repo.getAiSettings()).includes(body.apiKey), false);
+      const restarted = new AiSettings({ repo: new PgRepository(pool), key });
+      assert.equal((await restarted.credentials()).apiKey, body.apiKey);
+      const attempts = await Promise.allSettled(
+        [service, restarted].map((s) => s.save(admin.id, { ...body, apiKey: '', revision: 1 })),
+      );
+      assert.equal(attempts.filter((r) => r.status === 'fulfilled').length, 1);
+      assert.equal(attempts.find((r) => r.status === 'rejected').reason.code, 'AI_CONFLICT');
+      await restarted.save(admin.id, { ...body, apiKey: '', clearApiKey: true, revision: 2 });
+      assert.equal((await service.public()).hasApiKey, false);
+    } finally {
+      await pool.query('DELETE FROM pm_ai_settings WHERE id=true');
+      for (const id of ids.reverse()) await pool.query('DELETE FROM pm_users WHERE id=$1', [id]);
+      await pool.end();
+    }
+  },
+);
 
 test(
   '실제 PostgreSQL: 휴일 전용 기존 업무의 before 재검증·날짜 수정·일반 편집·재조회',

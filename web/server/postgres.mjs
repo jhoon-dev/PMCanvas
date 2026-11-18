@@ -419,6 +419,39 @@ export class PgRepository extends WorkspaceOperations {
         fail(409, 'NOTICE_UNAVAILABLE', '발송에 실패한 안내 메일만 다시 요청할 수 있습니다.');
     });
   }
+  async getAiSettings() {
+    return (
+      (
+        await this.pool.query(
+          'SELECT model,api_key_encrypted,revision FROM pm_ai_settings WHERE id=true',
+        )
+      ).rows[0] || null
+    );
+  }
+  async saveAiSettings(actorId, { model, apiKeyEncrypted, revision }) {
+    return this.transaction(async (c) => {
+      await c.query('SELECT pg_advisory_xact_lock(726534011)');
+      const actor = (
+        await c.query('SELECT is_admin,is_active FROM pm_users WHERE id=$1 FOR NO KEY UPDATE', [
+          actorId,
+        ])
+      ).rows[0];
+      if (!actor?.is_admin || !actor.is_active) fail(403, 'FORBIDDEN', '관리자 권한이 필요합니다.');
+      await c.query('SELECT pg_advisory_xact_lock(726534016)');
+      const old = (await c.query('SELECT revision FROM pm_ai_settings WHERE id=true FOR UPDATE'))
+        .rows[0];
+      if ((old?.revision || 0) !== revision)
+        fail(
+          409,
+          'AI_CONFLICT',
+          '다른 관리자가 AI 설정을 변경했습니다. 최신 설정을 다시 확인해 주세요.',
+        );
+      await c.query(
+        'INSERT INTO pm_ai_settings(id,model,api_key_encrypted,revision,updated_by) VALUES (true,$1,$2,$3,$4) ON CONFLICT(id) DO UPDATE SET model=$1,api_key_encrypted=$2,revision=$3,updated_by=$4,updated_at=now()',
+        [model, apiKeyEncrypted, revision + 1, actorId],
+      );
+    });
+  }
   async getMailSettings() {
     return (
       (

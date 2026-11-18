@@ -1,6 +1,23 @@
 import desktop from './desktop-en.js';
 // UI literals only. User-entered content never passes through this catalog.
 export default {
+  'AI 연결 설정': 'AI connection settings',
+  'AI 모델': 'AI model',
+  '등록된 API 키 삭제': 'Delete the saved API key',
+  '주간보고 AI 초안에 사용할 OpenAI API 키를 등록하세요. 이 서버의 편집 권한이 있는 사용자에게 적용되며 저장하면 바로 사용할 수 있습니다.':
+    'Register an OpenAI API key for weekly report drafts. It applies to users with project editing access on this server and takes effect when saved.',
+  '키는 서버에 암호화해 저장하며 다시 표시하지 않습니다. API 사용 요금은 등록한 OpenAI 계정에 청구됩니다.':
+    'The key is encrypted on the server and is never displayed again. API usage is charged to the registered OpenAI account.',
+  'API 키가 등록되어 있습니다. 빈칸으로 저장하면 기존 키를 유지합니다.':
+    'An API key is saved. Leave this field empty to keep the existing key.',
+  'API 키를 등록하면 주간보고 AI 초안 생성을 사용할 수 있습니다.':
+    'Register an API key to generate weekly report drafts.',
+  'AI 인증 정보를 읽지 못했습니다. 설정에서 API 키를 다시 등록해 주세요.':
+    'Could not read the AI credentials. Register the API key again in settings.',
+  '모델과 API 키 입력을 확인해 주세요.': 'Check the model and API key.',
+  '다른 관리자가 AI 설정을 변경했습니다. 최신 설정을 다시 확인해 주세요.':
+    'Another administrator changed the AI settings. Reload the latest settings.',
+  'AI 설정 관리 기능을 사용할 수 없습니다.': 'AI settings management is unavailable.',
   'AI 초안 생성': 'Generate AI draft',
   'AI 초안 생성 중…': 'Generating AI draft…',
   'AI가 금주·차주 설명을 작성하고 있습니다.':

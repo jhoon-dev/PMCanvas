@@ -10,6 +10,7 @@ import { MailSettings, legacyMailSettings } from './mail-settings.mjs';
 import { PasswordReset } from './password-reset.mjs';
 import { OperationAlerts } from './operation-alerts.mjs';
 import { WeeklyReportAi } from './weekly-report-ai.mjs';
+import { AiSettings } from './ai-settings.mjs';
 const pool = await createPool(),
   repo = new PgRepository(pool);
 try {
@@ -57,6 +58,12 @@ try {
   registrationEmail.start();
   const operationAlerts = new OperationAlerts({ repo, mailer, origin, basePath });
   operationAlerts.start();
+  const aiSettings = new AiSettings({
+    repo,
+    key,
+    apiKey: process.env.OPENAI_API_KEY || '',
+    model: process.env.OPENAI_MODEL || 'gpt-4.1-mini',
+  });
   const server = createApplication({
     repo,
     origin,
@@ -65,10 +72,8 @@ try {
     passwordReset,
     registrationEmail,
     mailSettings: mailer,
-    weeklyReportAi: new WeeklyReportAi({
-      apiKey: process.env.OPENAI_API_KEY || '',
-      model: process.env.OPENAI_MODEL || 'gpt-4.1-mini',
-    }),
+    aiSettings,
+    weeklyReportAi: new WeeklyReportAi({ settings: aiSettings }),
     registration: registrationConfig(process.env),
     adminMfa: new AdminMfa(repo, key),
     trustProxies: process.env.TRUSTED_PROXIES || '',

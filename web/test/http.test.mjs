@@ -11,6 +11,8 @@ import { registrationConfig } from '../server/registration.mjs';
 import { RegistrationEmail } from '../server/registration.mjs';
 import { PasswordReset } from '../server/password-reset.mjs';
 import { MailSettings } from '../server/mail-settings.mjs';
+import { AiSettings } from '../server/ai-settings.mjs';
+import { WeeklyReportAi } from '../server/weekly-report-ai.mjs';
 const PASSWORD = 'a-test-password-12345',
   HASH = await hashPassword(PASSWORD);
 const ORIGIN = 'http://localhost:3000';
@@ -116,6 +118,7 @@ async function fixture(
     mailer = null,
     mailSettingsFactory = null,
     weeklyReportAi = null,
+    aiSettingsFactory = null,
     registration = registrationConfig(),
   } = {},
 ) {
@@ -136,6 +139,7 @@ async function fixture(
     },
   ];
   const repo = new MemoryRepository(users),
+    aiSettings = aiSettingsFactory ? aiSettingsFactory(repo) : null,
     mailSettings = mailSettingsFactory ? mailSettingsFactory(repo) : null,
     effectiveMailer = mailSettings || mailer,
     reset = effectiveMailer
@@ -167,7 +171,9 @@ async function fixture(
       passwordReset: reset,
       registrationEmail,
       mailSettings,
-      weeklyReportAi,
+      aiSettings,
+      weeklyReportAi:
+        weeklyReportAi || (aiSettings ? new WeeklyReportAi({ settings: aiSettings }) : null),
       federation: new Federation({ repo, origin: ORIGIN, basePath, providers }),
       logger: { error() {} },
     });
@@ -253,6 +259,49 @@ const project = () => ({
       items: [{ id: 'i1', title: '기능 구현', hours: 8, doneDate: null }],
     },
   ],
+});
+
+test('AI settings API requires administrator and CSRF, hides keys from responses and audits, applies immediately', async (t) => {
+  const f = await fixture(t, {
+    aiSettingsFactory: (repo) => new AiSettings({ repo, key: Buffer.alloc(32, 21) }),
+  });
+  const admin = await f.login('owner@example.com'),
+    member = await f.login('other@example.com');
+  const path = 'admin/ai-settings',
+    body = {
+      model: 'gpt-4.1-mini',
+      apiKey: 'test-only-api-secret',
+      clearApiKey: false,
+      revision: 0,
+    };
+  assert.equal((await f.call(f.client(), path)).status, 401);
+  assert.equal((await f.call(member, path)).status, 403);
+  assert.equal((await f.call(member, path, { method: 'PUT', body })).status, 403);
+  assert.equal(
+    (await f.call(admin, path, { method: 'PUT', body, headers: { 'X-CSRF-Token': '' } })).status,
+    403,
+  );
+  assert.equal((await f.call(admin, path)).data.settings.hasApiKey, false);
+  const saved = await f.call(admin, path, { method: 'PUT', body });
+  assert.equal(saved.status, 200);
+  assert.deepEqual(saved.data.settings, { model: body.model, hasApiKey: true, revision: 1 });
+  assert.equal(JSON.stringify((await f.call(admin, path)).data).includes(body.apiKey), false);
+  assert.equal(JSON.stringify(await f.repo.securityEvents()).includes(body.apiKey), false);
+  assert.equal((await f.call(admin, path, { method: 'PUT', body })).status, 409);
+  assert.equal(
+    (await f.call(member, 'workspace/sync', { method: 'POST', body: {} })).data
+      .weeklyReportAiEnabled,
+    true,
+  );
+  await f.call(admin, path, {
+    method: 'PUT',
+    body: { ...body, apiKey: '', clearApiKey: true, revision: 1 },
+  });
+  assert.equal(
+    (await f.call(admin, 'workspace/sync', { method: 'POST', body: {} })).data
+      .weeklyReportAiEnabled,
+    false,
+  );
 });
 
 test('주간보고 AI: 인증·CSRF·편집 권한·기간·revision 검증, 저장 없이 초안 반환', async (t) => {
