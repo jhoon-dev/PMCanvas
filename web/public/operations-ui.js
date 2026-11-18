@@ -11,6 +11,7 @@ export function workspaceOperations({
   projects,
   refreshUsers,
   openMail,
+  openAi,
   openConnections,
   openAudit,
   canChange,
@@ -28,6 +29,7 @@ export function workspaceOperations({
   const tabs = [
     ['users', ui('사용자')],
     ['mail', ui('메일')],
+    ['ai', 'AI'],
     ['security', ui('인증·보안')],
     ['backups', ui('백업')],
   ];
@@ -69,6 +71,11 @@ export function workspaceOperations({
     adminTab = tab === 'pending' ? 'users' : tab;
     const generation = ++screen;
     backup.stop();
+    if (adminTab === 'ai') {
+      await openAi();
+      if (generation === screen && body().querySelector('#aiSettingsHost')) mountNav();
+      return;
+    }
     if (adminTab === 'mail') {
       await openMail();
       if (generation === screen && body().querySelector('#mailSettingsHost')) mountNav();

@@ -75,19 +75,26 @@ export class WeeklyReportAi {
     model = 'gpt-4.1-mini',
     fetchImpl = globalThis.fetch,
     timeoutMs = 45000,
+    settings = null,
   } = {}) {
     this.apiKey = apiKey.trim();
     this.model = model.trim() || 'gpt-4.1-mini';
     this.fetch = fetchImpl;
     this.timeoutMs = timeoutMs;
+    this.settings = settings;
   }
 
   get enabled() {
     return Boolean(this.apiKey);
   }
 
+  async isConfigured() {
+    return this.settings ? (await this.settings.public()).hasApiKey : this.enabled;
+  }
+
   async generate(context) {
-    if (!this.enabled)
+    const { apiKey, model } = this.settings ? await this.settings.credentials() : this;
+    if (!apiKey)
       fail(503, 'AI_NOT_CONFIGURED', 'AI 연결이 설정되지 않았습니다. 관리자에게 문의해 주세요.');
     const signal = AbortSignal.timeout(this.timeoutMs);
     let result;
@@ -97,11 +104,11 @@ export class WeeklyReportAi {
         redirect: 'error',
         signal,
         headers: {
-          Authorization: 'Bearer ' + this.apiKey,
+          Authorization: 'Bearer ' + apiKey,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: this.model,
+          model,
           store: false,
           instructions,
           input: JSON.stringify(context),

@@ -295,6 +295,21 @@ export class MemoryRepository extends MemoryOperations {
     for (const n of failed)
       Object.assign(n, { state: 'pending', attempts: 0, lease: null, available: 0 });
   }
+  async getAiSettings() {
+    return this.aiSettings ? structuredClone(this.aiSettings) : null;
+  }
+  async saveAiSettings(actorId, { model, apiKeyEncrypted, revision }) {
+    const actor = this.users.get(actorId);
+    if (!actor?.is_admin || actor.is_active === false)
+      fail(403, 'FORBIDDEN', '관리자 권한이 필요합니다.');
+    if ((this.aiSettings?.revision || 0) !== revision)
+      fail(
+        409,
+        'AI_CONFLICT',
+        '다른 관리자가 AI 설정을 변경했습니다. 최신 설정을 다시 확인해 주세요.',
+      );
+    this.aiSettings = { model, api_key_encrypted: apiKeyEncrypted, revision: revision + 1 };
+  }
   async getMailSettings() {
     return this.mailSettings ? structuredClone(this.mailSettings) : null;
   }

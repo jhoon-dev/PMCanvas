@@ -269,14 +269,20 @@ export function weeklyHtml(report) {
     '</body></html>'
   );
 }
-function weeklyAiControls(option) {
+export function weeklyAiControls(option) {
   if (!option) return '';
   return (
     '<div class="pm-weekly-ai"><button type="button" class="button" data-pm-ai-draft ' +
     (option.enabled ? '' : 'disabled') +
     '>' +
     esc(ui('AI 초안 생성')) +
-    '</button><p class="muted">' +
+    '</button>' +
+    (!option.enabled && option.canConfigure
+      ? '<button type="button" class="button" data-action="ai-settings">' +
+        esc(ui('AI 연결 설정')) +
+        '</button>'
+      : '') +
+    '<p class="muted">' +
     esc(
       ui(
         option.enabled

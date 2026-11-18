@@ -1,4 +1,4 @@
-import { managementView, installManagementUi } from './management-ui.js';
+import { managementView, installManagementUi, weeklyAiControls } from './management-ui.js';
 import { ui, getLanguage } from './i18n.js';
 import { PROJECT_SCREENS, projectNavigation } from './project-navigation.js';
 import { setBusinessTimeZone } from './business-clock.js';
@@ -277,7 +277,7 @@ function render() {
       content = managementView(p, asOf, {
         section: PROJECT_SCREENS[view].section,
         page: managementPage,
-        weeklyAi: { enabled: weeklyReportAiEnabled },
+        weeklyAi: { enabled: weeklyReportAiEnabled, canConfigure: currentUser?.isAdmin },
       });
       break;
     case 'reports':
@@ -419,6 +419,7 @@ document.addEventListener('click', (e) => {
   else if (a === 'audit') admin.audit();
   else if (a === 'connections') admin.connections();
   else if (a === 'mail-settings') admin.mail();
+  else if (a === 'ai-settings') admin.ai();
   else if (a === 'security-audit') admin.securityAudit();
   else if (a === 'operation-alerts') alertsUi();
   else if (a === 'logout') admin.logout();
@@ -907,6 +908,15 @@ const admin = createAdminUi({
   dialog: info,
   canChange: opsCanChange,
   onMailEnabled: (enabled) => auth.setMailEnabled(enabled),
+  onAiConfigured: (configured) => {
+    weeklyReportAiEnabled = configured;
+    document.querySelectorAll('#pmManagement .pm-weekly-ai').forEach((host) => {
+      host.outerHTML = weeklyAiControls({
+        enabled: configured,
+        canConfigure: currentUser?.isAdmin,
+      });
+    });
+  },
   reload: async (id) => {
     await loadProjects({ force: true, activeId: id ?? state.activeId });
   },

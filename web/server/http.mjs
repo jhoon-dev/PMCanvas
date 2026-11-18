@@ -38,6 +38,7 @@ export function createHandler({
   registrationEmail = null,
   mailSettings = null,
   weeklyReportAi = null,
+  aiSettings = null,
   registration = registrationConfig(),
   federation = new Federation({ repo, origin, basePath }),
 }) {
@@ -66,6 +67,11 @@ export function createHandler({
       });
   };
   const cookieConfig = { secure, basePath };
+  const aiConfigured = async () =>
+    Boolean(
+      weeklyReportAi &&
+      (weeklyReportAi.isConfigured ? await weeklyReportAi.isConfigured() : weeklyReportAi.enabled),
+    );
   const completeLogin = async (req, res, user, { recoveryCodes = null } = {}) => {
     const old = cookieValue(req, 'pmcanvas_session');
     if (old) await repo.deleteSession(digest(old));
@@ -167,6 +173,7 @@ export function createHandler({
       'workspace-cache.js',
       'info-dialog.js',
       'mail-settings-ui.js',
+      'ai-settings-ui.js',
       'backup-settings-ui.js',
       'i18n.js',
       'locales/en.js',
@@ -629,6 +636,19 @@ export function createHandler({
       req.actorId = user.id;
       if (mutation && !safeEqual(req.headers['x-csrf-token'], session.csrf))
         fail(403, 'CSRF_FAILED', '보안 토큰을 갱신하려면 다시 로그인해 주세요.');
+      if (path === '/api/admin/ai-settings') {
+        if (!user.isAdmin) fail(403, 'FORBIDDEN', '관리자 권한이 필요합니다.');
+        if (!aiSettings)
+          fail(503, 'AI_ADMIN_UNAVAILABLE', 'AI 설정 관리 기능을 사용할 수 없습니다.');
+        if (method === 'GET') return json(res, 200, { settings: await aiSettings.public() });
+        if (method === 'PUT') {
+          await reserve('ai-settings:' + user.id, 20, 600000);
+          const settings = await aiSettings.save(user.id, await readJson(req, 16384));
+          await audit(req, 'ai.settings.updated', { configured: settings.hasApiKey });
+          return json(res, 200, { settings });
+        }
+        fail(405, 'METHOD_NOT_ALLOWED', '지원하지 않는 요청입니다.');
+      }
       if (path === '/api/admin/mail-settings' || path === '/api/admin/mail-settings/test') {
         if (!user.isAdmin) fail(403, 'FORBIDDEN', '관리자 권한이 필요합니다.');
         if (!mailSettings)
@@ -810,7 +830,7 @@ export function createHandler({
       if (path === '/api/workspace/sync' && method === 'POST')
         return json(res, 200, {
           ...(await repo.workspace(user.id, workspaceRequest(await readJson(req, 1048576)))),
-          weeklyReportAiEnabled: Boolean(weeklyReportAi?.enabled),
+          weeklyReportAiEnabled: await aiConfigured(),
         });
       if (path === '/api/trash' && method === 'GET')
         return json(res, 200, { items: await repo.listTrash(user.id) });
@@ -900,7 +920,7 @@ export function createHandler({
           return project;
         };
         const context = weeklyReportContext(await currentProject(), body);
-        if (!weeklyReportAi?.enabled)
+        if (!(await aiConfigured()))
           fail(
             503,
             'AI_NOT_CONFIGURED',
