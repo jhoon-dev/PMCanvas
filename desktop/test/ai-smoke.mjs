@@ -42,11 +42,24 @@ if (process.platform !== 'win32') {
   });
   workspace.save(path.join(temporary, 'AI.pmcanvas'));
   let application;
+  let completed = false;
+  let stage = 'launch';
+  const checkpoint = (name) => {
+    stage = name;
+    console.log('Native AI: ' + name);
+  };
+  const watchdog = setTimeout(() => {
+    console.error('Native AI timed out at: ' + stage);
+    process.exitCode = 1;
+    application?.process().kill('SIGKILL');
+    setTimeout(() => process.exit(1), 2000);
+  }, 180000);
+  watchdog.unref();
   const launch = async () => {
     application = await electron.launch({
       timeout: 60000,
       executablePath: installed || require('electron'),
-      args: installed ? ['--user-data-dir=' + temporary] : [root],
+      args: installed ? ['--user-data-dir=' + temporary, '--lang=en-US'] : [root, '--lang=en-US'],
       env: { ...process.env, PMCANVAS_DESKTOP_TEST: '1', PMCANVAS_DESKTOP_DATA: temporary },
     });
     const page = await application.firstWindow();
@@ -59,12 +72,14 @@ if (process.platform !== 'win32') {
   };
   try {
     let page = await launch();
+    checkpoint('save-key');
     await appSection(page, 'ai', application);
     const form = page.locator('#aiSettingsForm');
     await form.locator('[name=apiKey]').fill(key);
     await form.locator('[type=submit]').click();
     await expect(page.locator('#aiSettingsStatus')).toContainText('저장했습니다');
     await expect(form.locator('[name=apiKey]')).toHaveValue('');
+    checkpoint('reopen-settings');
     await appSection(page, 'general', application);
     await expect(page.locator('#languageSelect')).toBeEnabled();
     await appSection(page, 'ai', application);
@@ -75,8 +90,10 @@ if (process.platform !== 'win32') {
       revision: 1,
     });
     await page.screenshot({ path: path.join(output, 'settings.png') });
+    checkpoint('first-close');
     await application.close();
     application = null;
+    checkpoint('restart');
     page = await launch();
     await application.evaluate(() => {
       globalThis.aiTestRequests = [];
@@ -117,11 +134,13 @@ if (process.platform !== 'win32') {
     await weekly.locator('[name=from]').fill(today());
     await weekly.locator('[name=to]').fill(today());
     await weekly.locator('[name=notes]').fill('기존 금주 설명');
+    checkpoint('provider-failure');
     await weekly.locator('[data-pm-ai-draft]').click();
     await expect(page.locator('#pmManagement .pm-error')).toContainText(
       'AI 초안을 생성하지 못했습니다',
     );
     await expect(weekly.locator('[name=notes]')).toHaveValue('기존 금주 설명');
+    checkpoint('generate-draft');
     await weekly.locator('[data-pm-ai-draft]').click();
     await expect(weekly.locator('[name=nextNotes]')).toHaveValue('차주 AI 초안');
     assert.equal(
@@ -136,17 +155,31 @@ if (process.platform !== 'win32') {
     assert.equal(requests[1].store, false);
     await page.screenshot({ path: path.join(output, 'draft.png') });
     await page.getByRole('button', { name: '입력 취소', exact: true }).click();
+    checkpoint('delete-key');
     await appSection(page, 'ai', application);
     await page.locator('#aiSettingsForm [name=clearApiKey]').check();
     await page.locator('#aiSettingsForm [type=submit]').click();
     await expect(page.locator('#aiSettingsStatus')).toContainText('저장했습니다');
     assert.equal((await page.evaluate(() => window.desktop.aiSettings())).hasApiKey, false);
     assert.ok(!readFileSync(path.join(temporary, 'AI.pmcanvas'), 'utf8').includes(key));
+    completed = true;
     console.log(
       'PASS: native encrypted AI settings, restart, draft generation, failure preserves input, key deletion and no project mutation.',
     );
+  } catch (error) {
+    console.error('Native AI failed at: ' + stage, error.stack || error.message);
+    throw error;
   } finally {
-    await application?.close();
+    checkpoint('final-close');
+    if (application && !completed) {
+      await Promise.race([
+        application.evaluate(({ app }) => app.exit(0)).catch(() => {}),
+        new Promise((resolve) => setTimeout(resolve, 3000)),
+      ]);
+      if (application.process().exitCode === null) application.process().kill('SIGKILL');
+    }
+    if (completed) await application?.close();
+    clearTimeout(watchdog);
     if (
       path.dirname(temporary) !== path.resolve(os.tmpdir()) ||
       !path.basename(temporary).startsWith('pmcanvas-ai-native-')
