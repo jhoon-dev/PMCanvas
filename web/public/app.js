@@ -1,5 +1,5 @@
 import { managementView, installManagementUi } from './management-ui.js';
-import { ui } from './i18n.js';
+import { ui, getLanguage } from './i18n.js';
 import { PROJECT_SCREENS, projectNavigation } from './project-navigation.js';
 import { setBusinessTimeZone } from './business-clock.js';
 import { installLanguage } from './i18n.js';
@@ -24,6 +24,7 @@ import { dashboardView } from './dashboard-view.js';
 import { icon, btn, pageHead, empty } from './view-ui.js';
 import { today, progress, summary } from './engine.js';
 let currentUser = null,
+  weeklyReportAiEnabled = false,
   saveInFlight = false,
   mutationSequence = 0,
   myProjects = [],
@@ -93,6 +94,7 @@ function clearAccountWorkspace() {
   myProjects = [];
   storageError = '';
   savedProjects.clear();
+  weeklyReportAiEnabled = false;
 }
 const wbs = new WbsView({
   resolveConflict: openConflict,
@@ -275,6 +277,7 @@ function render() {
       content = managementView(p, asOf, {
         section: PROJECT_SCREENS[view].section,
         page: managementPage,
+        weeklyAi: { enabled: weeklyReportAiEnabled },
       });
       break;
     case 'reports':
@@ -592,12 +595,14 @@ async function loadProjects({ force = false, activeId = state.activeId } = {}) {
   )
     return false;
   const updated = applyWorkspaceSync(state, myProjects, data);
+  const aiChanged = weeklyReportAiEnabled !== Boolean(data.weeklyReportAiEnabled);
+  weeklyReportAiEnabled = Boolean(data.weeklyReportAiEnabled);
   state = updated.state;
   myProjects = updated.myProjects;
   savedProjects.clear();
   for (const p of state.projects) if (!p._summary) savedProjects.set(p.id, structuredClone(p));
   storageError = '';
-  if (force || updated.changed) render();
+  if (force || updated.changed || aiChanged) render();
   admin.summary();
   return true;
 }
@@ -775,6 +780,23 @@ const managementUi = installManagementUi({
   getDate: () => asOf,
   toast,
   canChange: opsCanChange,
+  generateWeeklyDraft: async (fields) => {
+    const p = project(),
+      request = workspaceReads.begin(currentUser?.id, mutationSequence);
+    if (storageError || wbs.dirty || !p?._revision)
+      throw Error(ui('프로젝트 변경사항을 먼저 저장한 뒤 AI 초안을 생성해 주세요.'));
+    const result = await api('projects/' + p.id + '/weekly-ai-draft', {
+      method: 'POST',
+      body: { ...fields, revision: p._revision, language: getLanguage() },
+    });
+    if (
+      !workspaceReads.accepts(request, currentUser?.id, mutationSequence) ||
+      project()?.id !== p.id ||
+      project()?._revision !== result.revision
+    )
+      throw Error(ui('내용이 변경되었습니다. AI 초안을 다시 생성해 주세요.'));
+    return result;
+  },
   save: async (next) => {
     state.projects[state.projects.findIndex((p) => p.id === next.id)] = next;
     if (!(await persist())) throw Error(storageError || ui('저장에 실패했습니다.'));

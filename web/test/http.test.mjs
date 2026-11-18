@@ -115,6 +115,7 @@ async function fixture(
     trustProxies = '',
     mailer = null,
     mailSettingsFactory = null,
+    weeklyReportAi = null,
     registration = registrationConfig(),
   } = {},
 ) {
@@ -166,6 +167,7 @@ async function fixture(
       passwordReset: reset,
       registrationEmail,
       mailSettings,
+      weeklyReportAi,
       federation: new Federation({ repo, origin: ORIGIN, basePath, providers }),
       logger: { error() {} },
     });
@@ -251,6 +253,140 @@ const project = () => ({
       items: [{ id: 'i1', title: '기능 구현', hours: 8, doneDate: null }],
     },
   ],
+});
+
+test('주간보고 AI: 인증·CSRF·편집 권한·기간·revision 검증, 저장 없이 초안 반환', async (t) => {
+  const contexts = [];
+  const f = await fixture(t, {
+    basePath: '/pmcanvas',
+    weeklyReportAi: {
+      enabled: true,
+      async generate(context) {
+        contexts.push(context);
+        return { notes: '금주 초안', nextNotes: '차주 초안' };
+      },
+    },
+  });
+  const owner = await f.login('owner@example.com'),
+    other = await f.login('other@example.com');
+  const p = project();
+  const saved = (await f.call(owner, 'projects', { method: 'POST', body: { project: p } })).data
+    .project;
+  const path = 'projects/' + p.id + '/weekly-ai-draft';
+  const body = {
+    revision: saved._revision,
+    from: '2026-10-19',
+    to: '2026-10-23',
+    notes: '참고 메모',
+    language: 'en',
+  };
+  assert.equal((await f.call(f.client(), path, { method: 'POST', body })).status, 401);
+  assert.equal(
+    (await f.call(owner, path, { method: 'POST', body, headers: { 'X-CSRF-Token': '' } })).status,
+    403,
+  );
+  assert.equal((await f.call(other, path, { method: 'POST', body })).status, 404);
+  await f.repo.grantAccess(f.users[0].id, p.id, 'other@example.com', 'viewer');
+  assert.equal((await f.call(other, path, { method: 'POST', body })).status, 403);
+  assert.equal(
+    (await f.call(owner, path, { method: 'POST', body: { ...body, revision: 99 } })).status,
+    409,
+  );
+  for (const change of [
+    { revision: null },
+    { from: 'bad' },
+    { to: '2099-01-01' },
+    { notes: 10 },
+    { project: p },
+  ])
+    assert.equal(
+      (await f.call(owner, path, { method: 'POST', body: { ...body, ...change } })).status,
+      400,
+    );
+  assert.equal(contexts.length, 0);
+  const result = await f.call(owner, path, { method: 'POST', body });
+  assert.equal(result.status, 200);
+  assert.deepEqual(result.data, {
+    notes: '금주 초안',
+    nextNotes: '차주 초안',
+    revision: saved._revision,
+  });
+  assert.equal(contexts[0].language, 'en');
+  assert.equal(contexts[0].authorNotes.notes, '참고 메모');
+  assert.equal(contexts[0].ongoing.rows[0].name, p.tasks[0].name);
+  assert.deepEqual((await f.call(owner, 'projects/' + p.id)).data.project, saved);
+  const sync = await f.call(owner, 'workspace/sync', { method: 'POST', body: {} });
+  assert.equal(sync.data.weeklyReportAiEnabled, true);
+  await f.repo.grantAccess(f.users[0].id, p.id, 'other@example.com', 'editor');
+  assert.equal((await f.call(other, path, { method: 'POST', body })).status, 200);
+});
+
+test('주간보고 AI: 미설정 안내와 계정별 호출 제한', async (t) => {
+  const disabled = await fixture(t),
+    owner = await disabled.login('owner@example.com');
+  const p = project();
+  await disabled.call(owner, 'projects', { method: 'POST', body: { project: p } });
+  const body = { revision: 1, from: '2026-10-19', to: '2026-10-23' };
+  const path = 'projects/' + p.id + '/weekly-ai-draft';
+  const unavailable = await disabled.call(owner, path, { method: 'POST', body });
+  assert.equal(unavailable.status, 503);
+  assert.equal(unavailable.data.error.code, 'AI_NOT_CONFIGURED');
+  assert.equal(
+    (await disabled.call(owner, 'workspace/sync', { method: 'POST', body: {} })).data
+      .weeklyReportAiEnabled,
+    false,
+  );
+  let calls = 0;
+  const enabled = await fixture(t, {
+    weeklyReportAi: {
+      enabled: true,
+      async generate() {
+        calls++;
+        return { notes: '초안', nextNotes: '계획' };
+      },
+    },
+  });
+  const editor = await enabled.login('owner@example.com');
+  await enabled.call(editor, 'projects', { method: 'POST', body: { project: p } });
+  for (let i = 0; i < 5; i++)
+    assert.equal((await enabled.call(editor, path, { method: 'POST', body })).status, 200);
+  assert.equal((await enabled.call(editor, path, { method: 'POST', body })).status, 429);
+  assert.equal(calls, 5);
+});
+
+test('주간보고 AI: 생성 중 변경된 revision·권한·세션이면 결과를 반환하지 않음', async (t) => {
+  for (const mode of ['revision', 'viewer', 'revoked', 'logout'])
+    await t.test(mode, async (t) => {
+      let duringGenerate;
+      const f = await fixture(t, {
+        weeklyReportAi: {
+          enabled: true,
+          async generate() {
+            await duringGenerate();
+            return { notes: '초안', nextNotes: '계획' };
+          },
+        },
+      });
+      const owner = await f.login('owner@example.com'),
+        other = await f.login('other@example.com');
+      const p = project();
+      await f.call(owner, 'projects', { method: 'POST', body: { project: p } });
+      await f.repo.grantAccess(f.users[0].id, p.id, 'other@example.com', 'editor');
+      duringGenerate = async () => {
+        if (mode === 'revision')
+          await f.repo.updateProject(f.users[0].id, p.id, { ...p, name: '변경됨' }, 1);
+        if (mode === 'viewer')
+          await f.repo.grantAccess(f.users[0].id, p.id, 'other@example.com', 'viewer');
+        if (mode === 'revoked') await f.repo.revokeAccess(f.users[0].id, p.id, f.users[1].id);
+        if (mode === 'logout') await f.call(other, 'auth/logout', { method: 'POST' });
+      };
+      const result = await f.call(other, 'projects/' + p.id + '/weekly-ai-draft', {
+        method: 'POST',
+        body: { revision: 1, from: '2026-10-19', to: '2026-10-23' },
+      });
+      assert.equal(result.status, { revision: 409, viewer: 403, revoked: 404, logout: 401 }[mode]);
+      assert.equal(result.data.notes, undefined);
+    });
 });
 test('외부 계정 매핑은 관리자·CSRF 검증, 비밀 제외, 기존 사용자 ID 보존', async (t) => {
   const p = {

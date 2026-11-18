@@ -1231,6 +1231,98 @@ test('투입 계획을 저장·재조회하면 대시보드·인력·M/M에 반�
   await expect(page.locator('.date-number')).toContainText('11.06');
 });
 
+test('주간보고 AI: 설정 안내·오류 보존·생성 중 중복 방지·초안 편집 후 발행', async ({ page }) => {
+  const session = await login(page),
+    p = await createProject(page, session, { name: 'AI 주간보고 검증' });
+  await selectProject(page, p, 'weekly');
+  const host = page.locator('#pmManagement');
+  await host.locator('[data-management-pane=add]').click();
+  const weekly = host.locator('[data-pm-form=weekly]'),
+    button = weekly.locator('[data-pm-ai-draft]');
+  await expect(button).toBeDisabled();
+  await expect(weekly).toContainText('관리자의 AI 연결 설정');
+  await page.route('**/api/workspace/sync', async (route) => {
+    const response = await route.fetch();
+    await route.fulfill({
+      response,
+      json: { ...(await response.json()), weeklyReportAiEnabled: true },
+    });
+  });
+  await selectProject(page, p, 'weekly');
+  await expect(host.locator('[data-management-pane=add]')).toBeVisible();
+  await host.locator('[data-management-pane=add]').click();
+  await expect(button).toBeEnabled();
+  await weekly.locator('[name=from]').fill('2026-10-19');
+  await weekly.locator('[name=to]').fill('2026-10-23');
+  await weekly.locator('[name=notes]').fill('기존 설명');
+  await weekly.locator('[name=nextNotes]').fill('기존 계획');
+  let count = 0,
+    release;
+  await page.route('**/api/projects/' + p.id + '/weekly-ai-draft', async (route) => {
+    count++;
+    const body = route.request().postDataJSON();
+    expect(body.notes).toBe('기존 설명');
+    expect(body.nextNotes).toBe('기존 계획');
+    expect(body.language).toBe('ko');
+    expect(body.project).toBeUndefined();
+    expect(body.revision).toBeGreaterThan(0);
+    if (count === 1) {
+      await route.fulfill({
+        status: 502,
+        json: {
+          error: {
+            code: 'AI_UNAVAILABLE',
+            message: 'AI 초안을 생성하지 못했습니다. 잠시 후 다시 시도해 주세요.',
+          },
+        },
+      });
+      return;
+    }
+    await new Promise((resolve) => {
+      release = resolve;
+    });
+    await route.fulfill({
+      json: {
+        notes: '생성된 금주 설명 <script>alert(1)</script>',
+        nextNotes: '생성된 차주 설명',
+        revision: body.revision,
+      },
+    });
+  });
+  await button.click();
+  await expect(host.locator('.pm-error')).toContainText('AI 초안을 생성하지 못했습니다.');
+  await expect(weekly.locator('[name=notes]')).toHaveValue('기존 설명');
+  await expect(weekly.locator('[name=nextNotes]')).toHaveValue('기존 계획');
+  await expect(button).toBeEnabled();
+  await weekly.locator('button[type=submit]').click();
+  await expect(host.locator('[data-pm-publish]')).toBeVisible();
+  await button.click();
+  await expect(button).toHaveText('AI 초안 생성 중…');
+  await expect(host).toHaveAttribute('inert', '');
+  await expect.poll(() => Boolean(release)).toBe(true);
+  await button.evaluate((node) => node.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+  expect(count).toBe(2);
+  release();
+  await expect(weekly.locator('[name=nextNotes]')).toHaveValue('생성된 차주 설명');
+  await expect(host.locator('[data-pm-publish]')).toHaveCount(0);
+  await expect(host).not.toHaveAttribute('inert');
+  await expect(host.locator('.pm-error')).toBeEmpty();
+  const stored = (await (await page.request.get(api + 'projects/' + p.id)).json()).project;
+  expect(stored.weeklyReports || []).toHaveLength(0);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: test.info().outputPath('weekly-ai-mobile.png'), fullPage: true });
+  await weekly.locator('[name=notes]').fill('검토 후 수정한 금주 설명');
+  await weekly.locator('button[type=submit]').click();
+  await expect(host.locator('#pmWeeklyPreview')).toContainText('검토 후 수정한 금주 설명');
+  await host.locator('[data-pm-publish]').click();
+  await expect(page.locator('#toast')).toContainText('주간보고를 발행');
+  const published = (await (await page.request.get(api + 'projects/' + p.id)).json()).project
+    .weeklyReports;
+  expect(published).toHaveLength(1);
+  expect(published[0].notes).toBe('검토 후 수정한 금주 설명');
+  expect(published[0].nextNotes).toBe('생성된 차주 설명');
+});
+
 test('PM 관리: 마일스톤·이슈·투입 계획·주간보고 발행과 불변 사본·모바일 화면', async ({ page }) => {
   await page.clock.setFixedTime(new Date('2026-11-03T08:00:00Z'));
   const session = await login(page),

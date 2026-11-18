@@ -25,6 +25,7 @@ import { registrationDecision, backupSettings } from './workspace-model.mjs';
 import { registrationConfig } from './registration.mjs';
 import { mailAddress } from './mailer.mjs';
 import { workspaceRequest } from './workspace-sync.mjs';
+import { weeklyReportContext } from './weekly-report-ai.mjs';
 
 export function createHandler({
   repo,
@@ -36,6 +37,7 @@ export function createHandler({
   passwordReset = null,
   registrationEmail = null,
   mailSettings = null,
+  weeklyReportAi = null,
   registration = registrationConfig(),
   federation = new Federation({ repo, origin, basePath }),
 }) {
@@ -806,11 +808,10 @@ export function createHandler({
       if (path === '/api/my-work' && method === 'GET')
         return json(res, 200, { projects: await repo.myWork(user.id) });
       if (path === '/api/workspace/sync' && method === 'POST')
-        return json(
-          res,
-          200,
-          await repo.workspace(user.id, workspaceRequest(await readJson(req, 1048576))),
-        );
+        return json(res, 200, {
+          ...(await repo.workspace(user.id, workspaceRequest(await readJson(req, 1048576)))),
+          weeklyReportAiEnabled: Boolean(weeklyReportAi?.enabled),
+        });
       if (path === '/api/trash' && method === 'GET')
         return json(res, 200, { items: await repo.listTrash(user.id) });
       const restoreMatch = path.match(/^\/api\/trash\/(project|tasks)\/([^/]+)\/restore$/);
@@ -871,6 +872,45 @@ export function createHandler({
           await audit(req, 'account.user.created', { targetId: created.id });
           return json(res, 201, { user: created });
         }
+      }
+      const aiReportMatch = path.match(/^\/api\/projects\/([^/]+)\/weekly-ai-draft$/);
+      if (aiReportMatch && method === 'POST') {
+        const id = aiReportMatch[1];
+        if (!uuid(id)) fail(404, 'NOT_FOUND', '프로젝트를 찾을 수 없습니다.');
+        const body = await readJson(req, 32768);
+        if (!Number.isSafeInteger(body.revision) || body.revision < 1)
+          fail(400, 'REVISION_REQUIRED', '프로젝트 버전이 필요합니다.');
+        if (
+          Object.keys(body).some(
+            (key) => !['revision', 'from', 'to', 'notes', 'nextNotes', 'language'].includes(key),
+          )
+        )
+          fail(400, 'INVALID_AI_INPUT', '주간보고 설명과 언어를 확인해 주세요.');
+        const currentProject = async () => {
+          if (!(await repo.findSession(req.sessionHash)))
+            fail(401, 'AUTH_REQUIRED', '로그인이 필요합니다.');
+          const project = await repo.getProject(user.id, id);
+          if (project._role === 'viewer') fail(403, 'FORBIDDEN', '편집 권한이 필요합니다.');
+          if (project._revision !== body.revision)
+            fail(
+              409,
+              'REVISION_CONFLICT',
+              '프로젝트가 변경되었습니다. 최신 내용을 불러온 뒤 AI 초안을 다시 생성해 주세요.',
+            );
+          return project;
+        };
+        const context = weeklyReportContext(await currentProject(), body);
+        if (!weeklyReportAi?.enabled)
+          fail(
+            503,
+            'AI_NOT_CONFIGURED',
+            'AI 연결이 설정되지 않았습니다. 관리자에게 문의해 주세요.',
+          );
+        await reserve('weekly-ai:' + user.id, 5, 60000);
+        await reserve('weekly-ai-global', 30, 60000);
+        const draft = await weeklyReportAi.generate(context);
+        await currentProject();
+        return json(res, 200, { ...draft, revision: body.revision });
       }
       const importMatch = path.match(/^\/api\/projects\/([^/]+)\/import-excel$/);
       if (importMatch && method === 'POST') {
@@ -1023,9 +1063,11 @@ export function createHandler({
         error: {
           code: error.code && error.status ? error.code : 'INTERNAL_ERROR',
           message: error.status
-            ? error.status === 429 && auditPath.startsWith('/api/admin/mail-settings')
-              ? '메일 설정 요청이 많습니다. 잠시 후 다시 시도해 주세요.'
-              : error.message
+            ? error.status === 429 && auditPath.endsWith('/weekly-ai-draft')
+              ? 'AI 요청이 많습니다. 잠시 후 다시 시도해 주세요.'
+              : error.status === 429 && auditPath.startsWith('/api/admin/mail-settings')
+                ? '메일 설정 요청이 많습니다. 잠시 후 다시 시도해 주세요.'
+                : error.message
             : '서버 처리 중 오류가 발생했습니다.',
         },
       });

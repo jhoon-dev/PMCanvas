@@ -1,6 +1,35 @@
 import desktop from './desktop-en.js';
 // UI literals only. User-entered content never passes through this catalog.
 export default {
+  'AI 초안 생성': 'Generate AI draft',
+  'AI 초안 생성 중…': 'Generating AI draft…',
+  'AI가 금주·차주 설명을 작성하고 있습니다.':
+    'AI is drafting this week’s summary and next week’s plan.',
+  'AI 초안을 채웠습니다. 내용을 검토한 뒤 미리보기 해 주세요.':
+    'AI draft added. Review the text, then preview the report.',
+  '선택한 기간의 업무·담당자·진척·현재 이슈와 입력한 설명을 OpenAI에 보내 초안을 만듭니다. 두 설명란을 새 초안으로 채우며, 검토 후 미리보기·발행하세요.':
+    'Send tasks, assignees, progress, current issues and your notes for the selected period to OpenAI. Both narrative fields will be replaced with a new draft. Review, preview and publish when ready.',
+  'AI 초안 생성은 관리자의 AI 연결 설정 후 사용할 수 있습니다.':
+    'AI drafts are available after your administrator configures the AI connection.',
+  '프로젝트 변경사항을 먼저 저장한 뒤 AI 초안을 생성해 주세요.':
+    'Save project changes before generating an AI draft.',
+  '내용이 변경되었습니다. AI 초안을 다시 생성해 주세요.':
+    'The content changed. Generate the AI draft again.',
+  'AI 연결이 설정되지 않았습니다. 관리자에게 문의해 주세요.':
+    'AI is not configured. Contact your administrator.',
+  '주간보고 설명과 언어를 확인해 주세요.': 'Check the report notes and language.',
+  '주간보고는 오늘까지의 1~7일 기간으로 작성해 주세요.':
+    'Choose a report period of 1–7 days ending no later than today.',
+  '프로젝트가 변경되었습니다. 최신 내용을 불러온 뒤 AI 초안을 다시 생성해 주세요.':
+    'The project changed. Load the latest version and generate the AI draft again.',
+  'AI 초안을 생성하지 못했습니다. 잠시 후 다시 시도해 주세요.':
+    'Could not generate the AI draft. Try again later.',
+  'AI 응답 시간이 초과되었습니다. 다시 시도해 주세요.': 'The AI request timed out. Try again.',
+  'AI 요청이 많습니다. 잠시 후 다시 시도해 주세요.': 'Too many AI requests. Try again later.',
+  '입력 내용으로 AI 초안을 만들 수 없습니다. 설명을 확인해 주세요.':
+    'Could not draft a report from this input. Review your notes.',
+  'AI 초안 형식을 확인하지 못했습니다. 다시 시도해 주세요.':
+    'The AI draft format could not be validated. Try again.',
   '근무일 없는 일정: ': 'No workdays in schedule: ',
   '근무일이 포함되도록 일정이나 휴무일 설정을 확인해 주세요.':
     'Check the schedule or holiday settings so the task includes a workday.',
