@@ -39,25 +39,25 @@ const plan = releasePlan({
 assertPublicDesktopRelease(plan);
 const runId = process.env.PM_RELEASE_RUN_ID || process.env.GITHUB_RUN_ID;
 assert.match(runId, /^\d+$/);
-const sourceRun = JSON.parse(gh(['api', 'repos/jhoon-dev/PMCanvas/actions/runs/' + runId]));
+const sourceRun = JSON.parse(gh(['api', 'repos/jhoon-dev/pm-canvas/actions/runs/' + runId]));
 const jobs = JSON.parse(
-  gh(['api', 'repos/jhoon-dev/PMCanvas/actions/runs/' + runId + '/jobs?per_page=100']),
+  gh(['api', 'repos/jhoon-dev/pm-canvas/actions/runs/' + runId + '/jobs?per_page=100']),
 ).jobs;
 const commit = verifiedReleaseSource(sourceRun, jobs, plan);
-const main = JSON.parse(gh(['api', 'repos/jhoon-dev/PMCanvas/git/ref/heads/main'])).object;
+const main = JSON.parse(gh(['api', 'repos/jhoon-dev/pm-canvas/git/ref/heads/main'])).object;
 assert.equal(main.type, 'commit');
 assert.match(main.sha, /^[a-f0-9]{40}$/);
 assertMainlineCommit(
   commit,
   main.sha,
-  JSON.parse(gh(['api', 'repos/jhoon-dev/PMCanvas/compare/' + commit + '...' + main.sha])),
+  JSON.parse(gh(['api', 'repos/jhoon-dev/pm-canvas/compare/' + commit + '...' + main.sha])),
 );
 const sourcePackage = JSON.parse(
-  gh(['api', 'repos/jhoon-dev/PMCanvas/contents/desktop/package.json?ref=' + commit]),
+  gh(['api', 'repos/jhoon-dev/pm-canvas/contents/desktop/package.json?ref=' + commit]),
 );
 const pkg = JSON.parse(Buffer.from(sourcePackage.content, 'base64'));
 const trustSource = JSON.parse(
-  gh(['api', 'repos/jhoon-dev/PMCanvas/contents/desktop/update-trust.mjs?ref=' + commit]),
+  gh(['api', 'repos/jhoon-dev/pm-canvas/contents/desktop/update-trust.mjs?ref=' + commit]),
 );
 assert.equal(
   Buffer.from(trustSource.content, 'base64').toString('utf8'),
@@ -69,7 +69,7 @@ assert.match(version, /^\d+\.\d+\.\d+$/);
 const tag = 'desktop-v' + version;
 const findRelease = () =>
   editableReleaseDraft(
-    JSON.parse(gh(['api', 'repos/jhoon-dev/PMCanvas/releases?per_page=100'])),
+    JSON.parse(gh(['api', 'repos/jhoon-dev/pm-canvas/releases?per_page=100'])),
     tag,
     commit,
   );
@@ -155,7 +155,8 @@ fs.writeFileSync(
   `PM Canvas ${version}\n\n${targets} 설치 파일과 SHA-256을 제공합니다. ${trust}\n\n` +
     `검증: 선택한 ${evidence.length}개 운영체제/아키텍처에서 0.7.1 설치 → ${version} 업데이트 → 제거 → 재설치를 실제 수행하고 ` +
     '프로젝트·복구·언어·시간대·완료 기록·계층·기준 계획 보존을 확인했습니다. 상세 결과는 install-validation JSON을 확인하세요. ' +
-    '프로젝트를 설치 폴더 밖에 저장하고 앱을 종료한 뒤 설치하세요. 파일 옵션 → 앱 설정 → 업데이트 확인에서 새 버전을 확인하고 업데이트를 진행할 수 있습니다.\n',
+    '프로젝트를 설치 폴더 밖에 저장하고 앱을 종료한 뒤 설치하세요. 파일 옵션 → 앱 설정 → 업데이트 확인에서 새 버전을 확인하고 업데이트를 진행할 수 있습니다.\n\n' +
+    '이전 저장소 주소를 사용하는 앱에서 업데이트 확인이 실패하면 이 릴리스의 서명·공증된 Mac 설치 파일을 사용하세요. Windows EXE 사용자는 Microsoft Store로 전환하세요. [기존 설치본 전환 안내](https://github.com/jhoon-dev/pm-canvas/blob/main/desktop/README.md)\n',
 );
 if (!release)
   gh([
@@ -175,7 +176,7 @@ gh(['release', 'upload', tag, ...uploads, '--clobber']);
 release = findRelease();
 assert.ok(release?.id);
 assert.equal(release.draft, true);
-const uploaded = JSON.parse(gh(['api', 'repos/jhoon-dev/PMCanvas/releases/' + release.id]));
+const uploaded = JSON.parse(gh(['api', 'repos/jhoon-dev/pm-canvas/releases/' + release.id]));
 // A resumed draft must not contain stale unsigned or unselected-platform assets.
 assert.equal(uploaded.assets.length, uploads.length);
 for (const file of uploads) {
@@ -189,6 +190,6 @@ for (const file of uploads) {
 }
 gh(['release', 'edit', tag, '--notes-file', notes, '--draft=false', '--latest=true']);
 console.log(
-  `PASS: ${plan.mode} installers, checksums and ${evidence.length} installation results published at https://github.com/jhoon-dev/PMCanvas/releases/tag/` +
+  `PASS: ${plan.mode} installers, checksums and ${evidence.length} installation results published at https://github.com/jhoon-dev/pm-canvas/releases/tag/` +
     tag,
 );

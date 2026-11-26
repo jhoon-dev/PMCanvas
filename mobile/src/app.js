@@ -637,11 +637,12 @@ document.addEventListener('click', (event) => {
     return;
   }
   if (action === 'delete-project') {
+    const { id, revision } = record;
     confirmDelete('이 기기에 저장된 프로젝트를 삭제합니다. 필요한 파일을 먼저 내보내 주세요.').then(
       (confirmed) => {
         if (confirmed)
           run(async () => {
-            await store.remove(record.id);
+            await store.remove(id, revision);
             navigate('projects', '');
           });
       },

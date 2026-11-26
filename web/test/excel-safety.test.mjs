@@ -6,6 +6,18 @@ import { buildTemplate, buildWorkbook } from '../server/excel.mjs';
 import { parseWorkbook } from '../server/excel-import.mjs';
 import { previewImport, suggestMapping } from '../public/wbs-import.js';
 import { screenProject } from './support/screen-fixtures.mjs';
+import { fileJob } from '../server/file-jobs.mjs';
+
+test('Excel 작업 시간 초과는 재시도를 안내', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const rejected = assert.rejects(
+    fileJob('template', { project: screenProject() }),
+    (error) =>
+      error.status === 504 && error.code === 'FILE_TIMEOUT' && /다시 시도/.test(error.message),
+  );
+  t.mock.timers.tick(45000);
+  await rejected;
+});
 
 test('Excel 입력 양식은 날짜·공수·담당자 목록을 제공하고 값 입력 후 추가 가능', async () => {
   const p = screenProject(),

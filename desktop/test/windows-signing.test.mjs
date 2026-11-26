@@ -79,7 +79,8 @@ test(
       {
         windowsHide: true,
         stdio: 'pipe',
-        timeout: 30000,
+        // The first Add-Type invocation can take longer while Windows scans the compiler.
+        timeout: 120000,
         env: { ...process.env, PM_TEST_PS_BINARY: shadow },
       },
     );
@@ -115,9 +116,10 @@ test(
     const result = spawnSync(
       process.execPath,
       ['--input-type=module', '-e', source, unsigned],
-      options,
+      // This process performs three DPAPI calls and an Authenticode check.
+      { ...options, timeout: 180000 },
     );
-    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.status, 0, result.error?.code || result.stderr);
     assert.equal(result.stdout, 'private-key-roundtrip-and-unsigned-rejection');
     assert.equal(fs.existsSync(marker), false, 'System tools must bypass the PATH fixture');
   },

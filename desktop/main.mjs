@@ -38,7 +38,7 @@ import { DesktopWeeklyAi } from './weekly-ai.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const metadata = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'));
-const PRIVACY_POLICY = 'https://github.com/jhoon-dev/PMCanvas/blob/main/desktop/PRIVACY.md';
+const PRIVACY_POLICY = 'https://github.com/jhoon-dev/pm-canvas/blob/main/desktop/PRIVACY.md';
 const testing = !app.isPackaged && process.env.PMCANVAS_DESKTOP_TEST === '1';
 // Keep existing recovery, preferences and Chromium storage across the display-name change.
 if (!app.commandLine.hasSwitch('user-data-dir')) {

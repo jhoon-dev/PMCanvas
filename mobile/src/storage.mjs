@@ -1,6 +1,9 @@
 import { assertReportHistory } from '../../shared/browser/management.js';
 import { normalizeProject } from './model.mjs';
 
+const revisionConflict = () =>
+  Error('다른 창에서 변경되었습니다. 프로젝트 목록에서 다시 열어 주세요.');
+
 export class ProjectStore {
   constructor(factory = globalThis.indexedDB, name = 'pmcanvas-mobile-v1') {
     this.factory = factory;
@@ -56,39 +59,26 @@ export class ProjectStore {
       String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')),
     );
   }
-  async save(input, expectedRevision = null) {
-    const project = normalizeProject(input);
+  async #write(id, expectedRevision, operation) {
     const db = await this.open();
     return new Promise((resolve, reject) => {
-      // A native force-stop can interrupt Chromium's relaxed WAL flush. Confirm
-      // the durable commit before publishing "saved" or allowing another action.
+      // Wait for a durable commit and keep the revision check and write atomic.
       const tx = db.transaction('projects', 'readwrite', { durability: 'strict' });
       const store = tx.objectStore('projects');
-      const request = store.get(project.id);
-      let record, failure;
+      const request = store.get(id);
+      let result, failure;
       request.onsuccess = () => {
         const previous = request.result;
-        if (expectedRevision !== null && (previous?.revision ?? 0) !== expectedRevision) {
-          failure = Error('다른 창에서 변경되었습니다. 프로젝트 목록에서 다시 열어 주세요.');
-          tx.abort();
-          return;
-        }
         try {
-          if (previous) assertReportHistory(previous.project, project);
+          if (expectedRevision !== null && (previous?.revision ?? 0) !== expectedRevision)
+            throw revisionConflict();
+          result = operation(store, previous);
         } catch (error) {
           failure = error;
           tx.abort();
-          return;
         }
-        record = {
-          id: project.id,
-          project,
-          revision: (previous?.revision ?? 0) + 1,
-          updatedAt: new Date().toISOString(),
-        };
-        store.put(record);
       };
-      tx.oncomplete = () => resolve(record);
+      tx.oncomplete = () => resolve(result);
       tx.onabort = () =>
         reject(
           failure || tx.error || Error('기기에 저장하지 못했습니다. 저장 공간을 확인해 주세요.'),
@@ -96,7 +86,22 @@ export class ProjectStore {
       tx.onerror = () => {};
     });
   }
-  async remove(id) {
-    await this.transaction('readwrite', (store) => store.delete(id));
+  async save(input, expectedRevision = null) {
+    const project = normalizeProject(input);
+    return this.#write(project.id, expectedRevision, (store, previous) => {
+      if (previous) assertReportHistory(previous.project, project);
+      const record = {
+        id: project.id,
+        project,
+        revision: (previous?.revision ?? 0) + 1,
+        updatedAt: new Date().toISOString(),
+      };
+      store.put(record);
+      return record;
+    });
+  }
+  async remove(id, expectedRevision) {
+    if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 1) throw revisionConflict();
+    await this.#write(id, expectedRevision, (store) => store.delete(id));
   }
 }

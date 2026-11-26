@@ -1,7 +1,7 @@
 import https from 'node:https';
 import { checkStoreUpdates } from './store-updates.mjs';
 
-export const RELEASES_PAGE = 'https://github.com/jhoon-dev/PMCanvas/releases';
+export const RELEASES_PAGE = 'https://github.com/jhoon-dev/pm-canvas/releases';
 export const STORE_UPDATES = 'ms-windows-store://downloadsandupdates';
 export const MAC_STORE_UPDATES = 'macappstore://showUpdatesPage';
 export class MacStoreUpdateService {
@@ -56,7 +56,8 @@ export class StoreUpdateService {
     return this.pending;
   }
 }
-export const RELEASES_API = 'https://api.github.com/repos/jhoon-dev/PMCanvas/releases?per_page=100';
+// The GitHub repository ID keeps release discovery independent of repository aliases.
+export const RELEASES_API = 'https://api.github.com/repositories/1433731411/releases?per_page=100';
 const versionPattern = '(0|[1-9]\\d{0,5})\\.(0|[1-9]\\d{0,5})\\.(0|[1-9]\\d{0,5})';
 const version = new RegExp('^' + versionPattern + '$');
 const tag = new RegExp('^desktop-v(' + versionPattern + ')$');
@@ -99,36 +100,21 @@ export function selectUpdate(releases, currentVersion, platform, arch) {
         : platform === 'darwin' && ['arm64', 'x64'].includes(arch)
           ? 'PMCanvas-Desktop-' + latestVersion + '-macOS-' + arch + '.dmg'
           : null;
+    const downloadBase = RELEASES_PAGE + '/download/' + latest.tag_name + '/';
     const asset = (file) =>
-      latest.assets.some(
-        (a) =>
-          a.name === file &&
-          a.browser_download_url ===
-            'https://github.com/jhoon-dev/PMCanvas/releases/download/' +
-              latest.tag_name +
-              '/' +
-              file,
-      );
+      latest.assets.some((a) => a.name === file && a.browser_download_url === downloadBase + file);
+    const downloadAvailable = Boolean(name && asset(name) && asset(name + '.sha256'));
     const result = {
       currentVersion,
       version: latestVersion,
       available: compareVersions(latestVersion, currentVersion) > 0,
-      downloadAvailable: Boolean(name && asset(name) && asset(name + '.sha256')),
+      downloadAvailable,
       url,
-      ...(name && asset(name) && asset(name + '.sha256')
+      ...(downloadAvailable
         ? {
             fileName: name,
-            downloadUrl:
-              'https://github.com/jhoon-dev/PMCanvas/releases/download/' +
-              latest.tag_name +
-              '/' +
-              name,
-            checksumUrl:
-              'https://github.com/jhoon-dev/PMCanvas/releases/download/' +
-              latest.tag_name +
-              '/' +
-              name +
-              '.sha256',
+            downloadUrl: downloadBase + name,
+            checksumUrl: downloadBase + name + '.sha256',
           }
         : {}),
     };

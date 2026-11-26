@@ -591,6 +591,8 @@ async function loadProjects({ force = false, activeId = state.activeId } = {}) {
   if (
     wbs.dirty ||
     wbs.interacting ||
+    managementUi.dirty() ||
+    managementUi.pending() ||
     !workspaceReads.accepts(request, currentUser?.id, mutationSequence) ||
     (!force && (saveInFlight || storageError || document.querySelector('dialog[open]')))
   )

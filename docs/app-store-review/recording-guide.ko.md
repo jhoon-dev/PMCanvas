@@ -76,4 +76,4 @@ Apple 심사 첨부가 영상 형식·크기를 지원하면 첨부하고, 그�
 - [Apple: 내부 TestFlight 테스터](https://developer.apple.com/help/app-store-connect/test-a-beta-version/add-internal-testers/)
 - [Apple: iPhone·iPad 화면 기록](https://support.apple.com/en-us/102653)
 - [Apple: Mac 화면 기록](https://support.apple.com/en-us/102618)
-- [iOS 서명·업로드 성공](https://github.com/jhoon-dev/PMCanvas/actions/runs/41296552107)
+- [iOS 서명·업로드 성공](https://github.com/jhoon-dev/pm-canvas/actions/runs/41296552107)

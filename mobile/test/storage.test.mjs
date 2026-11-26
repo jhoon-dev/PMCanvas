@@ -14,7 +14,7 @@ test('committed projects survive a new store connection and are isolated by ID',
   await store.save({ ...project(), id: 'second', name: '두 번째' }, 0);
   const reopened = new ProjectStore(factory);
   assert.equal((await reopened.list()).length, 2);
-  await reopened.remove('sample');
+  await reopened.remove(first.id, first.revision);
   assert.equal((await store.list())[0].id, 'second');
 });
 test('simultaneous editors cannot overwrite a newer committed revision', async () => {
@@ -30,6 +30,19 @@ test('simultaneous editors cannot overwrite a newer committed revision', async (
   assert.match(outcomes.find((result) => result.status === 'rejected').reason.message, /다른 창/);
   assert.equal((await a.list())[0].revision, 2);
 });
+test('deleting from an older window preserves the latest committed project', async () => {
+  const factory = new IDBFactory(),
+    a = new ProjectStore(factory),
+    b = new ProjectStore(factory);
+  const first = await a.save(project(), 0);
+  const latest = await b.save({ ...first.project, name: 'B 창 변경' }, first.revision);
+  await assert.rejects(a.remove(first.id, first.revision), /다른 창/);
+  assert.deepEqual(await a.list(), [latest]);
+  await a.remove(latest.id, latest.revision);
+  await assert.rejects(b.remove(latest.id, latest.revision), /다른 창/);
+  assert.deepEqual(await b.list(), []);
+});
+
 test('validation and transaction aborts preserve previously committed data', async () => {
   const store = new ProjectStore(new IDBFactory());
   await store.save(project(), 0);

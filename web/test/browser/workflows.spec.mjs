@@ -499,6 +499,55 @@ test('저장 후 늦게 도착한 내 업무 응답은 최신 동기화 화면�
   await expect(page.locator('#main')).not.toContainText('이전 응답 노출 금지');
 });
 
+test('동기화 요청 중 작성한 주간보고 설명이 응답 후에도 유지됨', async ({ page }) => {
+  await page.clock.install();
+  const session = await login(page);
+  const project = await createProject(page, session, { name: '주간보고 작성 프로젝트' });
+  await selectProject(page, project, 'weekly');
+  await page.locator('#pmManagement [data-management-pane=add]').click();
+  const weekly = page.locator('[data-pm-form=weekly]');
+  await expect(weekly).toBeVisible();
+
+  const updated = await page.request.put(api + 'projects/' + project.id, {
+    headers: { Origin: origin, 'X-CSRF-Token': session.csrf },
+    data: {
+      project: { ...project, name: '다른 창에서 바꾼 프로젝트' },
+      revision: project._revision,
+    },
+  });
+  expect(updated.status()).toBe(200);
+
+  const requested = Promise.withResolvers();
+  const release = Promise.withResolvers();
+  await page.route(
+    '**/api/workspace/sync',
+    async (route) => {
+      requested.resolve();
+      await release.promise;
+      await route.fulfill({ response: await route.fetch() });
+    },
+    { times: 1 },
+  );
+  await page.clock.fastForward(15000);
+  const finished = page.waitForEvent('requestfinished', {
+    predicate: (request) => request.url().endsWith('/api/workspace/sync'),
+  });
+  const notes = weekly.locator('[name=notes]');
+  try {
+    await requested.promise;
+    await notes.fill('조회 응답을 기다리며 작성한 설명');
+    await expect(weekly).toHaveAttribute('data-pm-dirty', 'true');
+  } finally {
+    release.resolve();
+  }
+  await finished;
+  await page.evaluate(
+    () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+  );
+  await expect(notes).toHaveValue('조회 응답을 기다리며 작성한 설명');
+  await expect(page.locator('#breadcrumbProject')).toHaveText(project.name);
+});
+
 for (const failedCreation of [false, true]) {
   test(
     'JSON 백업 미확정 입력 복구·수정·저장' + (failedCreation ? '·최초 생성 실패 후 재시도' : ''),

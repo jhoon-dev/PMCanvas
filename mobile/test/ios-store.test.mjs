@@ -41,7 +41,7 @@ test('iOS distribution rejects development, device, expired and foreign profiles
 test('iOS upload inputs bind repository, main, app identity and unique build number', () => {
   const env = {
     GITHUB_REF: 'refs/heads/main',
-    GITHUB_REPOSITORY: 'jhoon-dev/PMCanvas',
+    GITHUB_REPOSITORY: 'jhoon-dev/pm-canvas',
     PM_IOS_TEAM_ID: expected.team,
     PM_IOS_BUILD_NUMBER: '1.1',
   };

@@ -8,6 +8,6 @@ export const privacyContent = `
   <p>프로젝트를 삭제하거나 앱·앱 데이터를 제거하면 기기의 자료를 잃을 수 있습니다. 필요한 프로젝트는 미리 파일로 내보내세요. 다른 곳에 저장·공유한 사본은 따로 관리해야 합니다. 개발자는 기기의 자료를 원격으로 삭제할 수 없습니다.</p>
   <h3>지원</h3>
   <p>지원 문의는 PM Canvas GitHub Issues에서 받습니다. 공개 게시판이므로 프로젝트 원본, 참여인력 개인정보, 비밀번호나 인증 키를 게시하지 마세요.</p>
-  <p><a href="https://github.com/jhoon-dev/PMCanvas/blob/main/mobile/PRIVACY.md" target="_blank" rel="noopener noreferrer">개인정보처리방침 전문</a> · <a href="https://github.com/jhoon-dev/PMCanvas/issues" target="_blank" rel="noopener noreferrer">지원 문의</a></p>
+  <p><a href="https://github.com/jhoon-dev/pm-canvas/blob/main/mobile/PRIVACY.md" target="_blank" rel="noopener noreferrer">개인정보처리방침 전문</a> · <a href="https://github.com/jhoon-dev/pm-canvas/issues" target="_blank" rel="noopener noreferrer">지원 문의</a></p>
   <p>시행일: 2026-10-31 · 개발자: jhoon-dev · 브랜드: Toolmoa</p>
 `;
