@@ -52,7 +52,7 @@ test('MSIX manifest uses default virtualization, escapes identities and uses ful
   assert.equal(element('Identity').getAttribute('Version'), '1.9.0.0');
   assert.equal(element('PublisherDisplayName').textContent, 'Example & Company');
   assert.equal(element('Application').getAttribute('Executable'), 'app\\PM Canvas.exe');
-  assert.equal(element('uap:VisualElements').getAttribute('BackgroundColor'), '#2c2e3a');
+  assert.equal(element('uap:VisualElements').getAttribute('BackgroundColor'), '#38475b');
   assert.doesNotMatch(
     xml,
     /unvirtualizedResources|WriteVirtualization|ExcludedDirectory|xmlns:desktop6|xmlns:virtualization/,
