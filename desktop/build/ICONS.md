@@ -1,12 +1,13 @@
 # PM Canvas icon source
 
-`build/icon-source.svg` is the original PM Canvas artwork: a canvas frame, a P
-project spine and two staggered schedule bars. It replaces the Electron default
+`build/icon-source.svg` is the original PM Canvas artwork: a single canvas background,
+a P project spine and two staggered schedule bars. The canvas fills the icon without
+an outer box or inset frame. It replaces the Electron default
 atom artwork to meet Microsoft Store's on-device tile requirements.
 
 The generator renders the vector to the opaque 1024px `icon-source.png` master,
 then derives Windows ICO, Store tiles, macOS, mobile and web icons from it.
-`build/icon-settings.json` defines the shared background, `#2c2e3a`.
+`build/icon-settings.json` defines the shared background, `#38475b`.
 The Windows ICO includes 16, 20, 24, 32, 40, 48, 64, 128 and 256px PNG frames.
 Store tiles use the same original artwork at 50, 150 and 44px.
 
