@@ -60,9 +60,31 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+          cache: gradle
+          cache-dependency-path: |
+            mobile/android/**/*.gradle*
+            mobile/android/**/gradle-wrapper.properties
+            mobile/package-lock.json
       - run: npm ci --ignore-scripts
       - run: chmod +x android/gradlew
-      - run: npm run android:apk
+      - name: Build Android and back off only on Maven rate limiting
+        shell: bash
+        run: |
+          set -o pipefail
+          for attempt in 1 2 3; do
+            log="$RUNNER_TEMP/pmcanvas-android-$attempt.log"
+            set +e
+            npm run android:apk 2>&1 | tee "$log"
+            build_status=${PIPESTATUS[0]}
+            set -e
+            if (( build_status == 0 )); then exit 0; fi
+            if ! grep -q 'Received status code 429 from server: Too Many Requests' "$log" || (( attempt == 3 )); then
+              exit "$build_status"
+            fi
+            delay=$((attempt * 60))
+            echo "::warning::Maven dependency downloads were throttled; retrying in $delay seconds (attempt $attempt/3)."
+            sleep "$delay"
+          done
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: PMCanvas-Android-development
