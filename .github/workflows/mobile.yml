@@ -66,6 +66,7 @@ jobs:
             mobile/android/**/*.gradle*
             mobile/android/**/gradle-wrapper.properties
             mobile/package-lock.json
+            .github/workflows/mobile.yml
       - name: Restore compatible Gradle dependencies after a cache miss
         if: steps.java.outputs.cache-hit != 'true' && steps.java.outputs.cache-primary-key != ''
         uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
