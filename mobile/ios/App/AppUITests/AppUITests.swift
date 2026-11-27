@@ -81,6 +81,25 @@ final class AppUITests: XCTestCase {
                       "Control did not enter the visible workspace: \(element.debugDescription)")
     }
 
+    private func verifyOfflinePrivacy(in web: XCUIElement, app: XCUIApplication) {
+        let open = web.buttons["개인정보처리방침"]
+        let heading = web.staticTexts["기기에 보관하는 정보"]
+        XCTAssertTrue(open.wait(for: \.isHittable, toEqual: true, timeout: 20), app.debugDescription)
+        open.tap()
+        // A cold simulator's WebContent process can miss the first native tap
+        // even after exposing its accessibility tree. Retry that interaction
+        // once, only while the original control remains ready and no dialog is
+        // open. The same offline content must still appear without relaunching.
+        if !heading.waitForExistence(timeout: 20), open.isHittable {
+            open.tap()
+        }
+        XCTAssertTrue(heading.waitForExistence(timeout: 20), app.debugDescription)
+        let close = web.buttons["개인정보처리방침 닫기"]
+        XCTAssertTrue(close.wait(for: \.isHittable, toEqual: true, timeout: 20), app.debugDescription)
+        close.tap()
+        XCTAssertTrue(heading.waitForNonExistence(timeout: 10), app.debugDescription)
+    }
+
     private func keepScreenshot(_ app: XCUIApplication, _ name: String,
                                 ready element: XCUIElement, repetitions: Int = 1) {
         guard app.wait(for: .runningForeground, timeout: 10) else {
@@ -146,9 +165,8 @@ final class AppUITests: XCTestCase {
         let web = app.webViews.firstMatch
         let create = web.buttons["＋ 새 프로젝트"]
         XCTAssertTrue(create.wait(for: \.isHittable, toEqual: true, timeout: 120), "Bundled Store screen did not load")
-        web.buttons["개인정보처리방침"].tap()
-        XCTAssertTrue(web.staticTexts["기기에 보관하는 정보"].waitForExistence(timeout: 20))
-        web.buttons["개인정보처리방침 닫기"].tap()
+        verifyOfflinePrivacy(in: web, app: app)
+        XCTAssertTrue(create.wait(for: \.isHittable, toEqual: true, timeout: 10), app.debugDescription)
         create.tap()
         let projectName = "Autumn Release Plan"
         let name = web.textFields["프로젝트명"]
@@ -209,6 +227,7 @@ final class AppUITests: XCTestCase {
 
     func testProjectSurvivesRelaunchAndPolicyIsAvailableOffline() {
         continueAfterFailure = false
+        XCUIDevice.shared.orientation = .portrait
         let app = XCUIApplication()
         storeApp = app
         app.launch()
@@ -216,9 +235,8 @@ final class AppUITests: XCTestCase {
         let create = web.buttons["＋ 새 프로젝트"]
         XCTAssertTrue(create.wait(for: \.isHittable, toEqual: true, timeout: 120), "Bundled iPhone screen did not load")
 
-        web.buttons["개인정보처리방침"].tap()
-        XCTAssertTrue(web.staticTexts["기기에 보관하는 정보"].waitForExistence(timeout: 20))
-        web.buttons["개인정보처리방침 닫기"].tap()
+        verifyOfflinePrivacy(in: web, app: app)
+        XCTAssertTrue(create.wait(for: \.isHittable, toEqual: true, timeout: 10), app.debugDescription)
 
         create.tap()
         let name = web.textFields["프로젝트명"]
