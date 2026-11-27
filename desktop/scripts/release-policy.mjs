@@ -41,7 +41,7 @@ export function assertPublicDesktopRelease(plan) {
 }
 export function verifiedReleaseSource(run, jobs, options) {
   if (
-    run.repository?.full_name?.toLowerCase() !== 'jhoon-dev/pmcanvas' ||
+    run.repository?.full_name?.toLowerCase() !== 'jhoon-dev/pm-canvas' ||
     run.event !== 'workflow_dispatch' ||
     run.head_branch !== 'main' ||
     run.path !== '.github/workflows/desktop.yml' ||

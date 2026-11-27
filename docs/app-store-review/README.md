@@ -19,4 +19,4 @@
 4. 제출할 빌드와 테스트·영상 빌드가 같은지 확인합니다. 실패 수정으로 빌드가 바뀌면 해당 빌드를 다시 검증합니다.
 5. 실물 QA와 영상 확보 후 App Review에 제출합니다. iOS는 **제출 준비 중**입니다.
 
-[iOS 서명·Apple 검증·업로드 기록](https://github.com/jhoon-dev/PMCanvas/actions/runs/41296552107)을 참고합니다.
+[iOS 서명·Apple 검증·업로드 기록](https://github.com/jhoon-dev/pm-canvas/actions/runs/41296552107)을 참고합니다.

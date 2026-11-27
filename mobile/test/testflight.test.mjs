@@ -59,7 +59,7 @@ test('TestFlight inputs use the selected package version and reject wrong refs o
   const config = { appId: expected.bundleId };
   const env = {
     GITHUB_REF: 'refs/heads/main',
-    GITHUB_REPOSITORY: 'jhoon-dev/PMCanvas',
+    GITHUB_REPOSITORY: 'jhoon-dev/pm-canvas',
     PM_MAS_TEAM_ID: 'ABCDE12345',
     PM_TESTFLIGHT_BUILD_NUMBER: '42',
     PM_TESTFLIGHT_PLATFORM: 'macos',

@@ -173,16 +173,25 @@ function removeInstallation() {
   else fs.rmSync(install, { recursive: true });
 }
 async function waitRemoved() {
-  for (let i = 0; i < 100 && fs.existsSync(install); i++)
-    await new Promise((r) => setTimeout(r, 200));
-  assert.equal(fs.existsSync(install), false, 'Installation folder remains after removal.');
-  if (platform === 'win') {
-    let present = false;
-    try {
-      run('reg', ['query', registry]);
-      present = true;
-    } catch {}
-    assert.equal(present, false, 'Uninstall registry remains.');
+  // NSIS can finish removing files and registration in a separate process
+  // after its initial uninstaller process exits.
+  const deadline = Date.now() + 180000;
+  while (true) {
+    const installed = fs.existsSync(install);
+    if (!installed) {
+      if (platform !== 'win') return;
+      try {
+        run('reg', ['query', registry]);
+      } catch (error) {
+        if (error.status !== 1) throw error;
+        return;
+      }
+    }
+    if (Date.now() >= deadline) {
+      assert.equal(installed, false, 'Installation folder remains after removal.');
+      assert.fail('Uninstall registry remains.');
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500));
   }
 }
 try {

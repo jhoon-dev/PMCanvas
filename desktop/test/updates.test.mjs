@@ -19,7 +19,7 @@ const release = (v = '0.8.0') => ({
   ].map((name) => ({
     name,
     browser_download_url:
-      'https://github.com/jhoon-dev/PMCanvas/releases/download/desktop-v' + v + '/' + name,
+      'https://github.com/jhoon-dev/pm-canvas/releases/download/desktop-v' + v + '/' + name,
   })),
 });
 test('update selection uses stable desktop tags, numeric versions and compatible checksummed assets', () => {
@@ -55,7 +55,7 @@ test('Mac-only releases keep Windows updates pointed at the newest compatible in
       return {
         name,
         browser_download_url:
-          'https://github.com/jhoon-dev/PMCanvas/releases/download/desktop-v0.8.0/' + name,
+          'https://github.com/jhoon-dev/pm-canvas/releases/download/desktop-v0.8.0/' + name,
       };
     }),
   );
@@ -109,7 +109,8 @@ test('manual update checks share a request, cache successes and allow retry afte
 });
 test('release transport rejects HTTP errors, malformed JSON and oversized bodies', async () => {
   for (const scenario of ['http', 'json', 'oversize', 'valid']) {
-    const request = (_url, _options, callback) => {
+    const request = (url, _options, callback) => {
+      assert.equal(url, 'https://api.github.com/repositories/1433731411/releases?per_page=100');
       const req = new EventEmitter();
       req.destroy = (error) => {
         req.emit('error', error);

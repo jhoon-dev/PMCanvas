@@ -43,6 +43,10 @@ export default {
     'Could not generate the AI draft. Try again later.',
   'AI 응답 시간이 초과되었습니다. 다시 시도해 주세요.': 'The AI request timed out. Try again.',
   'AI 요청이 많습니다. 잠시 후 다시 시도해 주세요.': 'Too many AI requests. Try again later.',
+  '파일 작업 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요.':
+    'The file operation timed out. Try again later.',
+  '파일 출력 한도를 초과했습니다. 출력 범위 또는 파일 크기를 줄여 주세요.':
+    'The file output limit was exceeded. Select a smaller range or use a smaller file.',
   '입력 내용으로 AI 초안을 만들 수 없습니다. 설명을 확인해 주세요.':
     'Could not draft a report from this input. Review your notes.',
   'AI 초안 형식을 확인하지 못했습니다. 다시 시도해 주세요.':

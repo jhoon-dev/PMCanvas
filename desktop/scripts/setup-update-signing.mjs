@@ -14,7 +14,7 @@ import {
 requirePrivateRuntime();
 if (process.platform !== 'win32' || !process.env.LOCALAPPDATA || process.argv[2] !== '--register')
   throw Error('Run on Windows: node scripts/setup-update-signing.mjs --register');
-const repository = 'github.com/jhoon-dev/PMCanvas';
+const repository = 'github.com/jhoon-dev/pm-canvas';
 const environment = 'desktop-update-signing';
 const folder = path.join(process.env.LOCALAPPDATA, 'PMCanvas-UpdateSigning');
 const created = !fs.existsSync(folder);
@@ -45,7 +45,7 @@ try {
     if (!Object.hasOwn(trusted, id) || trusted[id] !== publicKey)
       throw Error('A different update trust key exists. Perform an explicit key rotation.');
   }
-  const endpoint = 'repos/jhoon-dev/PMCanvas/environments/' + environment;
+  const endpoint = 'repos/jhoon-dev/pm-canvas/environments/' + environment;
   quietRun('gh', ['api', '--method', 'PUT', endpoint, '--input', '-'], {
     input: JSON.stringify({
       deployment_branch_policy: { protected_branches: false, custom_branch_policies: true },

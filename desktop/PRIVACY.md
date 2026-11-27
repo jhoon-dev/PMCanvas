@@ -41,7 +41,7 @@ Mac App Store 설치본은 GitHub 업데이트 API를 조회하거나 설치 파
 
 ### 지원과 변경
 
-지원 및 개인정보 관련 문의는 [PM Canvas GitHub Issues](https://github.com/jhoon-dev/PMCanvas/issues)에서 받습니다. Issues는 공개되므로 프로젝트 원본, 참여인력 개인정보, 비밀번호·인증 키 또는 민감한 로그를 게시하지 마세요. 사용자가 자발적으로 게시한 문의 내용과 GitHub 계정 정보는 문의 확인·응답에 사용되며 GitHub에도 보관됩니다. 앱의 처리 방식이 바뀌면 이 문서와 시행일을 갱신합니다.
+지원 및 개인정보 관련 문의는 [PM Canvas GitHub Issues](https://github.com/jhoon-dev/pm-canvas/issues)에서 받습니다. Issues는 공개되므로 프로젝트 원본, 참여인력 개인정보, 비밀번호·인증 키 또는 민감한 로그를 게시하지 마세요. 사용자가 자발적으로 게시한 문의 내용과 GitHub 계정 정보는 문의 확인·응답에 사용되며 GitHub에도 보관됩니다. 앱의 처리 방식이 바뀌면 이 문서와 시행일을 갱신합니다.
 
 ## English
 
@@ -75,4 +75,4 @@ Project and recovery JSON and exported files are not encrypted or password-prote
 
 ### Support and changes
 
-Contact the developer through [PM Canvas GitHub Issues](https://github.com/jhoon-dev/PMCanvas/issues) for support or privacy questions. Issues are public: do not post original projects, team members' personal details, passwords, authentication keys or sensitive logs. Information you voluntarily submit and your GitHub account details are used to understand and respond to your request and are also retained by GitHub. This document and its effective date will be updated when the app's processing changes.
+Contact the developer through [PM Canvas GitHub Issues](https://github.com/jhoon-dev/pm-canvas/issues) for support or privacy questions. Issues are public: do not post original projects, team members' personal details, passwords, authentication keys or sensitive logs. Information you voluntarily submit and your GitHub account details are used to understand and respond to your request and are also retained by GitHub. This document and its effective date will be updated when the app's processing changes.

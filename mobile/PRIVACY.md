@@ -18,7 +18,7 @@
 
 앱 저장소와 내보낸 파일에는 앱 자체의 암호화나 비밀번호 보호가 없습니다. 기기 잠금과 백업·공유 위치의 접근 권한을 관리하세요. Apple과 Google의 설치·업데이트·진단·백업 처리는 각사의 [Apple 개인정보 처리방침](https://www.apple.com/legal/privacy/) 및 [Google 개인정보처리방침](https://policies.google.com/privacy)을 따릅니다.
 
-지원·개인정보 문의는 [PM Canvas GitHub Issues](https://github.com/jhoon-dev/PMCanvas/issues)에서 받습니다. 공개 게시판에 프로젝트 원본, 참여인력 개인정보, 암호나 인증 키를 게시하지 마세요. 자발적으로 게시한 문의 내용과 GitHub 계정 정보는 지원에 사용되며 GitHub에도 보관됩니다. 외부 정책·지원 링크를 열면 브라우저를 통해 해당 서비스에 접속하며 일반 접속 정보가 전달될 수 있습니다. [GitHub 개인정보처리방침](https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement)이 적용됩니다. 앱의 처리 방식이 바뀌면 이 문서와 시행일을 갱신합니다.
+지원·개인정보 문의는 [PM Canvas GitHub Issues](https://github.com/jhoon-dev/pm-canvas/issues)에서 받습니다. 공개 게시판에 프로젝트 원본, 참여인력 개인정보, 암호나 인증 키를 게시하지 마세요. 자발적으로 게시한 문의 내용과 GitHub 계정 정보는 지원에 사용되며 GitHub에도 보관됩니다. 외부 정책·지원 링크를 열면 브라우저를 통해 해당 서비스에 접속하며 일반 접속 정보가 전달될 수 있습니다. [GitHub 개인정보처리방침](https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement)이 적용됩니다. 앱의 처리 방식이 바뀌면 이 문서와 시행일을 갱신합니다.
 
 ## English
 
@@ -32,4 +32,4 @@ Deleting projects, uninstalling the app, clearing browser or app data, or device
 
 App storage and exported files do not have app-level encryption or password protection. Protect your device and backup or sharing locations. Apple's and Google's installation, update, diagnostic and backup processing follows the [Apple Privacy Policy](https://www.apple.com/legal/privacy/) and [Google Privacy Policy](https://policies.google.com/privacy).
 
-Contact the developer through [PM Canvas GitHub Issues](https://github.com/jhoon-dev/PMCanvas/issues). Issues are public: do not post original projects, team members' personal information, passwords or authentication keys. Voluntary inquiries and GitHub account information are used for support and retained by GitHub. Opening external policy or support links connects a browser to those services, which may receive ordinary connection information. The [GitHub Privacy Statement](https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement) applies. This document and effective date will be updated if processing changes.
+Contact the developer through [PM Canvas GitHub Issues](https://github.com/jhoon-dev/pm-canvas/issues). Issues are public: do not post original projects, team members' personal information, passwords or authentication keys. Voluntary inquiries and GitHub account information are used for support and retained by GitHub. Opening external policy or support links connects a browser to those services, which may receive ordinary connection information. The [GitHub Privacy Statement](https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement) applies. This document and effective date will be updated if processing changes.

@@ -120,7 +120,7 @@ jobs:
         with:
           node-version: '24'
       - name: Download synthetic Windows credential fixture from this run
-        run: gh run download "$GITHUB_RUN_ID" --repo github.com/jhoon-dev/PMCanvas --name desktop-test-results-Windows --dir "$PM_SIGNING_INTEROP_FOLDER"
+        run: gh run download "$GITHUB_RUN_ID" --repo github.com/jhoon-dev/pm-canvas --name desktop-test-results-Windows --dir "$PM_SIGNING_INTEROP_FOLDER"
         env:
           GH_TOKEN: ${{ github.token }}
           PM_SIGNING_INTEROP_FOLDER: ${{ runner.temp }}/pmcanvas-signing-interop

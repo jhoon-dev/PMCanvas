@@ -24,7 +24,7 @@ const payload = Buffer.from('synthetic installer payload; never executed');
 const digest = (value) => createHash('sha256').update(value).digest('hex');
 const fileName = 'PMCanvas-Desktop-0.9.0-Windows-x64.exe';
 const downloadUrl =
-  'https://github.com/jhoon-dev/PMCanvas/releases/download/desktop-v0.9.0/' + fileName;
+  'https://github.com/jhoon-dev/pm-canvas/releases/download/desktop-v0.9.0/' + fileName;
 const update = {
   currentVersion: '0.8.0',
   version: '0.9.0',
@@ -86,7 +86,7 @@ test('startup checks run once, can be disabled, and never download or install wi
   let checks = 0,
     downloads = 0;
   const service = {
-    url: 'https://github.com/jhoon-dev/PMCanvas/releases',
+    url: 'https://github.com/jhoon-dev/pm-canvas/releases',
     async check() {
       checks++;
       return update;
@@ -207,7 +207,7 @@ test('manual download verifies bytes, shares concurrent requests and rechecks th
   const directory = temp(t);
   let downloads = 0;
   const manager = new UpdateManager({
-    service: { url: 'https://github.com/jhoon-dev/PMCanvas/releases', check: async () => update },
+    service: { url: 'https://github.com/jhoon-dev/pm-canvas/releases', check: async () => update },
     version: '0.8.0',
     directory,
     download: (...args) => {

@@ -11,7 +11,7 @@ import {
   randomUUID,
 } from 'node:crypto';
 
-export const REPOSITORY = 'jhoon-dev/PMCanvas';
+export const REPOSITORY = 'jhoon-dev/pm-canvas';
 const githubRepository = 'github.com/' + REPOSITORY;
 export const ENVIRONMENT = 'desktop-release';
 export const APPLE_CERTIFICATES = 'https://developer.apple.com/account/resources/certificates/list';

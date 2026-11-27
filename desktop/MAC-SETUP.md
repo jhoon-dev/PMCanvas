@@ -16,7 +16,7 @@ npm --prefix desktop run signing:setup
 2. 도구가 표시한 Apple 페이지에서 **Certificates → + → Developer ID Application**을 선택하고 표시된 CSR만 업로드합니다. Apple 로그인·멤버십·약관·발급은 본인이 진행합니다. 개인 키를 Apple에 올리지 않습니다.
 3. 발급된 `.cer`를 다운로드합니다. 스크립트를 종료했다면 같은 명령을 다시 실행하고 기존 작업 폴더를 선택합니다.
 4. 메뉴 **2**에서 `.cer` 경로, 원래 개인 키 암호 A, 새 P12 암호 B를 입력합니다. 인증서 종류·유효기간·키 일치·Apple 중간 인증서 서명과 고정 SHA-256을 확인한 뒤 P12를 생성합니다. 기존 키·완성된 P12는 덮어쓰지 않습니다.
-5. GitHub CLI 로그인이 필요하면 다른 터미널에서 `gh auth login`을 완료합니다. 메뉴 **3**에서 P12 암호 B를 입력하면 `jhoon-dev/PMCanvas`의 **desktop-release Environment**에 `MAC_CSC_LINK`, `MAC_CSC_KEY_PASSWORD`를 등록합니다.
+5. GitHub CLI 로그인이 필요하면 다른 터미널에서 `gh auth login`을 완료합니다. 메뉴 **3**에서 P12 암호 B를 입력하면 `jhoon-dev/pm-canvas`의 **desktop-release Environment**에 `MAC_CSC_LINK`, `MAC_CSC_KEY_PASSWORD`를 등록합니다.
 6. 메뉴 **4**에서 공증 방식을 선택합니다. Apple 계정 방식은 앱 전용 암호·Team ID를, API 방식은 App Manager 권한의 Team Key P8·Key ID·Issuer ID를 입력합니다. 키 발급 위치와 정확한 Secret 이름은 아래 5·6절에 설명합니다.
 7. 등록 후 **Actions → Desktop verification and builds**에서 `platform=mac`, `signed=true`, `publish=false`로 먼저 확인합니다. 성공 실행을 확인한 뒤 공개합니다.
 
@@ -152,14 +152,14 @@ GitHub CLI를 사용한다면 파일을 표준 입력으로 전달할 수 있습
 
 ```sh
 gh auth login
-base64 -i "$HOME/Certificates/PMCanvas-DeveloperID.p12" | tr -d '\n' | gh secret set MAC_CSC_LINK --env desktop-release --repo jhoon-dev/PMCanvas
-gh secret set MAC_CSC_KEY_PASSWORD --env desktop-release --repo jhoon-dev/PMCanvas
+base64 -i "$HOME/Certificates/PMCanvas-DeveloperID.p12" | tr -d '\n' | gh secret set MAC_CSC_LINK --env desktop-release --repo jhoon-dev/pm-canvas
+gh secret set MAC_CSC_KEY_PASSWORD --env desktop-release --repo jhoon-dev/pm-canvas
 # 암호를 숨김 프롬프트에 입력합니다.
 
-base64 -i "$HOME/Certificates/AuthKey_KEYID.p8" | tr -d '\n' | gh secret set APPLE_API_KEY_BASE64 --env desktop-release --repo jhoon-dev/PMCanvas
-gh secret set APPLE_API_KEY_ID --env desktop-release --repo jhoon-dev/PMCanvas
-gh secret set APPLE_API_ISSUER --env desktop-release --repo jhoon-dev/PMCanvas
-gh secret list --env desktop-release --repo jhoon-dev/PMCanvas
+base64 -i "$HOME/Certificates/AuthKey_KEYID.p8" | tr -d '\n' | gh secret set APPLE_API_KEY_BASE64 --env desktop-release --repo jhoon-dev/pm-canvas
+gh secret set APPLE_API_KEY_ID --env desktop-release --repo jhoon-dev/pm-canvas
+gh secret set APPLE_API_ISSUER --env desktop-release --repo jhoon-dev/pm-canvas
+gh secret list --env desktop-release --repo jhoon-dev/pm-canvas
 ```
 
 `gh secret list`에는 이름만 보이며, 저장한 Secret 원문은 다시 조회할 수 없습니다. CLI 프롬프트에서 실제 값을 입력합니다. [GitHub Environment Secret 안내](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/use-secrets)

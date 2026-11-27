@@ -3,7 +3,7 @@ export const IOS_BUNDLE_ID = 'app.toolmoa.pmcanvas';
 export function iosStoreInputs(pkg, config, env) {
   if (config.appId !== IOS_BUNDLE_ID || !/^\d+\.\d+\.\d+$/.test(pkg.version))
     throw Error('Unexpected iOS application or release version.');
-  if (env.GITHUB_REF !== 'refs/heads/main' || env.GITHUB_REPOSITORY !== 'jhoon-dev/PMCanvas')
+  if (env.GITHUB_REF !== 'refs/heads/main' || env.GITHUB_REPOSITORY !== 'jhoon-dev/pm-canvas')
     throw Error('Submit iOS releases only from this repository main branch.');
   if (!/^[A-Z0-9]{10}$/.test(env.PM_IOS_TEAM_ID || '')) throw Error('Invalid Apple Team ID.');
   if (!/^[1-9]\d{0,3}\.[1-9]\d{0,2}$/.test(env.PM_IOS_BUILD_NUMBER || ''))

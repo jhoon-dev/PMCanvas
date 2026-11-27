@@ -40,7 +40,7 @@ Environment Secrets:
 | `ASC_KEY_ID`                     | API Key ID                                              |
 | `ASC_ISSUER_ID`                  | API Issuer ID                                           |
 
-base64는 암호화가 아닙니다. `gh secret set NAME --env desktop-mac-store --repo jhoon-dev/PMCanvas`의 숨김 입력 또는 파일의 표준 입력으로 등록하고 값을 로그에 출력하지 않습니다. 기존 `desktop-release`의 Developer ID Secrets와 별도로 관리합니다.
+base64는 암호화가 아닙니다. `gh secret set NAME --env desktop-mac-store --repo jhoon-dev/pm-canvas`의 숨김 입력 또는 파일의 표준 입력으로 등록하고 값을 로그에 출력하지 않습니다. 기존 `desktop-release`의 Developer ID Secrets와 별도로 관리합니다.
 
 ## 빌드·업로드
 

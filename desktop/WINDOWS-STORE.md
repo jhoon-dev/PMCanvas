@@ -78,7 +78,7 @@ Store 패키지 버전은 앱의 세 필드 `[major, minor, patch]`에 Windows�
 1. 앱에 새 submission을 만들고 Packages에 검증된 **Store.msix** 파일을 올립니다.
 2. 예약 ID·Publisher·표시 이름이 일치하는지 확인합니다. 불일치하면 Partner Center 값으로 설정을 고쳐 새 버전 패키지를 만듭니다.
 3. 앱 설명·한국어/영어 스토어 문구·스크린샷·지원 정보·실제 데이터 처리에 맞는 개인정보처리방침 URL·연령 등급·배포 국가 등을 작성합니다.
-4. 제한 기능 사용 사유에는 `runFullTrust`: 오프라인 Electron 데스크톱 앱 실행이라고 설명합니다. `unvirtualizedResources` 요청은 제거하고, 지원 URL에 `https://github.com/jhoon-dev/PMCanvas/issues`를 기재합니다. 기존 제출에서 등록한 권한 사용 사유도 갱신하세요.
+4. 제한 기능 사용 사유에는 `runFullTrust`: 오프라인 Electron 데스크톱 앱 실행이라고 설명합니다. `unvirtualizedResources` 요청은 제거하고, 지원 URL에 `https://github.com/jhoon-dev/pm-canvas/issues`를 기재합니다. 기존 제출에서 등록한 권한 사용 사유도 갱신하세요.
 5. 인증 참고 사항에 기본 아이콘 교체와 `unvirtualizedResources`·가상화 예외 제거를 명시하고, 새 패키지로 심사를 제출합니다. 연락처 추가만으로 기존 권한 거절이 해소되는 것은 아닙니다.
 6. 승인·공개 후 실제 Store 설치본을 내려받아 파일 열기·저장·Excel·업데이트를 최종 확인합니다.
 
@@ -100,6 +100,6 @@ The package retains only runFullTrust to run the offline Electron desktop applic
 User-selected project files remain in their existing locations. The Store profile is stored
 under the user's home folder, outside AppData, without disabling MSIX virtualization.
 Existing EXE profiles are copied once without modifying or deleting the originals.
-Developer website: https://github.com/jhoon-dev/PMCanvas
-Support: https://github.com/jhoon-dev/PMCanvas/issues
+Developer website: https://github.com/jhoon-dev/pm-canvas
+Support: https://github.com/jhoon-dev/pm-canvas/issues
 ```

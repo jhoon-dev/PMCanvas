@@ -277,7 +277,7 @@ test(
       assert.ok(!item.args.includes('--body'));
       assert.ok(!JSON.stringify(item.args).includes(passB));
       if (item.args.includes('--repo'))
-        assert.equal(item.args[item.args.indexOf('--repo') + 1], 'github.com/jhoon-dev/PMCanvas');
+        assert.equal(item.args[item.args.indexOf('--repo') + 1], 'github.com/jhoon-dev/pm-canvas');
     }
     const before = digest(fs.readFileSync(p12));
     if (

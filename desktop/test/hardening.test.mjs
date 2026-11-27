@@ -81,7 +81,7 @@ test('signed updates bind publisher key, version, asset, size and hash; replacin
   }
   const directory = temp(t),
     downloadUrl =
-      'https://github.com/jhoon-dev/PMCanvas/releases/download/desktop-v0.9.0/' + f.name;
+      'https://github.com/jhoon-dev/pm-canvas/releases/download/desktop-v0.9.0/' + f.name;
   const update = {
     available: true,
     downloadAvailable: true,

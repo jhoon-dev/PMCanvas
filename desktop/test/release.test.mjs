@@ -36,7 +36,7 @@ test('platform plans keep both default targets and require both Mac architecture
     assert.deepEqual(win.systems, ['win32-x64']);
     assert.equal(win.installs.include.length, 1);
     const run = {
-      repository: { full_name: 'jhoon-dev/PMCanvas' },
+      repository: { full_name: 'jhoon-dev/pm-canvas' },
       event: 'workflow_dispatch',
       path: '.github/workflows/desktop.yml',
       head_sha: 'a'.repeat(40),
@@ -121,7 +121,7 @@ test('CI dispatch rejects mixed signing modes, unsafe run IDs and publication wi
 
 test('publication recovery requires all source checks and rejects another repository, workflow or event', () => {
   const run = {
-    repository: { full_name: 'jhoon-dev/PMCanvas' },
+    repository: { full_name: 'jhoon-dev/pm-canvas' },
     event: 'workflow_dispatch',
     path: '.github/workflows/desktop.yml',
     head_sha: 'a'.repeat(40),

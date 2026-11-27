@@ -492,7 +492,7 @@ try {
     1 +
     '.0.0';
   const futureRelease =
-    'https://github.com/jhoon-dev/PMCanvas/releases/tag/desktop-v' + futureVersion;
+    'https://github.com/jhoon-dev/pm-canvas/releases/tag/desktop-v' + futureVersion;
   await application.evaluate(({ shell }, futureVersion) => {
     const https = process.getBuiltinModule('https'),
       { EventEmitter } = process.getBuiltinModule('events');
@@ -516,7 +516,7 @@ try {
             JSON.stringify([
               {
                 tag_name: tag,
-                html_url: 'https://github.com/jhoon-dev/PMCanvas/releases/tag/' + tag,
+                html_url: 'https://github.com/jhoon-dev/pm-canvas/releases/tag/' + tag,
                 assets: [],
                 draft: false,
                 prerelease: false,
@@ -566,7 +566,10 @@ try {
   await nativeCommand(application, 'privacy');
   await expect
     .poll(() => application.evaluate(() => globalThis.__releasePages))
-    .toEqual([futureRelease, 'https://github.com/jhoon-dev/PMCanvas/blob/main/desktop/PRIVACY.md']);
+    .toEqual([
+      futureRelease,
+      'https://github.com/jhoon-dev/pm-canvas/blob/main/desktop/PRIVACY.md',
+    ]);
   assert.deepEqual(await page.evaluate(() => window.desktop.snapshot()), beforePrivacy);
   assert.deepEqual((await page.evaluate(() => window.desktop.snapshot())).project, finalProject);
   await application.evaluate(({ shell }) => {

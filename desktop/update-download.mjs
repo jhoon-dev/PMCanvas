@@ -6,9 +6,10 @@ import { Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { verifyUpdateManifest, UPDATE_MANIFEST } from './update-signatures.mjs';
 import { cleanupUpdateCache, cachedInstaller } from './update-cache.mjs';
+import { RELEASES_PAGE } from './updates.mjs';
 
 export const MAX_INSTALLER_BYTES = 1024 * 1024 * 1024;
-const assetBase = 'https://github.com/jhoon-dev/PMCanvas/releases/download/desktop-v';
+const assetBase = RELEASES_PAGE + '/download/desktop-v';
 const allowedHosts = new Set([
   'github.com',
   'release-assets.githubusercontent.com',
